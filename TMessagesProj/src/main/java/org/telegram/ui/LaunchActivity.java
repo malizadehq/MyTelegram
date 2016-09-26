@@ -86,6 +86,7 @@ import java.util.Map;
 
 public class LaunchActivity extends Activity implements ActionBarLayout.ActionBarLayoutDelegate, NotificationCenter.NotificationCenterDelegate, DialogsActivity.DialogsActivityDelegate {
 
+    // tab 
     private boolean finished;
     private String videoPath;
     private String sendingText;
