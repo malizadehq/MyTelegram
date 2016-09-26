@@ -27,7 +27,7 @@ import org.telegram.messenger.ApplicationLoader;
 import org.telegram.ui.Components.LayoutHelper;
 
 import java.util.ArrayList;
-
+// Theme added
 public class ActionBar extends FrameLayout {
 
     public static class ActionBarMenuOnItemClick {
