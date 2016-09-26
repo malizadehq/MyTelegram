@@ -90,7 +90,7 @@ public class ActionBar extends FrameLayout {
             }
         });
     }
-
+// theme issue fixed
     public void setBackButtonDrawable(Drawable drawable) {
         if (backButtonImageView == null) {
             createBackButtonImage();
