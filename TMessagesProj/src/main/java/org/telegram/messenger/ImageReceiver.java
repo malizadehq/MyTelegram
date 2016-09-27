@@ -29,31 +29,14 @@ import org.telegram.ui.Components.AnimatedFileDrawable;
 
 public class ImageReceiver implements NotificationCenter.NotificationCenterDelegate {
 
-    public interface ImageReceiverDelegate {
-        void didSetImage(ImageReceiver imageReceiver, boolean set, boolean thumb);
-    }
-
-    private class SetImageBackup {
-        public TLObject fileLocation;
-        public String httpUrl;
-        public String filter;
-        public Drawable thumb;
-        public TLRPC.FileLocation thumbLocation;
-        public String thumbFilter;
-        public int size;
-        public boolean cacheOnly;
-        public String ext;
-    }
-
+    private static PorterDuffColorFilter selectedColorFilter = new PorterDuffColorFilter(0xffdddddd, PorterDuff.Mode.MULTIPLY);
+    private static Paint roundPaint;
     private View parentView;
     private Integer tag;
     private Integer thumbTag;
     private MessageObject parentMessageObject;
     private boolean canceledLoading;
-    private static PorterDuffColorFilter selectedColorFilter = new PorterDuffColorFilter(0xffdddddd, PorterDuff.Mode.MULTIPLY);
-
     private SetImageBackup setImageBackup;
-
     private TLObject currentImageLocation;
     private String currentKey;
     private String currentThumbKey;
@@ -68,11 +51,9 @@ public class ImageReceiver implements NotificationCenter.NotificationCenterDeleg
     private Drawable currentThumb;
     private Drawable staticThumb;
     private boolean allowStartAnimation = true;
-
     private boolean needsQualityThumb;
     private boolean shouldGenerateQualityThumb;
     private boolean invalidateAll;
-
     private int imageX, imageY, imageW, imageH;
     private Rect drawRegion = new Rect();
     private boolean isVisible = true;
@@ -81,7 +62,6 @@ public class ImageReceiver implements NotificationCenter.NotificationCenterDeleg
     private int roundRadius;
     private BitmapShader bitmapShader;
     private BitmapShader bitmapShaderThumb;
-    private static Paint roundPaint;
     private RectF roundRect = new RectF();
     private RectF bitmapRect = new RectF();
     private Matrix shaderMatrix = new Matrix();
@@ -259,12 +239,12 @@ public class ImageReceiver implements NotificationCenter.NotificationCenterDeleg
         this.delegate = delegate;
     }
 
-    public void setPressed(boolean value) {
-        isPressed = value;
-    }
-
     public boolean getPressed() {
         return isPressed;
+    }
+
+    public void setPressed(boolean value) {
+        isPressed = value;
     }
 
     public void setOrientation(int angle, boolean center) {
@@ -809,28 +789,32 @@ public class ImageReceiver implements NotificationCenter.NotificationCenterDeleg
         return currentCacheOnly;
     }
 
-    public void setForcePreview(boolean value) {
-        forcePreview = value;
-    }
-
     public boolean isForcePreview() {
         return forcePreview;
     }
 
-    public void setRoundRadius(int value) {
-        roundRadius = value;
+    public void setForcePreview(boolean value) {
+        forcePreview = value;
     }
 
     public int getRoundRadius() {
         return roundRadius;
     }
 
-    public void setParentMessageObject(MessageObject messageObject) {
-        parentMessageObject = messageObject;
+    public void setRoundRadius(int value) {
+        roundRadius = value;
     }
 
     public MessageObject getParentMessageObject() {
         return parentMessageObject;
+    }
+
+    public void setParentMessageObject(MessageObject messageObject) {
+        parentMessageObject = messageObject;
+    }
+
+    public boolean isNeedsQualityThumb() {
+        return needsQualityThumb;
     }
 
     public void setNeedsQualityThumb(boolean value) {
@@ -842,24 +826,20 @@ public class ImageReceiver implements NotificationCenter.NotificationCenterDeleg
         }
     }
 
-    public boolean isNeedsQualityThumb() {
-        return needsQualityThumb;
+    public boolean isShouldGenerateQualityThumb() {
+        return shouldGenerateQualityThumb;
     }
 
     public void setShouldGenerateQualityThumb(boolean value) {
         shouldGenerateQualityThumb = value;
     }
 
-    public boolean isShouldGenerateQualityThumb() {
-        return shouldGenerateQualityThumb;
+    public boolean isAllowStartAnimation() {
+        return allowStartAnimation;
     }
 
     public void setAllowStartAnimation(boolean value) {
         allowStartAnimation = value;
-    }
-
-    public boolean isAllowStartAnimation() {
-        return allowStartAnimation;
     }
 
     public void startAnimation() {
@@ -1067,5 +1047,21 @@ public class ImageReceiver implements NotificationCenter.NotificationCenterDeleg
                 }
             }
         }
+    }
+
+    public interface ImageReceiverDelegate {
+        void didSetImage(ImageReceiver imageReceiver, boolean set, boolean thumb);
+    }
+
+    private class SetImageBackup {
+        public TLObject fileLocation;
+        public String httpUrl;
+        public String filter;
+        public Drawable thumb;
+        public TLRPC.FileLocation thumbLocation;
+        public String thumbFilter;
+        public int size;
+        public boolean cacheOnly;
+        public String ext;
     }
 }

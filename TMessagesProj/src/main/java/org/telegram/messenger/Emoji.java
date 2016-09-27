@@ -8,11 +8,6 @@
 
 package org.telegram.messenger;
 
-import java.io.File;
-import java.io.InputStream;
-import java.util.HashMap;
-import java.util.Locale;
-
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
@@ -29,16 +24,13 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.TextView;
 
-public class Emoji {
-    private static HashMap<CharSequence, DrawableInfo> rects = new HashMap<>();
-    private static int drawImgSize;
-    private static int bigImgSize;
-    private static boolean inited = false;
-    private static Paint placeholderPaint;
-    private static final int splitCount = 4;
-    private static Bitmap emojiBmp[][] = new Bitmap[5][splitCount];
-    private static boolean loadingEmoji[][] = new boolean[5][splitCount];
+import java.io.File;
+import java.io.InputStream;
+import java.util.HashMap;
+import java.util.Locale;
 
+public class Emoji {
+    private static final int splitCount = 4;
     private static final int[][] cols = {
             {11, 11, 11, 11},
             {6, 6, 6, 6},
@@ -46,6 +38,13 @@ public class Emoji {
             {9, 9, 9, 9},
             {8, 8, 8, 7}
     };
+    private static HashMap<CharSequence, DrawableInfo> rects = new HashMap<>();
+    private static int drawImgSize;
+    private static int bigImgSize;
+    private static boolean inited = false;
+    private static Paint placeholderPaint;
+    private static Bitmap emojiBmp[][] = new Bitmap[5][splitCount];
+    private static boolean loadingEmoji[][] = new boolean[5][splitCount];
 
     static {
         int emojiFullSize;
@@ -216,88 +215,6 @@ public class Emoji {
         return ed;
     }
 
-    public static class EmojiDrawable extends Drawable {
-        private DrawableInfo info;
-        private boolean fullSize = false;
-        private static Paint paint = new Paint(Paint.FILTER_BITMAP_FLAG);
-        private static Rect rect = new Rect();
-
-        public EmojiDrawable(DrawableInfo i) {
-            info = i;
-        }
-
-        public DrawableInfo getDrawableInfo() {
-            return info;
-        }
-
-        public Rect getDrawRect() {
-            Rect original = getBounds();
-            int cX = original.centerX(), cY = original.centerY();
-            rect.left = cX - (fullSize ? bigImgSize : drawImgSize) / 2;
-            rect.right = cX + (fullSize ? bigImgSize : drawImgSize) / 2;
-            rect.top = cY - (fullSize ? bigImgSize : drawImgSize) / 2;
-            rect.bottom = cY + (fullSize ? bigImgSize : drawImgSize) / 2;
-            return rect;
-        }
-
-        @Override
-        public void draw(Canvas canvas) {
-            if (emojiBmp[info.page][info.page2] == null) {
-                if (loadingEmoji[info.page][info.page2]) {
-                    return;
-                }
-                loadingEmoji[info.page][info.page2] = true;
-                Utilities.globalQueue.postRunnable(new Runnable() {
-                    @Override
-                    public void run() {
-                        loadEmoji(info.page, info.page2);
-                        loadingEmoji[info.page][info.page2] = false;
-                    }
-                });
-                canvas.drawRect(getBounds(), placeholderPaint);
-                return;
-            }
-
-            Rect b;
-            if (fullSize) {
-                b = getDrawRect();
-            } else {
-                b = getBounds();
-            }
-
-            //if (!canvas.quickReject(b.left, b.top, b.right, b.bottom, Canvas.EdgeType.AA)) {
-                canvas.drawBitmap(emojiBmp[info.page][info.page2], info.rect, b, paint);
-            //}
-        }
-
-        @Override
-        public int getOpacity() {
-            return PixelFormat.TRANSPARENT;
-        }
-
-        @Override
-        public void setAlpha(int alpha) {
-
-        }
-
-        @Override
-        public void setColorFilter(ColorFilter cf) {
-
-        }
-    }
-
-    private static class DrawableInfo {
-        public Rect rect;
-        public byte page;
-        public byte page2;
-
-        public DrawableInfo(Rect r, byte p, byte p2) {
-            rect = r;
-            page = p;
-            page2 = p2;
-        }
-    }
-
     private static boolean inArray(char c, char[] a) {
         for (char cc : a) {
             if (cc == c) {
@@ -420,6 +337,88 @@ public class Emoji {
             return cs;
         }
         return s;
+    }
+
+    public static class EmojiDrawable extends Drawable {
+        private static Paint paint = new Paint(Paint.FILTER_BITMAP_FLAG);
+        private static Rect rect = new Rect();
+        private DrawableInfo info;
+        private boolean fullSize = false;
+
+        public EmojiDrawable(DrawableInfo i) {
+            info = i;
+        }
+
+        public DrawableInfo getDrawableInfo() {
+            return info;
+        }
+
+        public Rect getDrawRect() {
+            Rect original = getBounds();
+            int cX = original.centerX(), cY = original.centerY();
+            rect.left = cX - (fullSize ? bigImgSize : drawImgSize) / 2;
+            rect.right = cX + (fullSize ? bigImgSize : drawImgSize) / 2;
+            rect.top = cY - (fullSize ? bigImgSize : drawImgSize) / 2;
+            rect.bottom = cY + (fullSize ? bigImgSize : drawImgSize) / 2;
+            return rect;
+        }
+
+        @Override
+        public void draw(Canvas canvas) {
+            if (emojiBmp[info.page][info.page2] == null) {
+                if (loadingEmoji[info.page][info.page2]) {
+                    return;
+                }
+                loadingEmoji[info.page][info.page2] = true;
+                Utilities.globalQueue.postRunnable(new Runnable() {
+                    @Override
+                    public void run() {
+                        loadEmoji(info.page, info.page2);
+                        loadingEmoji[info.page][info.page2] = false;
+                    }
+                });
+                canvas.drawRect(getBounds(), placeholderPaint);
+                return;
+            }
+
+            Rect b;
+            if (fullSize) {
+                b = getDrawRect();
+            } else {
+                b = getBounds();
+            }
+
+            //if (!canvas.quickReject(b.left, b.top, b.right, b.bottom, Canvas.EdgeType.AA)) {
+            canvas.drawBitmap(emojiBmp[info.page][info.page2], info.rect, b, paint);
+            //}
+        }
+
+        @Override
+        public int getOpacity() {
+            return PixelFormat.TRANSPARENT;
+        }
+
+        @Override
+        public void setAlpha(int alpha) {
+
+        }
+
+        @Override
+        public void setColorFilter(ColorFilter cf) {
+
+        }
+    }
+
+    private static class DrawableInfo {
+        public Rect rect;
+        public byte page;
+        public byte page2;
+
+        public DrawableInfo(Rect r, byte p, byte p2) {
+            rect = r;
+            page = p;
+            page2 = p2;
+        }
     }
 
     public static class EmojiSpan extends ImageSpan {

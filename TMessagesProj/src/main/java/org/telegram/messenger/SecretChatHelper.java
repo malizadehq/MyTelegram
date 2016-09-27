@@ -32,48 +32,14 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public class SecretChatHelper {
 
-    public static class TL_decryptedMessageHolder extends TLObject {
-        public static int constructor = 0x555555F9;
-
-        public long random_id;
-        public int date;
-        public TLRPC.TL_decryptedMessageLayer layer;
-        public TLRPC.EncryptedFile file;
-        public boolean new_key_used;
-
-        public void readParams(AbstractSerializedData stream, boolean exception) {
-            random_id = stream.readInt64(exception);
-            date = stream.readInt32(exception);
-            layer = TLRPC.TL_decryptedMessageLayer.TLdeserialize(stream, stream.readInt32(exception), exception);
-            if (stream.readBool(exception)) {
-                file = TLRPC.EncryptedFile.TLdeserialize(stream, stream.readInt32(exception), exception);
-            }
-            new_key_used = stream.readBool(exception);
-        }
-
-        public void serializeToStream(AbstractSerializedData stream) {
-            stream.writeInt32(constructor);
-            stream.writeInt64(random_id);
-            stream.writeInt32(date);
-            layer.serializeToStream(stream);
-            stream.writeBool(file != null);
-            if (file != null) {
-                file.serializeToStream(stream);
-            }
-            stream.writeBool(new_key_used);
-        }
-    }
-
     public static final int CURRENT_SECRET_CHAT_LAYER = 46;
-
+    private static volatile SecretChatHelper Instance = null;
+    public ArrayList<TLRPC.Update> delayedEncryptedChatUpdates = new ArrayList<>();
     private ArrayList<Integer> sendingNotifyLayer = new ArrayList<>();
     private HashMap<Integer, ArrayList<TL_decryptedMessageHolder>> secretHolesQueue = new HashMap<>();
     private HashMap<Integer, TLRPC.EncryptedChat> acceptingChats = new HashMap<>();
-    public ArrayList<TLRPC.Update> delayedEncryptedChatUpdates = new ArrayList<>();
     private ArrayList<Long> pendingEncMessagesToDelete = new ArrayList<>();
     private boolean startingSecretChat = false;
-
-    private static volatile SecretChatHelper Instance = null;
 
     public static SecretChatHelper getInstance() {
         SecretChatHelper localInstance = Instance;
@@ -86,6 +52,14 @@ public class SecretChatHelper {
             }
         }
         return localInstance;
+    }
+
+    public static boolean isSecretVisibleMessage(TLRPC.Message message) {
+        return message.action instanceof TLRPC.TL_messageEncryptedAction && (message.action.encryptedAction instanceof TLRPC.TL_decryptedMessageActionScreenshotMessages || message.action.encryptedAction instanceof TLRPC.TL_decryptedMessageActionSetMessageTTL);
+    }
+
+    public static boolean isSecretInvisibleMessage(TLRPC.Message message) {
+        return message.action instanceof TLRPC.TL_messageEncryptedAction && !(message.action.encryptedAction instanceof TLRPC.TL_decryptedMessageActionScreenshotMessages || message.action.encryptedAction instanceof TLRPC.TL_decryptedMessageActionSetMessageTTL);
     }
 
     public void cleanup() {
@@ -624,14 +598,6 @@ public class SecretChatHelper {
         }
     }
 
-    public static boolean isSecretVisibleMessage(TLRPC.Message message) {
-        return message.action instanceof TLRPC.TL_messageEncryptedAction && (message.action.encryptedAction instanceof TLRPC.TL_decryptedMessageActionScreenshotMessages || message.action.encryptedAction instanceof TLRPC.TL_decryptedMessageActionSetMessageTTL);
-    }
-
-    public static boolean isSecretInvisibleMessage(TLRPC.Message message) {
-        return message.action instanceof TLRPC.TL_messageEncryptedAction && !(message.action.encryptedAction instanceof TLRPC.TL_decryptedMessageActionScreenshotMessages || message.action.encryptedAction instanceof TLRPC.TL_decryptedMessageActionSetMessageTTL);
-    }
-
     protected void performSendEncryptedRequest(final TLRPC.DecryptedMessage req, final TLRPC.Message newMsgObj, final TLRPC.EncryptedChat chat, final TLRPC.InputEncryptedFile encryptedFile, final String originalPath, final MessageObject newMsg) {
         if (req == null || chat.auth_key == null || chat instanceof TLRPC.TL_encryptedChatRequested || chat instanceof TLRPC.TL_encryptedChatWaiting) {
             return;
@@ -935,7 +901,7 @@ public class SecretChatHelper {
                     newMessage.media = new TLRPC.TL_messageMediaWebPage();
                     newMessage.media.webpage = new TLRPC.TL_webPageUrlPending();
                     newMessage.media.webpage.url = decryptedMessage.media.url;
-                }  else if (decryptedMessage.media instanceof TLRPC.TL_decryptedMessageMediaContact) {
+                } else if (decryptedMessage.media instanceof TLRPC.TL_decryptedMessageMediaContact) {
                     newMessage.media = new TLRPC.TL_messageMediaContact();
                     newMessage.media.last_name = decryptedMessage.media.last_name;
                     newMessage.media.first_name = decryptedMessage.media.first_name;
@@ -1880,6 +1846,38 @@ public class SecretChatHelper {
             progressDialog.show();
         } catch (Exception e) {
             //don't promt
+        }
+    }
+
+    public static class TL_decryptedMessageHolder extends TLObject {
+        public static int constructor = 0x555555F9;
+
+        public long random_id;
+        public int date;
+        public TLRPC.TL_decryptedMessageLayer layer;
+        public TLRPC.EncryptedFile file;
+        public boolean new_key_used;
+
+        public void readParams(AbstractSerializedData stream, boolean exception) {
+            random_id = stream.readInt64(exception);
+            date = stream.readInt32(exception);
+            layer = TLRPC.TL_decryptedMessageLayer.TLdeserialize(stream, stream.readInt32(exception), exception);
+            if (stream.readBool(exception)) {
+                file = TLRPC.EncryptedFile.TLdeserialize(stream, stream.readInt32(exception), exception);
+            }
+            new_key_used = stream.readBool(exception);
+        }
+
+        public void serializeToStream(AbstractSerializedData stream) {
+            stream.writeInt32(constructor);
+            stream.writeInt64(random_id);
+            stream.writeInt32(date);
+            layer.serializeToStream(stream);
+            stream.writeBool(file != null);
+            if (file != null) {
+                file.serializeToStream(stream);
+            }
+            stream.writeBool(new_key_used);
         }
     }
 }

@@ -49,7 +49,9 @@ import java.util.List;
 public class NotificationsController {
 
     public static final String EXTRA_VOICE_REPLY = "extra_voice_reply";
-
+    private static volatile NotificationsController Instance = null;
+    public ArrayList<MessageObject> popupMessages = new ArrayList<>();
+    protected AudioManager audioManager;
     private DispatchQueue notificationsQueue = new DispatchQueue("notificationsQueue");
     private ArrayList<MessageObject> pushMessages = new ArrayList<>();
     private ArrayList<MessageObject> delayedPushMessages = new ArrayList<>();
@@ -62,7 +64,6 @@ public class NotificationsController {
     private HashMap<Long, Integer> pushDialogsOverrideMention = new HashMap<>();
     private int wearNotificationId = 10000;
     private int autoNotificationId = 20000;
-    public ArrayList<MessageObject> popupMessages = new ArrayList<>();
     private long opened_dialog_id = 0;
     private int total_unread_count = 0;
     private int personal_count = 0;
@@ -71,10 +72,8 @@ public class NotificationsController {
     private boolean inChatSoundEnabled = true;
     private int lastBadgeCount;
     private String launcherClassName;
-
     private Runnable notificationDelayRunnable;
     private PowerManager.WakeLock notificationDelayWakelock;
-
     private long lastSoundPlay;
     private long lastSoundOutPlay;
     private SoundPool soundPool;
@@ -84,22 +83,7 @@ public class NotificationsController {
     private boolean soundInLoaded;
     private boolean soundOutLoaded;
     private boolean soundRecordLoaded;
-    protected AudioManager audioManager;
     private AlarmManager alarmManager;
-
-    private static volatile NotificationsController Instance = null;
-    public static NotificationsController getInstance() {
-        NotificationsController localInstance = Instance;
-        if (localInstance == null) {
-            synchronized (MessagesController.class) {
-                localInstance = Instance;
-                if (localInstance == null) {
-                    Instance = localInstance = new NotificationsController();
-                }
-            }
-        }
-        return localInstance;
-    }
 
     public NotificationsController() {
         notificationManager = NotificationManagerCompat.from(ApplicationLoader.applicationContext);
@@ -142,6 +126,66 @@ public class NotificationsController {
                 }
             }
         };
+    }
+
+    public static NotificationsController getInstance() {
+        NotificationsController localInstance = Instance;
+        if (localInstance == null) {
+            synchronized (MessagesController.class) {
+                localInstance = Instance;
+                if (localInstance == null) {
+                    Instance = localInstance = new NotificationsController();
+                }
+            }
+        }
+        return localInstance;
+    }
+
+    private static String getLauncherClassName(Context context) {
+        try {
+            PackageManager pm = context.getPackageManager();
+
+            Intent intent = new Intent(Intent.ACTION_MAIN);
+            intent.addCategory(Intent.CATEGORY_LAUNCHER);
+
+            List<ResolveInfo> resolveInfos = pm.queryIntentActivities(intent, 0);
+            for (ResolveInfo resolveInfo : resolveInfos) {
+                String pkgName = resolveInfo.activityInfo.applicationInfo.packageName;
+                if (pkgName.equalsIgnoreCase(context.getPackageName())) {
+                    return resolveInfo.activityInfo.name;
+                }
+            }
+        } catch (Throwable e) {
+            FileLog.e("tmessages", e);
+        }
+        return null;
+    }
+
+    public static void updateServerNotificationsSettings(long dialog_id) {
+        NotificationCenter.getInstance().postNotificationName(NotificationCenter.notificationsSettingsUpdated);
+        if ((int) dialog_id == 0) {
+            return;
+        }
+        SharedPreferences preferences = ApplicationLoader.applicationContext.getSharedPreferences("Notifications", Activity.MODE_PRIVATE);
+        TLRPC.TL_account_updateNotifySettings req = new TLRPC.TL_account_updateNotifySettings();
+        req.settings = new TLRPC.TL_inputPeerNotifySettings();
+        req.settings.sound = "default";
+        int mute_type = preferences.getInt("notify2_" + dialog_id, 0);
+        if (mute_type == 3) {
+            req.settings.mute_until = preferences.getInt("notifyuntil_" + dialog_id, 0);
+        } else {
+            req.settings.mute_until = mute_type != 2 ? 0 : Integer.MAX_VALUE;
+        }
+        req.settings.show_previews = preferences.getBoolean("preview_" + dialog_id, true);
+        req.settings.silent = preferences.getBoolean("silent_" + dialog_id, false);
+        req.peer = new TLRPC.TL_inputNotifyPeer();
+        ((TLRPC.TL_inputNotifyPeer) req.peer).peer = MessagesController.getInputPeer((int) dialog_id);
+        ConnectionsManager.getInstance().sendRequest(req, new RequestDelegate() {
+            @Override
+            public void run(TLObject response, TLRPC.TL_error error) {
+
+            }
+        });
     }
 
     public void cleanup() {
@@ -478,7 +522,7 @@ public class NotificationsController {
                             notifyOverride = 1;
                         }
                     }
-                    boolean canAddValue = !(notifyOverride == 2 || (!preferences.getBoolean("EnableAll", true) || ((int)dialog_id < 0) && !preferences.getBoolean("EnableGroup", true)) && notifyOverride == 0);
+                    boolean canAddValue = !(notifyOverride == 2 || (!preferences.getBoolean("EnableAll", true) || ((int) dialog_id < 0) && !preferences.getBoolean("EnableGroup", true)) && notifyOverride == 0);
 
                     Integer currentCount = pushDialogs.get(dialog_id);
                     Integer newCount = entry.getValue();
@@ -1087,26 +1131,6 @@ public class NotificationsController {
         }
     }
 
-    private static String getLauncherClassName(Context context) {
-        try {
-            PackageManager pm = context.getPackageManager();
-
-            Intent intent = new Intent(Intent.ACTION_MAIN);
-            intent.addCategory(Intent.CATEGORY_LAUNCHER);
-
-            List<ResolveInfo> resolveInfos = pm.queryIntentActivities(intent, 0);
-            for (ResolveInfo resolveInfo : resolveInfos) {
-                String pkgName = resolveInfo.activityInfo.applicationInfo.packageName;
-                if (pkgName.equalsIgnoreCase(context.getPackageName())) {
-                    return resolveInfo.activityInfo.name;
-                }
-            }
-        } catch (Throwable e) {
-            FileLog.e("tmessages", e);
-        }
-        return null;
-    }
-
     private boolean isPersonalMessage(MessageObject messageObject) {
         return messageObject.messageOwner.to_id != null && messageObject.messageOwner.to_id.chat_id == 0 && messageObject.messageOwner.to_id.channel_id == 0
                 && (messageObject.messageOwner.action == null || messageObject.messageOwner.action instanceof TLRPC.TL_messageActionEmpty);
@@ -1121,30 +1145,6 @@ public class NotificationsController {
             }
         }
         return notifyOverride;
-    }
-
-    private void dismissNotification() {
-        try {
-            notificationManager.cancel(1);
-            pushMessages.clear();
-            pushMessagesDict.clear();
-            for (HashMap.Entry<Long, Integer> entry : autoNotificationsIds.entrySet()) {
-                notificationManager.cancel(entry.getValue());
-            }
-            autoNotificationsIds.clear();
-            for (HashMap.Entry<Long, Integer> entry : wearNotificationsIds.entrySet()) {
-                notificationManager.cancel(entry.getValue());
-            }
-            wearNotificationsIds.clear();
-            AndroidUtilities.runOnUIThread(new Runnable() {
-                @Override
-                public void run() {
-                    NotificationCenter.getInstance().postNotificationName(NotificationCenter.pushMessagesUpdated);
-                }
-            });
-        } catch (Exception e) {
-            FileLog.e("tmessages", e);
-        }
     }
 
     /*public void playRecordSound() {
@@ -1183,6 +1183,30 @@ public class NotificationsController {
             FileLog.e("tmessages", e);
         }
     }*/
+
+    private void dismissNotification() {
+        try {
+            notificationManager.cancel(1);
+            pushMessages.clear();
+            pushMessagesDict.clear();
+            for (HashMap.Entry<Long, Integer> entry : autoNotificationsIds.entrySet()) {
+                notificationManager.cancel(entry.getValue());
+            }
+            autoNotificationsIds.clear();
+            for (HashMap.Entry<Long, Integer> entry : wearNotificationsIds.entrySet()) {
+                notificationManager.cancel(entry.getValue());
+            }
+            wearNotificationsIds.clear();
+            AndroidUtilities.runOnUIThread(new Runnable() {
+                @Override
+                public void run() {
+                    NotificationCenter.getInstance().postNotificationName(NotificationCenter.pushMessagesUpdated);
+                }
+            });
+        } catch (Exception e) {
+            FileLog.e("tmessages", e);
+        }
+    }
 
     private void playInChatSound() {
         if (!inChatSoundEnabled || MediaController.getInstance().isRecordingAudio()) {
@@ -1415,7 +1439,7 @@ public class NotificationsController {
             Intent intent = new Intent(ApplicationLoader.applicationContext, LaunchActivity.class);
             intent.setAction("com.tmessages.openchat" + Math.random() + Integer.MAX_VALUE);
             intent.setFlags(32768);
-            if ((int)dialog_id != 0) {
+            if ((int) dialog_id != 0) {
                 if (pushDialogs.size() == 1) {
                     if (chat_id != 0) {
                         intent.putExtra("chatId", chat_id);
@@ -1616,7 +1640,7 @@ public class NotificationsController {
         for (int a = 0; a < pushMessages.size(); a++) {
             MessageObject messageObject = pushMessages.get(a);
             long dialog_id = messageObject.getDialogId();
-            if ((int)dialog_id == 0) {
+            if ((int) dialog_id == 0) {
                 continue;
             }
 
@@ -1646,12 +1670,12 @@ public class NotificationsController {
             TLRPC.User user = null;
             String name;
             if (dialog_id > 0) {
-                user = MessagesController.getInstance().getUser((int)dialog_id);
+                user = MessagesController.getInstance().getUser((int) dialog_id);
                 if (user == null) {
                     continue;
                 }
             } else {
-                chat = MessagesController.getInstance().getChat(-(int)dialog_id);
+                chat = MessagesController.getInstance().getChat(-(int) dialog_id);
                 if (chat == null) {
                     continue;
                 }
@@ -1833,33 +1857,6 @@ public class NotificationsController {
                 } catch (Exception e) {
                     FileLog.e("tmessages", e);
                 }
-            }
-        });
-    }
-
-    public static void updateServerNotificationsSettings(long dialog_id) {
-        NotificationCenter.getInstance().postNotificationName(NotificationCenter.notificationsSettingsUpdated);
-        if ((int) dialog_id == 0) {
-            return;
-        }
-        SharedPreferences preferences = ApplicationLoader.applicationContext.getSharedPreferences("Notifications", Activity.MODE_PRIVATE);
-        TLRPC.TL_account_updateNotifySettings req = new TLRPC.TL_account_updateNotifySettings();
-        req.settings = new TLRPC.TL_inputPeerNotifySettings();
-        req.settings.sound = "default";
-        int mute_type = preferences.getInt("notify2_" + dialog_id, 0);
-        if (mute_type == 3) {
-            req.settings.mute_until = preferences.getInt("notifyuntil_" + dialog_id, 0);
-        } else {
-            req.settings.mute_until = mute_type != 2 ? 0 : Integer.MAX_VALUE;
-        }
-        req.settings.show_previews = preferences.getBoolean("preview_" + dialog_id, true);
-        req.settings.silent = preferences.getBoolean("silent_" + dialog_id, false);
-        req.peer = new TLRPC.TL_inputNotifyPeer();
-        ((TLRPC.TL_inputNotifyPeer) req.peer).peer = MessagesController.getInputPeer((int) dialog_id);
-        ConnectionsManager.getInstance().sendRequest(req, new RequestDelegate() {
-            @Override
-            public void run(TLObject response, TLRPC.TL_error error) {
-
             }
         });
     }

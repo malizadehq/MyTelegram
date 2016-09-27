@@ -14,10 +14,12 @@ import android.animation.ObjectAnimator;
 import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.app.ProgressDialog;
 import android.content.ContentUris;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.pm.ActivityInfo;
 import android.content.pm.PackageManager;
 import android.content.res.Configuration;
@@ -85,16 +87,19 @@ import java.util.Date;
 import java.util.Hashtable;
 import java.util.Locale;
 import java.util.regex.Pattern;
-// some featurs added
+
 public class AndroidUtilities {
 
+    public static final String THEME_PREFS = "theme";
+    public static final int THEME_PREFS_MODE = Activity.MODE_PRIVATE;
+    public static final int defColor = 0xff52759c;
+    public static final int FLAG_TAG_BR = 1;
+    public static final int FLAG_TAG_BOLD = 2;
+    public static final int FLAG_TAG_COLOR = 4;
+    public static final int FLAG_TAG_ALL = FLAG_TAG_BR | FLAG_TAG_BOLD | FLAG_TAG_COLOR;
     private static final Hashtable<String, Typeface> typefaceCache = new Hashtable<>();
-    private static int prevOrientation = -10;
-    private static boolean waitingForSms = false;
-    private static boolean waitingForCall = false;
     private static final Object smsLock = new Object();
     private static final Object callLock = new Object();
-
     public static int statusBarHeight = 0;
     public static float density = 1;
     public static Point displaySize = new Point();
@@ -102,13 +107,20 @@ public class AndroidUtilities {
     public static DisplayMetrics displayMetrics = new DisplayMetrics();
     public static int leftBaseline;
     public static boolean usingHardwareInput;
+    public static int themeColor = getIntColor("themeColor");
+    public static boolean needRestart = false;
+    public static boolean themeUpdated = false;
+    public static Pattern WEB_URL = null;
+    static long lastCheck = -1;
+    private static int prevOrientation = -10;
+    private static boolean waitingForSms = false;
+    private static boolean waitingForCall = false;
     private static Boolean isTablet = null;
     private static int adjustOwnerClassGuid = 0;
-
     private static Paint roundPaint;
     private static RectF bitmapRect;
+    private static ProgressDialog progressDialog;
 
-    public static Pattern WEB_URL = null;
     static {
         try {
             final String GOOD_IRI_CHAR = "a-zA-Z0-9\u00A0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF";
@@ -140,6 +152,68 @@ public class AndroidUtilities {
         density = ApplicationLoader.applicationContext.getResources().getDisplayMetrics().density;
         leftBaseline = isTablet() ? 80 : 72;
         checkDisplaySize();
+    }
+
+    public static int getDefBubbleColor() {
+        int color = 0xffb2dfdb;//0xff80cbc4;
+        if (getIntColor("themeColor") != 0xff52759c) {
+            color = AndroidUtilities.getIntDarkerColor("themeColor", -0x50);
+        }
+        return color;
+    }
+
+    public static int getIntAlphaColor(String key, int def, float factor) {
+        SharedPreferences themePrefs = ApplicationLoader.applicationContext.getSharedPreferences(THEME_PREFS, THEME_PREFS_MODE);
+        int color = themePrefs.getInt(key, def);
+        int alpha = Math.round(Color.alpha(color) * factor);
+        int red = Color.red(color);
+        int green = Color.green(color);
+        int blue = Color.blue(color);
+        return Color.argb(alpha, red, green, blue);
+    }
+
+    public static int getIntDarkerColor(String key, int factor) {
+        SharedPreferences themePrefs = ApplicationLoader.applicationContext.getSharedPreferences(THEME_PREFS, THEME_PREFS_MODE);
+        int color = themePrefs.getInt(key, defColor);
+        return setDarkColor(color, factor);
+    }
+
+    public static int setDarkColor(int color, int factor) {
+        int alpha = Color.alpha(color);
+        int red = Color.red(color) - factor;
+        int green = Color.green(color) - factor;
+        int blue = Color.blue(color) - factor;
+        if (factor < 0) {
+            red = (red > 0xff) ? 0xff : red;
+            green = (green > 0xff) ? 0xff : green;
+            blue = (blue > 0xff) ? 0xff : blue;
+            if (red == 0xff && green == 0xff && blue == 0xff) {
+                red = factor;
+                green = factor;
+                blue = factor;
+            }
+        }
+        if (factor > 0) {
+            red = (red < 0) ? 0 : red;
+            green = (green < 0) ? 0 : green;
+            blue = (blue < 0) ? 0 : blue;
+            if (red == 0 && green == 0 && blue == 0) {
+                red = factor;
+                green = factor;
+                blue = factor;
+            }
+        }
+        //return Color.argb(0xff, red, green, blue);
+        return Color.argb(alpha, red, green, blue);
+    }
+
+    public static int getIntColor(String key) {
+        SharedPreferences themePrefs = ApplicationLoader.applicationContext.getSharedPreferences(THEME_PREFS, THEME_PREFS_MODE);
+        return themePrefs.getInt(key, defColor);//Def color is Teal
+    }
+
+    public static String replacePersianNumber(String paramString) {
+        return paramString.replaceAll("0", "٠").replaceAll("1", "۱").replaceAll("2", "۲").replaceAll("3", "۳").replaceAll("4", "۴").replaceAll("5", "۵").replaceAll("6", "۶").replaceAll("7", "۷").replaceAll("8", "۸").replaceAll("9", "۹");
     }
 
     public static int[] calcDrawableColor(Drawable drawable) {
@@ -254,6 +328,18 @@ public class AndroidUtilities {
         }
     }
 
+    public static boolean getBoolPref(String key) {
+        boolean s = false;
+        if (ApplicationLoader.applicationContext.getSharedPreferences(THEME_PREFS, 0).getBoolean(key, false))
+            s = true;
+        return s;
+    }
+
+    public static int getIntDef(String key, int def) {
+        SharedPreferences themePrefs = ApplicationLoader.applicationContext.getSharedPreferences(THEME_PREFS, THEME_PREFS_MODE);
+        return themePrefs.getInt(key, def);
+    }
+
     public static boolean isGoogleMapsInstalled(final BaseFragment fragment) {
         try {
             ApplicationLoader.applicationContext.getPackageManager().getApplicationInfo("com.google.android.apps.maps", 0);
@@ -303,7 +389,7 @@ public class AndroidUtilities {
         }
         try {
             prevOrientation = activity.getRequestedOrientation();
-            WindowManager manager = (WindowManager)activity.getSystemService(Activity.WINDOW_SERVICE);
+            WindowManager manager = (WindowManager) activity.getSystemService(Activity.WINDOW_SERVICE);
             if (manager != null && manager.getDefaultDisplay() != null) {
                 int rotation = manager.getDefaultDisplay().getRotation();
                 int orientation = activity.getResources().getConfiguration().orientation;
@@ -355,6 +441,53 @@ public class AndroidUtilities {
 
     public static Typeface getTypeface(String assetPath) {
         synchronized (typefaceCache) {
+
+            SharedPreferences preferences = ApplicationLoader.applicationContext.getSharedPreferences("mainconfig", Activity.MODE_PRIVATE);
+            String font = preferences.getString("font_type", "ایران سانس نازک");
+            switch (font) {
+                case "تلگرام":
+                    assetPath = "fonts/rmedium.ttf";
+                    break;
+                case "ایران سانس نازک":
+                    assetPath = "fonts/iransans_light.ttf";
+                    break;
+                case "ایران سانس معمولی":
+                    assetPath = "fonts/iransans.ttf";
+                    break;
+                case "ایران سانس متوسط":
+                    assetPath = "fonts/iransans_medium.ttf";
+                    break;
+                case "ایران سانس ضخیم":
+                    assetPath = "fonts/iransans_bold.ttf";
+                    break;
+                case "افسانه":
+                    assetPath = "fonts/afsaneh.ttf";
+                    break;
+                case "دست نویس":
+                    assetPath = "fonts/dastnevis.ttf";
+                    break;
+                case "هما":
+                    assetPath = "fonts/hama.ttf";
+                    break;
+                case "مروارید":
+                    assetPath = "fonts/morvarid.ttf";
+                    break;
+                case "یکان":
+                    assetPath = "fonts/yekan.ttf";
+                    break;
+                case "ترافیک":
+                    assetPath = "fonts/traffic.ttf";
+                    break;
+                case "کودک":
+                    assetPath = "fonts/koodak.ttf";
+                    break;
+                case "لوتوس":
+                    assetPath = "fonts/lotus.ttf";
+                    break;
+                default:
+                    break;
+            }
+
             if (!typefaceCache.containsKey(assetPath)) {
                 try {
                     Typeface t = Typeface.createFromAsset(ApplicationLoader.applicationContext.getAssets(), assetPath);
@@ -401,7 +534,7 @@ public class AndroidUtilities {
             return;
         }
         try {
-            InputMethodManager inputManager = (InputMethodManager)view.getContext().getSystemService(Context.INPUT_METHOD_SERVICE);
+            InputMethodManager inputManager = (InputMethodManager) view.getContext().getSystemService(Context.INPUT_METHOD_SERVICE);
             inputManager.showSoftInput(view, InputMethodManager.SHOW_IMPLICIT);
         } catch (Exception e) {
             FileLog.e("tmessages", e);
@@ -510,7 +643,7 @@ public class AndroidUtilities {
     }
 
     public static long makeBroadcastId(int id) {
-        return 0x0000000100000000L | ((long)id & 0x00000000FFFFFFFFL);
+        return 0x0000000100000000L | ((long) id & 0x00000000FFFFFFFFL);
     }
 
     public static int getMyLayerVersion(int layer) {
@@ -546,6 +679,9 @@ public class AndroidUtilities {
     }
 
     public static boolean isTablet() {
+        if (!ApplicationLoader.applicationContext.getSharedPreferences("mainconfig", 0).getBoolean("tablet_mode", true)) {
+            return false;
+        }
         if (isTablet == null) {
             isTablet = ApplicationLoader.applicationContext.getResources().getBoolean(R.bool.isTablet);
         }
@@ -844,7 +980,7 @@ public class AndroidUtilities {
             if (mAttachInfo != null) {
                 Field mStableInsetsField = mAttachInfo.getClass().getDeclaredField("mStableInsets");
                 mStableInsetsField.setAccessible(true);
-                Rect insets = (Rect)mStableInsetsField.get(mAttachInfo);
+                Rect insets = (Rect) mStableInsetsField.get(mAttachInfo);
                 return insets.bottom;
             }
         } catch (Exception e) {
@@ -930,11 +1066,6 @@ public class AndroidUtilities {
         }
     }
 
-    public static final int FLAG_TAG_BR = 1;
-    public static final int FLAG_TAG_BOLD = 2;
-    public static final int FLAG_TAG_COLOR = 4;
-    public static final int FLAG_TAG_ALL = FLAG_TAG_BR | FLAG_TAG_BOLD | FLAG_TAG_COLOR;
-
     public static SpannableStringBuilder replaceTags(String str) {
         return replaceTags(str, FLAG_TAG_ALL);
     }
@@ -971,6 +1102,9 @@ public class AndroidUtilities {
                     stringBuilder.replace(start, start + 2, "");
                     end = stringBuilder.indexOf(">", start);
                     int color = Color.parseColor(stringBuilder.substring(start, end));
+                    if (color == -11242082) {
+                        color = ApplicationLoader.applicationContext.getSharedPreferences("mainconfig", 0).getInt("theme_color", -11242082);
+                    }
                     stringBuilder.replace(start, end + 1, "");
                     end = stringBuilder.indexOf("</c>");
                     stringBuilder.replace(end, end + 4, "");
@@ -1129,7 +1263,7 @@ public class AndroidUtilities {
         if (Environment.MEDIA_MOUNTED.equals(Environment.getExternalStorageState())) {
             storageDir = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES), "Telegram");
             if (!storageDir.mkdirs()) {
-                if (!storageDir.exists()){
+                if (!storageDir.exists()) {
                     FileLog.d("tmessages", "failed to create directory");
                     return null;
                 }
@@ -1176,7 +1310,7 @@ public class AndroidUtilities {
                     }
 
                     final String selection = "_id=?";
-                    final String[] selectionArgs = new String[] {
+                    final String[] selectionArgs = new String[]{
                             split[1]
                     };
 
@@ -1427,4 +1561,13 @@ public class AndroidUtilities {
             }
         }
     }
+
+    //Teleh
+    public static void setStringPref(Context context, String key, String s) {
+        SharedPreferences sharedPref = context.getSharedPreferences(THEME_PREFS, 0);
+        SharedPreferences.Editor e = sharedPref.edit();
+        e.putString(key, s);
+        e.commit();
+    }
+
 }

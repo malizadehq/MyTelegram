@@ -27,15 +27,14 @@ public class NativeLoader {
     private final static String LIB_NAME = "tmessages." + LIB_VERSION;
     private final static String LIB_SO_NAME = "lib" + LIB_NAME + ".so";
     private final static String LOCALE_LIB_SO_NAME = "lib" + LIB_NAME + "loc.so";
-    private String crashPath = "";
-
     private static volatile boolean nativeLoaded = false;
+    private String crashPath = "";
 
     private static File getNativeLibraryDir(Context context) {
         File f = null;
         if (context != null) {
             try {
-                f = new File((String)ApplicationInfo.class.getField("nativeLibraryDir").get(context.getApplicationInfo()));
+                f = new File((String) ApplicationInfo.class.getField("nativeLibraryDir").get(context.getApplicationInfo()));
             } catch (Throwable th) {
                 th.printStackTrace();
             }

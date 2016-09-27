@@ -21,6 +21,24 @@ import android.os.IBinder;
 
 public class AuthenticatorService extends Service {
 
+    private static Authenticator authenticator = null;
+
+    protected Authenticator getAuthenticator() {
+        if (authenticator == null) {
+            authenticator = new Authenticator(this);
+        }
+        return authenticator;
+    }
+
+    @Override
+    public IBinder onBind(Intent intent) {
+        if (intent.getAction().equals(AccountManager.ACTION_AUTHENTICATOR_INTENT)) {
+            return getAuthenticator().getIBinder();
+        } else {
+            return null;
+        }
+    }
+
     private static class Authenticator extends AbstractAccountAuthenticator {
         private final Context context;
 
@@ -74,24 +92,5 @@ public class AuthenticatorService extends Service {
             return null;
         }
 
-    }
-
-    private static Authenticator authenticator = null;
-
-    protected Authenticator getAuthenticator() {
-        if (authenticator == null) {
-            authenticator = new Authenticator(this);
-        }
-        return authenticator;
-    }
-
-
-    @Override
-    public IBinder onBind(Intent intent) {
-        if (intent.getAction().equals(AccountManager.ACTION_AUTHENTICATOR_INTENT)) {
-            return getAuthenticator().getIBinder();
-        } else {
-            return null;
-        }
     }
 }

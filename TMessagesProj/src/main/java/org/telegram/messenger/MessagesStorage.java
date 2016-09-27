@@ -37,11 +37,6 @@ import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicLong;
 
 public class MessagesStorage {
-    private DispatchQueue storageQueue = new DispatchQueue("storageQueue");
-    private SQLiteDatabase database;
-    private File cacheFile;
-    private AtomicLong lastTaskId = new AtomicLong(System.currentTimeMillis());
-
     public static int lastDateValue = 0;
     public static int lastPtsValue = 0;
     public static int lastQtsValue = 0;
@@ -49,13 +44,20 @@ public class MessagesStorage {
     public static int lastSecretVersion = 0;
     public static byte[] secretPBytes = null;
     public static int secretG = 0;
-
+    private static volatile MessagesStorage Instance = null;
+    private DispatchQueue storageQueue = new DispatchQueue("storageQueue");
+    private SQLiteDatabase database;
+    private File cacheFile;
+    private AtomicLong lastTaskId = new AtomicLong(System.currentTimeMillis());
     private int lastSavedSeq = 0;
     private int lastSavedPts = 0;
     private int lastSavedDate = 0;
     private int lastSavedQts = 0;
 
-    private static volatile MessagesStorage Instance = null;
+    public MessagesStorage() {
+        storageQueue.setPriority(Thread.MAX_PRIORITY);
+        openDatabase();
+    }
 
     public static MessagesStorage getInstance() {
         MessagesStorage localInstance = Instance;
@@ -70,9 +72,89 @@ public class MessagesStorage {
         return localInstance;
     }
 
-    public MessagesStorage() {
-        storageQueue.setPriority(Thread.MAX_PRIORITY);
-        openDatabase();
+    public static void addUsersAndChatsFromMessage(TLRPC.Message message, ArrayList<Integer> usersToLoad, ArrayList<Integer> chatsToLoad) {
+        if (message.from_id != 0) {
+            if (message.from_id > 0) {
+                if (!usersToLoad.contains(message.from_id)) {
+                    usersToLoad.add(message.from_id);
+                }
+            } else {
+                if (!chatsToLoad.contains(-message.from_id)) {
+                    chatsToLoad.add(-message.from_id);
+                }
+            }
+        }
+        if (message.via_bot_id != 0 && !usersToLoad.contains(message.via_bot_id)) {
+            usersToLoad.add(message.via_bot_id);
+        }
+        if (message.action != null) {
+            if (message.action.user_id != 0 && !usersToLoad.contains(message.action.user_id)) {
+                usersToLoad.add(message.action.user_id);
+            }
+            if (message.action.channel_id != 0 && !chatsToLoad.contains(message.action.channel_id)) {
+                chatsToLoad.add(message.action.channel_id);
+            }
+            if (message.action.chat_id != 0 && !chatsToLoad.contains(message.action.chat_id)) {
+                chatsToLoad.add(message.action.chat_id);
+            }
+            if (!message.action.users.isEmpty()) {
+                for (int a = 0; a < message.action.users.size(); a++) {
+                    Integer uid = message.action.users.get(a);
+                    if (!usersToLoad.contains(uid)) {
+                        usersToLoad.add(uid);
+                    }
+                }
+            }
+        }
+        if (!message.entities.isEmpty()) {
+            for (int a = 0; a < message.entities.size(); a++) {
+                TLRPC.MessageEntity entity = message.entities.get(a);
+                if (entity instanceof TLRPC.TL_messageEntityMentionName) {
+                    usersToLoad.add(((TLRPC.TL_messageEntityMentionName) entity).user_id);
+                } else if (entity instanceof TLRPC.TL_inputMessageEntityMentionName) {
+                    usersToLoad.add(((TLRPC.TL_inputMessageEntityMentionName) entity).user_id.user_id);
+                }
+            }
+        }
+        if (message.media != null) {
+            if (message.media.user_id != 0 && !usersToLoad.contains(message.media.user_id)) {
+                usersToLoad.add(message.media.user_id);
+            }
+        }
+        if (message.fwd_from != null) {
+            if (message.fwd_from.from_id != 0) {
+                if (!usersToLoad.contains(message.fwd_from.from_id)) {
+                    usersToLoad.add(message.fwd_from.from_id);
+                }
+            }
+            if (message.fwd_from.channel_id != 0) {
+                if (!chatsToLoad.contains(message.fwd_from.channel_id)) {
+                    chatsToLoad.add(message.fwd_from.channel_id);
+                }
+            }
+        }
+        if (message.ttl < 0) {
+            if (!chatsToLoad.contains(-message.ttl)) {
+                chatsToLoad.add(-message.ttl);
+            }
+        }
+    }
+
+    public static void createFirstHoles(long did, SQLitePreparedStatement state5, SQLitePreparedStatement state6, int messageId) throws Exception {
+        state5.requery();
+        state5.bindLong(1, did);
+        state5.bindInteger(2, messageId == 1 ? 1 : 0);
+        state5.bindInteger(3, messageId);
+        state5.step();
+
+        for (int b = 0; b < SharedMediaQuery.MEDIA_TYPES_COUNT; b++) {
+            state6.requery();
+            state6.bindLong(1, did);
+            state6.bindInteger(2, b);
+            state6.bindInteger(3, messageId == 1 ? 1 : 0);
+            state6.bindInteger(4, messageId);
+            state6.step();
+        }
     }
 
     public SQLiteDatabase getDatabase() {
@@ -4252,39 +4334,6 @@ public class MessagesStorage {
         putMessages(messages, withTransaction, useQueue, doNotUpdateDialogDate, downloadMask, false);
     }
 
-    public void putMessages(final ArrayList<TLRPC.Message> messages, final boolean withTransaction, boolean useQueue, final boolean doNotUpdateDialogDate, final int downloadMask, final boolean ifNoLastMessage) {
-        if (messages.size() == 0) {
-            return;
-        }
-        if (useQueue) {
-            storageQueue.postRunnable(new Runnable() {
-                @Override
-                public void run() {
-                    putMessagesInternal(messages, withTransaction, doNotUpdateDialogDate, downloadMask, ifNoLastMessage);
-                }
-            });
-        } else {
-            putMessagesInternal(messages, withTransaction, doNotUpdateDialogDate, downloadMask, ifNoLastMessage);
-        }
-    }
-
-    public void markMessageAsSendError(final TLRPC.Message message) {
-        storageQueue.postRunnable(new Runnable() {
-            @Override
-            public void run() {
-                try {
-                    long messageId = message.id;
-                    if (message.to_id.channel_id != 0) {
-                        messageId |= ((long) message.to_id.channel_id) << 32;
-                    }
-                    database.executeFast("UPDATE messages SET send_state = 2 WHERE mid = " + messageId).stepThis().dispose();
-                } catch (Exception e) {
-                    FileLog.e("tmessages", e);
-                }
-            }
-        });
-    }
-
     /*public void getHoleMessages() {
         storageQueue.postRunnable(new Runnable() {
             @Override
@@ -4338,6 +4387,39 @@ public class MessagesStorage {
             }
         });
     }*/
+
+    public void putMessages(final ArrayList<TLRPC.Message> messages, final boolean withTransaction, boolean useQueue, final boolean doNotUpdateDialogDate, final int downloadMask, final boolean ifNoLastMessage) {
+        if (messages.size() == 0) {
+            return;
+        }
+        if (useQueue) {
+            storageQueue.postRunnable(new Runnable() {
+                @Override
+                public void run() {
+                    putMessagesInternal(messages, withTransaction, doNotUpdateDialogDate, downloadMask, ifNoLastMessage);
+                }
+            });
+        } else {
+            putMessagesInternal(messages, withTransaction, doNotUpdateDialogDate, downloadMask, ifNoLastMessage);
+        }
+    }
+
+    public void markMessageAsSendError(final TLRPC.Message message) {
+        storageQueue.postRunnable(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    long messageId = message.id;
+                    if (message.to_id.channel_id != 0) {
+                        messageId |= ((long) message.to_id.channel_id) << 32;
+                    }
+                    database.executeFast("UPDATE messages SET send_state = 2 WHERE mid = " + messageId).stepThis().dispose();
+                } catch (Exception e) {
+                    FileLog.e("tmessages", e);
+                }
+            }
+        });
+    }
 
     public void setMessageSeq(final int mid, final int seq_in, final int seq_out) {
         storageQueue.postRunnable(new Runnable() {
@@ -4969,24 +5051,6 @@ public class MessagesStorage {
         }
     }
 
-    private class Hole {
-
-        public Hole(int s, int e) {
-            start = s;
-            end = e;
-        }
-
-        public Hole(int t, int s, int e) {
-            type = t;
-            start = s;
-            end = e;
-        }
-
-        public int start;
-        public int end;
-        public int type;
-    }
-
     public void closeHolesInMedia(long did, int minId, int maxId, int type) throws Exception {
         try {
             boolean ok = false;
@@ -5273,74 +5337,6 @@ public class MessagesStorage {
         });
     }
 
-    public static void addUsersAndChatsFromMessage(TLRPC.Message message, ArrayList<Integer> usersToLoad, ArrayList<Integer> chatsToLoad) {
-        if (message.from_id != 0) {
-            if (message.from_id > 0) {
-                if (!usersToLoad.contains(message.from_id)) {
-                    usersToLoad.add(message.from_id);
-                }
-            } else {
-                if (!chatsToLoad.contains(-message.from_id)) {
-                    chatsToLoad.add(-message.from_id);
-                }
-            }
-        }
-        if (message.via_bot_id != 0 && !usersToLoad.contains(message.via_bot_id)) {
-            usersToLoad.add(message.via_bot_id);
-        }
-        if (message.action != null) {
-            if (message.action.user_id != 0 && !usersToLoad.contains(message.action.user_id)) {
-                usersToLoad.add(message.action.user_id);
-            }
-            if (message.action.channel_id != 0 && !chatsToLoad.contains(message.action.channel_id)) {
-                chatsToLoad.add(message.action.channel_id);
-            }
-            if (message.action.chat_id != 0 && !chatsToLoad.contains(message.action.chat_id)) {
-                chatsToLoad.add(message.action.chat_id);
-            }
-            if (!message.action.users.isEmpty()) {
-                for (int a = 0; a < message.action.users.size(); a++) {
-                    Integer uid = message.action.users.get(a);
-                    if (!usersToLoad.contains(uid)) {
-                        usersToLoad.add(uid);
-                    }
-                }
-            }
-        }
-        if (!message.entities.isEmpty()) {
-            for (int a = 0; a < message.entities.size(); a++) {
-                TLRPC.MessageEntity entity = message.entities.get(a);
-                if (entity instanceof TLRPC.TL_messageEntityMentionName) {
-                    usersToLoad.add(((TLRPC.TL_messageEntityMentionName) entity).user_id);
-                } else if (entity instanceof TLRPC.TL_inputMessageEntityMentionName) {
-                    usersToLoad.add(((TLRPC.TL_inputMessageEntityMentionName) entity).user_id.user_id);
-                }
-            }
-        }
-        if (message.media != null) {
-            if (message.media.user_id != 0 && !usersToLoad.contains(message.media.user_id)) {
-                usersToLoad.add(message.media.user_id);
-            }
-        }
-        if (message.fwd_from != null) {
-            if (message.fwd_from.from_id != 0) {
-                if (!usersToLoad.contains(message.fwd_from.from_id)) {
-                    usersToLoad.add(message.fwd_from.from_id);
-                }
-            }
-            if (message.fwd_from.channel_id != 0) {
-                if (!chatsToLoad.contains(message.fwd_from.channel_id)) {
-                    chatsToLoad.add(message.fwd_from.channel_id);
-                }
-            }
-        }
-        if (message.ttl < 0) {
-            if (!chatsToLoad.contains(-message.ttl)) {
-                chatsToLoad.add(-message.ttl);
-            }
-        }
-    }
-
     public void getDialogs(final int offset, final int count) {
         storageQueue.postRunnable(new Runnable() {
             @Override
@@ -5492,23 +5488,6 @@ public class MessagesStorage {
                 }
             }
         });
-    }
-
-    public static void createFirstHoles(long did, SQLitePreparedStatement state5, SQLitePreparedStatement state6, int messageId) throws Exception {
-        state5.requery();
-        state5.bindLong(1, did);
-        state5.bindInteger(2, messageId == 1 ? 1 : 0);
-        state5.bindInteger(3, messageId);
-        state5.step();
-
-        for (int b = 0; b < SharedMediaQuery.MEDIA_TYPES_COUNT; b++) {
-            state6.requery();
-            state6.bindLong(1, did);
-            state6.bindInteger(2, b);
-            state6.bindInteger(3, messageId == 1 ? 1 : 0);
-            state6.bindInteger(4, messageId);
-            state6.step();
-        }
     }
 
     private void putDialogsInternal(final TLRPC.messages_Dialogs dialogs) {
@@ -5798,5 +5777,23 @@ public class MessagesStorage {
             FileLog.e("tmessages", e);
         }
         return chat;
+    }
+
+    private class Hole {
+
+        public int start;
+        public int end;
+        public int type;
+
+        public Hole(int s, int e) {
+            start = s;
+            end = e;
+        }
+
+        public Hole(int t, int s, int e) {
+            type = t;
+            start = s;
+            end = e;
+        }
     }
 }

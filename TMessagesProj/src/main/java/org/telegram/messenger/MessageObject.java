@@ -8,6 +8,7 @@
 
 package org.telegram.messenger;
 
+import android.content.SharedPreferences;
 import android.graphics.Paint;
 import android.graphics.Typeface;
 import android.text.Layout;
@@ -44,7 +45,13 @@ public class MessageObject {
     public static final int MESSAGE_SEND_STATE_SENDING = 1;
     public static final int MESSAGE_SEND_STATE_SENT = 0;
     public static final int MESSAGE_SEND_STATE_SEND_ERROR = 2;
-
+    private static final int LINES_PER_BLOCK = 10;
+    public static TextPaint textPaint;
+    public static Pattern urlPattern;
+    //Teleh
+    public static TextPaint textPaintRight = new TextPaint(Paint.ANTI_ALIAS_FLAG);
+    public static TextPaint textPaintLeft = new TextPaint(Paint.ANTI_ALIAS_FLAG);
+    private static TextPaint botButtonPaint;
     public TLRPC.Message messageOwner;
     public CharSequence messageText;
     public CharSequence linkDescription;
@@ -63,30 +70,16 @@ public class MessageObject {
     public int wantedBotKeyboardWidth;
     public boolean attachPathExists;
     public boolean mediaExists;
-
     public boolean forceUpdate;
-
-    private static TextPaint textPaint;
-    private static TextPaint botButtonPaint;
     public int lastLineWidth;
     public int textWidth;
     public int textHeight;
-
-    private boolean layoutCreated;
-
-    public static Pattern urlPattern;
-
-    public static class TextLayoutBlock {
-        public StaticLayout textLayout;
-        public float textXOffset;
-        public float textYOffset;
-        public int charactersOffset;
-        public int height;
-    }
-
-    private static final int LINES_PER_BLOCK = 10;
-
+    public boolean showAvatar = false;
+    public boolean showMyAvatar = false;
+    public boolean showMyAvatarGroup = true;
     public ArrayList<TextLayoutBlock> textLayoutBlocks;
+    protected int leftBound = 52;//52
+    private boolean layoutCreated;
 
     public MessageObject(TLRPC.Message message, AbstractMap<Integer, TLRPC.User> users, boolean generateLayout) {
         this(message, users, null, generateLayout);
@@ -98,13 +91,45 @@ public class MessageObject {
             textPaint.setColor(Theme.MSG_TEXT_COLOR);
             textPaint.linkColor = Theme.MSG_LINK_TEXT_COLOR;
         }
-
+        SharedPreferences themePrefs = ApplicationLoader.applicationContext.getSharedPreferences(AndroidUtilities.THEME_PREFS, AndroidUtilities.THEME_PREFS_MODE);
+        int def = themePrefs.getInt("themeColor", AndroidUtilities.defColor);
         textPaint.setTextSize(AndroidUtilities.dp(MessagesController.getInstance().fontSize));
+        textPaint.setTypeface(AndroidUtilities.getTypeface("fonts/rmedium.ttf"));
 
+        textPaintLeft.setColor(themePrefs.getInt("chatLTextColor", 0xff000000));
+        textPaintLeft.linkColor = themePrefs.getInt("chatLLinkColor", def);
+        textPaintLeft.setTextSize(AndroidUtilities.dp(MessagesController.getInstance().fontSize));
+        textPaintLeft.setTypeface(AndroidUtilities.getTypeface("fonts/rmedium.ttf"));
+        textPaint = textPaintLeft;
+
+        textPaintRight.setColor(themePrefs.getInt("chatRTextColor", 0xff000000));
+        textPaintRight.linkColor = themePrefs.getInt("chatRLinkColor", def);
+        textPaintRight.setTextSize(AndroidUtilities.dp(MessagesController.getInstance().fontSize));
+        textPaintRight.setTypeface(AndroidUtilities.getTypeface("fonts/rmedium.ttf"));
+
+        showMyAvatar = themePrefs.getBoolean("chatShowOwnAvatar", false);
+        showMyAvatarGroup = themePrefs.getBoolean("chatShowOwnAvatarGroup", false);
+        showAvatar = themePrefs.getBoolean("chatShowContactAvatar", false);
+        int aSize = themePrefs.getInt("chatAvatarSize", 42);
+        leftBound = aSize + AndroidUtilities.dp(3);
         messageOwner = message;
 
         if (message.replyMessage != null) {
             replyMessageObject = new MessageObject(message.replyMessage, users, chats, false);
+        }
+        if (isOut()) {
+            textPaint = textPaintRight;
+            textPaint.linkColor = textPaintRight.linkColor;
+        } else {
+            if (isReply()) {
+                textPaint = textPaintLeft;
+                textPaint.linkColor = textPaintLeft.linkColor;
+            }
+        }
+        //if channel, always left
+        if (message.to_id != null && message.to_id.channel_id != 0 && !isMegagroup() && !isOutOwner()) {
+            textPaint = textPaintLeft;
+            textPaint.linkColor = textPaintLeft.linkColor;
         }
 
         TLRPC.User fromUser = null;
@@ -397,6 +422,341 @@ public class MessageObject {
         return textPaint;
     }
 
+    public static boolean isGifDocument(TLRPC.Document document) {
+        return document != null && document.thumb != null && document.mime_type != null && (document.mime_type.equals("image/gif") || isNewGifDocument(document));
+    }
+
+    public static boolean isNewGifDocument(TLRPC.Document document) {
+        if (document != null && document.mime_type != null && document.mime_type.equals("video/mp4")) {
+            for (int a = 0; a < document.attributes.size(); a++) {
+                if (document.attributes.get(a) instanceof TLRPC.TL_documentAttributeAnimated) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private static boolean containsUrls(CharSequence message) {
+        if (message == null || message.length() < 2 || message.length() > 1024 * 20) {
+            return false;
+        }
+
+        int length = message.length();
+
+        int digitsInRow = 0;
+        int schemeSequence = 0;
+        int dotSequence = 0;
+
+        char lastChar = 0;
+
+        for (int i = 0; i < length; i++) {
+            char c = message.charAt(i);
+
+            if (c >= '0' && c <= '9') {
+                digitsInRow++;
+                if (digitsInRow >= 6) {
+                    return true;
+                }
+                schemeSequence = 0;
+                dotSequence = 0;
+            } else if (!(c != ' ' && digitsInRow > 0)) {
+                digitsInRow = 0;
+            }
+            if ((c == '@' || c == '#' || c == '/') && i == 0 || i != 0 && (message.charAt(i - 1) == ' ' || message.charAt(i - 1) == '\n')) {
+                return true;
+            }
+            if (c == ':') {
+                if (schemeSequence == 0) {
+                    schemeSequence = 1;
+                } else {
+                    schemeSequence = 0;
+                }
+            } else if (c == '/') {
+                if (schemeSequence == 2) {
+                    return true;
+                }
+                if (schemeSequence == 1) {
+                    schemeSequence++;
+                } else {
+                    schemeSequence = 0;
+                }
+            } else if (c == '.') {
+                if (dotSequence == 0 && lastChar != ' ') {
+                    dotSequence++;
+                } else {
+                    dotSequence = 0;
+                }
+            } else if (c != ' ' && lastChar == '.' && dotSequence == 1) {
+                return true;
+            } else {
+                dotSequence = 0;
+            }
+            lastChar = c;
+        }
+        return false;
+    }
+
+    private static void addUsernamesAndHashtags(CharSequence charSequence, boolean botCommands) {
+        try {
+            if (urlPattern == null) {
+                urlPattern = Pattern.compile("(^|\\s)/[a-zA-Z@\\d_]{1,255}|(^|\\s)@[a-zA-Z\\d_]{1,32}|(^|\\s)#[\\w\\.]+");
+            }
+            Matcher matcher = urlPattern.matcher(charSequence);
+            while (matcher.find()) {
+                int start = matcher.start();
+                int end = matcher.end();
+                if (charSequence.charAt(start) != '@' && charSequence.charAt(start) != '#' && charSequence.charAt(start) != '/') {
+                    start++;
+                }
+                URLSpanNoUnderline url = null;
+                if (charSequence.charAt(start) == '/') {
+                    if (botCommands) {
+                        url = new URLSpanBotCommand(charSequence.subSequence(start, end).toString());
+                    }
+                } else {
+                    url = new URLSpanNoUnderline(charSequence.subSequence(start, end).toString());
+                }
+                if (url != null) {
+                    ((Spannable) charSequence).setSpan(url, start, end, 0);
+                }
+            }
+        } catch (Exception e) {
+            FileLog.e("tmessages", e);
+        }
+    }
+
+    public static void addLinks(CharSequence messageText) {
+        addLinks(messageText, true);
+    }
+
+    public static void addLinks(CharSequence messageText, boolean botCommands) {
+        if (messageText instanceof Spannable && containsUrls(messageText)) {
+            if (messageText.length() < 200) {
+                try {
+                    Linkify.addLinks((Spannable) messageText, Linkify.WEB_URLS | Linkify.PHONE_NUMBERS);
+                } catch (Exception e) {
+                    FileLog.e("tmessages", e);
+                }
+            } else {
+                try {
+                    Linkify.addLinks((Spannable) messageText, Linkify.WEB_URLS);
+                } catch (Exception e) {
+                    FileLog.e("tmessages", e);
+                }
+            }
+            addUsernamesAndHashtags(messageText, botCommands);
+        }
+    }
+
+    public static int getUnreadFlags(TLRPC.Message message) {
+        int flags = 0;
+        if (!message.unread) {
+            flags |= 1;
+        }
+        if (!message.media_unread) {
+            flags |= 2;
+        }
+        return flags;
+    }
+
+    public static void setUnreadFlags(TLRPC.Message message, int flag) {
+        message.unread = (flag & 1) == 0;
+        message.media_unread = (flag & 2) == 0;
+    }
+
+    public static boolean isUnread(TLRPC.Message message) {
+        return message.unread;
+    }
+
+    public static boolean isContentUnread(TLRPC.Message message) {
+        return message.media_unread;
+    }
+
+    public static boolean isMegagroup(TLRPC.Message message) {
+        return (message.flags & TLRPC.MESSAGE_FLAG_MEGAGROUP) != 0;
+    }
+
+    public static boolean isOut(TLRPC.Message message) {
+        return message.out;
+    }
+
+    public static long getDialogId(TLRPC.Message message) {
+        if (message.dialog_id == 0 && message.to_id != null) {
+            if (message.to_id.chat_id != 0) {
+                if (message.to_id.chat_id < 0) {
+                    message.dialog_id = AndroidUtilities.makeBroadcastId(message.to_id.chat_id);
+                } else {
+                    message.dialog_id = -message.to_id.chat_id;
+                }
+            } else if (message.to_id.channel_id != 0) {
+                message.dialog_id = -message.to_id.channel_id;
+            } else if (isOut(message)) {
+                message.dialog_id = message.to_id.user_id;
+            } else {
+                message.dialog_id = message.from_id;
+            }
+        }
+        return message.dialog_id;
+    }
+
+    public static boolean isStickerDocument(TLRPC.Document document) {
+        if (document != null) {
+            for (int a = 0; a < document.attributes.size(); a++) {
+                TLRPC.DocumentAttribute attribute = document.attributes.get(a);
+                if (attribute instanceof TLRPC.TL_documentAttributeSticker) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    public static boolean isVoiceDocument(TLRPC.Document document) {
+        if (document != null) {
+            for (int a = 0; a < document.attributes.size(); a++) {
+                TLRPC.DocumentAttribute attribute = document.attributes.get(a);
+                if (attribute instanceof TLRPC.TL_documentAttributeAudio) {
+                    return attribute.voice;
+                }
+            }
+        }
+        return false;
+    }
+
+    public static boolean isMusicDocument(TLRPC.Document document) {
+        if (document != null) {
+            for (int a = 0; a < document.attributes.size(); a++) {
+                TLRPC.DocumentAttribute attribute = document.attributes.get(a);
+                if (attribute instanceof TLRPC.TL_documentAttributeAudio) {
+                    return !attribute.voice;
+                }
+            }
+        }
+        return false;
+    }
+
+    public static boolean isVideoDocument(TLRPC.Document document) {
+        if (document != null) {
+            boolean isAnimated = false;
+            boolean isVideo = false;
+            for (int a = 0; a < document.attributes.size(); a++) {
+                TLRPC.DocumentAttribute attribute = document.attributes.get(a);
+                if (attribute instanceof TLRPC.TL_documentAttributeVideo) {
+                    isVideo = true;
+                } else if (attribute instanceof TLRPC.TL_documentAttributeAnimated) {
+                    isAnimated = true;
+                }
+            }
+            return isVideo && !isAnimated;
+        }
+        return false;
+    }
+
+    public static boolean isStickerMessage(TLRPC.Message message) {
+        return message.media != null && message.media.document != null && isStickerDocument(message.media.document);
+    }
+
+    public static boolean isMusicMessage(TLRPC.Message message) {
+        if (message.media instanceof TLRPC.TL_messageMediaWebPage) {
+            return isMusicDocument(message.media.webpage.document);
+        }
+        return message.media != null && message.media.document != null && isMusicDocument(message.media.document);
+    }
+
+    public static boolean isVoiceMessage(TLRPC.Message message) {
+        if (message.media instanceof TLRPC.TL_messageMediaWebPage) {
+            return isVoiceDocument(message.media.webpage.document);
+        }
+        return message.media != null && message.media.document != null && isVoiceDocument(message.media.document);
+    }
+
+    public static boolean isVideoMessage(TLRPC.Message message) {
+        if (message.media instanceof TLRPC.TL_messageMediaWebPage) {
+            return isVideoDocument(message.media.webpage.document);
+        }
+        return message.media != null && message.media.document != null && isVideoDocument(message.media.document);
+    }
+
+    public static TLRPC.InputStickerSet getInputStickerSet(TLRPC.Message message) {
+        if (message.media != null && message.media.document != null) {
+            for (TLRPC.DocumentAttribute attribute : message.media.document.attributes) {
+                if (attribute instanceof TLRPC.TL_documentAttributeSticker) {
+                    if (attribute.stickerset instanceof TLRPC.TL_inputStickerSetEmpty) {
+                        return null;
+                    }
+                    return attribute.stickerset;
+                }
+            }
+        }
+        return null;
+    }
+
+    public static boolean isForwardedMessage(TLRPC.Message message) {
+        return (message.flags & TLRPC.MESSAGE_FLAG_FWD) != 0;
+    }
+
+    public static boolean isMediaEmpty(TLRPC.Message message) {
+        return message == null || message.media == null || message.media instanceof TLRPC.TL_messageMediaEmpty || message.media instanceof TLRPC.TL_messageMediaWebPage;
+    }
+
+    public static boolean canEditMessage(TLRPC.Message message, TLRPC.Chat chat) {
+        if (message == null || message.to_id == null || message.action != null && !(message.action instanceof TLRPC.TL_messageActionEmpty) || isForwardedMessage(message) || message.via_bot_id != 0 || message.id < 0 || Math.abs(message.date - ConnectionsManager.getInstance().getCurrentTime()) > MessagesController.getInstance().maxEditTime) {
+            return false;
+        }
+        if (message.to_id.channel_id == 0) {
+            return message.out && (message.media instanceof TLRPC.TL_messageMediaPhoto ||
+                    message.media instanceof TLRPC.TL_messageMediaDocument && !isStickerMessage(message) ||
+                    message.media instanceof TLRPC.TL_messageMediaEmpty ||
+                    message.media instanceof TLRPC.TL_messageMediaWebPage ||
+                    message.media == null);
+        }
+        if (chat == null && message.to_id.channel_id != 0) {
+            chat = MessagesController.getInstance().getChat(message.to_id.channel_id);
+            if (chat == null) {
+                return false;
+            }
+        }
+        if (chat.megagroup && message.out || !chat.megagroup && (chat.creator || chat.editor && isOut(message)) && message.post) {
+            if (message.media instanceof TLRPC.TL_messageMediaPhoto ||
+                    message.media instanceof TLRPC.TL_messageMediaDocument && !isStickerMessage(message) ||
+                    message.media instanceof TLRPC.TL_messageMediaEmpty ||
+                    message.media instanceof TLRPC.TL_messageMediaWebPage ||
+                    message.media == null) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public static boolean canDeleteMessage(TLRPC.Message message, TLRPC.Chat chat) {
+        if (message.id < 0) {
+            return true;
+        }
+        if (chat == null && message.to_id.channel_id != 0) {
+            chat = MessagesController.getInstance().getChat(message.to_id.channel_id);
+        }
+        if (ChatObject.isChannel(chat)) {
+            if (message.id == 1) {
+                return false;
+            }
+            if (chat.creator) {
+                return true;
+            } else if (chat.editor) {
+                if (isOut(message) || message.from_id > 0 && !message.post) {
+                    return true;
+                }
+            } else if (chat.moderator) {
+                if (message.from_id > 0 && !message.post) {
+                    return true;
+                }
+            } else if (isOut(message) && message.from_id > 0) {
+                return true;
+            }
+        }
+        return isOut(message) || !ChatObject.isChannel(chat);
+    }
+
     public void generatePinMessageText(TLRPC.User fromUser, TLRPC.Chat chat) {
         if (fromUser == null && chat == null) {
             if (messageOwner.from_id > 0) {
@@ -537,21 +897,6 @@ public class MessageObject {
             messageText = Emoji.replaceEmoji(messageText, textPaint.getFontMetricsInt(), AndroidUtilities.dp(20), false);
             generateLayout(fromUser);
         }
-    }
-
-    public static boolean isGifDocument(TLRPC.Document document) {
-        return document != null && document.thumb != null && document.mime_type != null && (document.mime_type.equals("image/gif") || isNewGifDocument(document));
-    }
-
-    public static boolean isNewGifDocument(TLRPC.Document document) {
-        if (document != null && document.mime_type != null && document.mime_type.equals("video/mp4")) {
-            for (int a = 0; a < document.attributes.size(); a++) {
-                if (document.attributes.get(a) instanceof TLRPC.TL_documentAttributeAnimated) {
-                    return true;
-                }
-            }
-        }
-        return false;
     }
 
     public void generateThumbs(boolean update) {
@@ -736,66 +1081,6 @@ public class MessageObject {
         return FileLoader.MEDIA_DIR_CACHE;
     }
 
-    private static boolean containsUrls(CharSequence message) {
-        if (message == null || message.length() < 2 || message.length() > 1024 * 20) {
-            return false;
-        }
-
-        int length = message.length();
-
-        int digitsInRow = 0;
-        int schemeSequence = 0;
-        int dotSequence = 0;
-
-        char lastChar = 0;
-
-        for (int i = 0; i < length; i++) {
-            char c = message.charAt(i);
-
-            if (c >= '0' && c <= '9') {
-                digitsInRow++;
-                if (digitsInRow >= 6) {
-                    return true;
-                }
-                schemeSequence = 0;
-                dotSequence = 0;
-            } else if (!(c != ' ' && digitsInRow > 0)) {
-                digitsInRow = 0;
-            }
-            if ((c == '@' || c == '#' || c == '/') && i == 0 || i != 0 && (message.charAt(i - 1) == ' ' || message.charAt(i - 1) == '\n')) {
-                return true;
-            }
-            if (c == ':') {
-                if (schemeSequence == 0) {
-                    schemeSequence = 1;
-                } else {
-                    schemeSequence = 0;
-                }
-            } else if (c == '/') {
-                if (schemeSequence == 2) {
-                    return true;
-                }
-                if (schemeSequence == 1) {
-                    schemeSequence++;
-                } else {
-                    schemeSequence = 0;
-                }
-            } else if (c == '.') {
-                if (dotSequence == 0 && lastChar != ' ') {
-                    dotSequence++;
-                } else {
-                    dotSequence = 0;
-                }
-            } else if (c != ' ' && lastChar == '.' && dotSequence == 1) {
-                return true;
-            } else {
-                dotSequence = 0;
-            }
-            lastChar = c;
-        }
-        return false;
-    }
-
     public void generateLinkDescription() {
         if (linkDescription != null) {
             return;
@@ -830,59 +1115,6 @@ public class MessageObject {
         }
     }
 
-    private static void addUsernamesAndHashtags(CharSequence charSequence, boolean botCommands) {
-        try {
-            if (urlPattern == null) {
-                urlPattern = Pattern.compile("(^|\\s)/[a-zA-Z@\\d_]{1,255}|(^|\\s)@[a-zA-Z\\d_]{1,32}|(^|\\s)#[\\w\\.]+");
-            }
-            Matcher matcher = urlPattern.matcher(charSequence);
-            while (matcher.find()) {
-                int start = matcher.start();
-                int end = matcher.end();
-                if (charSequence.charAt(start) != '@' && charSequence.charAt(start) != '#' && charSequence.charAt(start) != '/') {
-                    start++;
-                }
-                URLSpanNoUnderline url = null;
-                if (charSequence.charAt(start) == '/') {
-                    if (botCommands) {
-                        url = new URLSpanBotCommand(charSequence.subSequence(start, end).toString());
-                    }
-                } else {
-                    url = new URLSpanNoUnderline(charSequence.subSequence(start, end).toString());
-                }
-                if (url != null) {
-                    ((Spannable) charSequence).setSpan(url, start, end, 0);
-                }
-            }
-        } catch (Exception e) {
-            FileLog.e("tmessages", e);
-        }
-    }
-
-
-    public static void addLinks(CharSequence messageText) {
-        addLinks(messageText, true);
-    }
-
-    public static void addLinks(CharSequence messageText, boolean botCommands) {
-        if (messageText instanceof Spannable && containsUrls(messageText)) {
-            if (messageText.length() < 200) {
-                try {
-                    Linkify.addLinks((Spannable) messageText, Linkify.WEB_URLS | Linkify.PHONE_NUMBERS);
-                } catch (Exception e) {
-                    FileLog.e("tmessages", e);
-                }
-            } else {
-                try {
-                    Linkify.addLinks((Spannable) messageText, Linkify.WEB_URLS);
-                } catch (Exception e) {
-                    FileLog.e("tmessages", e);
-                }
-            }
-            addUsernamesAndHashtags(messageText, botCommands);
-        }
-    }
-
     private void generateLayout(TLRPC.User fromUser) {
         if (type != 0 || messageOwner.to_id == null || messageText == null || messageText.length() == 0) {
             return;
@@ -906,14 +1138,14 @@ public class MessageObject {
 
         boolean useManualParse = !hasEntities && (
                 messageOwner instanceof TLRPC.TL_message_old ||
-                messageOwner instanceof TLRPC.TL_message_old2 ||
-                messageOwner instanceof TLRPC.TL_message_old3 ||
-                messageOwner instanceof TLRPC.TL_message_old4 ||
-                messageOwner instanceof TLRPC.TL_messageForwarded_old ||
-                messageOwner instanceof TLRPC.TL_messageForwarded_old2 ||
-                messageOwner instanceof TLRPC.TL_message_secret ||
-                isOut() && messageOwner.send_state != MESSAGE_SEND_STATE_SENT ||
-                messageOwner.id < 0 || messageOwner.media instanceof TLRPC.TL_messageMediaUnsupported);
+                        messageOwner instanceof TLRPC.TL_message_old2 ||
+                        messageOwner instanceof TLRPC.TL_message_old3 ||
+                        messageOwner instanceof TLRPC.TL_message_old4 ||
+                        messageOwner instanceof TLRPC.TL_messageForwarded_old ||
+                        messageOwner instanceof TLRPC.TL_messageForwarded_old2 ||
+                        messageOwner instanceof TLRPC.TL_message_secret ||
+                        isOut() && messageOwner.send_state != MESSAGE_SEND_STATE_SENT ||
+                        messageOwner.id < 0 || messageOwner.media instanceof TLRPC.TL_messageMediaUnsupported);
 
         if (useManualParse) {
             addLinks(messageText);
@@ -985,13 +1217,19 @@ public class MessageObject {
         int maxWidth;
         if (AndroidUtilities.isTablet()) {
             if (messageOwner.from_id > 0 && (messageOwner.to_id.channel_id != 0 || messageOwner.to_id.chat_id != 0) && !isOut()) {
-                maxWidth = AndroidUtilities.getMinTabletSide() - AndroidUtilities.dp(122);
+                //  maxWidth = AndroidUtilities.getMinTabletSide() - AndroidUtilities.dp(122);
+                maxWidth = AndroidUtilities.getMinTabletSide() - AndroidUtilities.dp(leftBound + 70);
             } else {
                 maxWidth = AndroidUtilities.getMinTabletSide() - AndroidUtilities.dp(80);
             }
         } else {
-            if (messageOwner.from_id > 0 && (messageOwner.to_id.channel_id != 0 || messageOwner.to_id.chat_id != 0) && !isOut()) {
-                maxWidth = Math.min(AndroidUtilities.displaySize.x, AndroidUtilities.displaySize.y) - AndroidUtilities.dp(122);
+              /*if (messageOwner.from_id > 0 && (messageOwner.to_id.channel_id != 0 || messageOwner.to_id.chat_id != 0) && !isOut()) {
+                maxWidth = Math.min(AndroidUtilities.displaySize.x, AndroidUtilities.displaySize.y) - AndroidUtilities.dp(122);*/
+            if (messageOwner.from_id > 0 && (messageOwner.to_id.channel_id != 0 || messageOwner.to_id.chat_id != 0) && !isOut()
+                    || messageOwner.from_id > 0 && showMyAvatar && isOut()
+                    || (messageOwner.to_id.chat_id > 0 || messageOwner.to_id.channel_id > 0) && showMyAvatarGroup && isOut()
+                    || messageOwner.from_id > 0 && showAvatar && !isOutOwner()) {
+                maxWidth = Math.min(AndroidUtilities.displaySize.x, AndroidUtilities.displaySize.y) - AndroidUtilities.dp(leftBound + 70);
             } else {
                 maxWidth = Math.min(AndroidUtilities.displaySize.x, AndroidUtilities.displaySize.y) - AndroidUtilities.dp(80);
             }
@@ -1165,17 +1403,6 @@ public class MessageObject {
         return getUnreadFlags(messageOwner);
     }
 
-    public static int getUnreadFlags(TLRPC.Message message) {
-        int flags = 0;
-        if (!message.unread) {
-            flags |= 1;
-        }
-        if (!message.media_unread) {
-            flags |= 2;
-        }
-        return flags;
-    }
-
     public void setContentIsRead() {
         messageOwner.media_unread = false;
     }
@@ -1193,52 +1420,12 @@ public class MessageObject {
                 (messageOwner.media instanceof TLRPC.TL_messageMediaPhoto && messageOwner.ttl > 0 && messageOwner.ttl <= 60 || isVoice() || isVideo());
     }
 
-    public static void setUnreadFlags(TLRPC.Message message, int flag) {
-        message.unread = (flag & 1) == 0;
-        message.media_unread = (flag & 2) == 0;
-    }
-
-    public static boolean isUnread(TLRPC.Message message) {
-        return message.unread;
-    }
-
-    public static boolean isContentUnread(TLRPC.Message message) {
-        return message.media_unread;
-    }
-
     public boolean isMegagroup() {
         return isMegagroup(messageOwner);
     }
 
-    public static boolean isMegagroup(TLRPC.Message message) {
-        return (message.flags & TLRPC.MESSAGE_FLAG_MEGAGROUP) != 0;
-    }
-
-    public static boolean isOut(TLRPC.Message message) {
-        return message.out;
-    }
-
     public long getDialogId() {
         return getDialogId(messageOwner);
-    }
-
-    public static long getDialogId(TLRPC.Message message) {
-        if (message.dialog_id == 0 && message.to_id != null) {
-            if (message.to_id.chat_id != 0) {
-                if (message.to_id.chat_id < 0) {
-                    message.dialog_id = AndroidUtilities.makeBroadcastId(message.to_id.chat_id);
-                } else {
-                    message.dialog_id = -message.to_id.chat_id;
-                }
-            } else if (message.to_id.channel_id != 0) {
-                message.dialog_id = -message.to_id.channel_id;
-            } else if (isOut(message)) {
-                message.dialog_id = message.to_id.user_id;
-            } else {
-                message.dialog_id = message.from_id;
-            }
-        }
-        return message.dialog_id;
     }
 
     public boolean isSending() {
@@ -1277,103 +1464,11 @@ public class MessageObject {
         return "";
     }
 
-    public static boolean isStickerDocument(TLRPC.Document document) {
-        if (document != null) {
-            for (int a = 0; a < document.attributes.size(); a++) {
-                TLRPC.DocumentAttribute attribute = document.attributes.get(a);
-                if (attribute instanceof TLRPC.TL_documentAttributeSticker) {
-                    return true;
-                }
-            }
-        }
-        return false;
-    }
-
-    public static boolean isVoiceDocument(TLRPC.Document document) {
-        if (document != null) {
-            for (int a = 0; a < document.attributes.size(); a++) {
-                TLRPC.DocumentAttribute attribute = document.attributes.get(a);
-                if (attribute instanceof TLRPC.TL_documentAttributeAudio) {
-                    return attribute.voice;
-                }
-            }
-        }
-        return false;
-    }
-
-    public static boolean isMusicDocument(TLRPC.Document document) {
-        if (document != null) {
-            for (int a = 0; a < document.attributes.size(); a++) {
-                TLRPC.DocumentAttribute attribute = document.attributes.get(a);
-                if (attribute instanceof TLRPC.TL_documentAttributeAudio) {
-                    return !attribute.voice;
-                }
-            }
-        }
-        return false;
-    }
-
-    public static boolean isVideoDocument(TLRPC.Document document) {
-        if (document != null) {
-            boolean isAnimated = false;
-            boolean isVideo = false;
-            for (int a = 0; a < document.attributes.size(); a++) {
-                TLRPC.DocumentAttribute attribute = document.attributes.get(a);
-                if (attribute instanceof TLRPC.TL_documentAttributeVideo) {
-                    isVideo = true;
-                } else if (attribute instanceof TLRPC.TL_documentAttributeAnimated) {
-                    isAnimated = true;
-                }
-            }
-            return isVideo && !isAnimated;
-        }
-        return false;
-    }
-
     public TLRPC.Document getDocument() {
         if (messageOwner.media instanceof TLRPC.TL_messageMediaWebPage) {
             return messageOwner.media.webpage.document;
         }
         return messageOwner.media != null ? messageOwner.media.document : null;
-    }
-
-    public static boolean isStickerMessage(TLRPC.Message message) {
-        return message.media != null && message.media.document != null && isStickerDocument(message.media.document);
-    }
-
-    public static boolean isMusicMessage(TLRPC.Message message) {
-        if (message.media instanceof TLRPC.TL_messageMediaWebPage) {
-            return isMusicDocument(message.media.webpage.document);
-        }
-        return message.media != null && message.media.document != null && isMusicDocument(message.media.document);
-    }
-
-    public static boolean isVoiceMessage(TLRPC.Message message) {
-        if (message.media instanceof TLRPC.TL_messageMediaWebPage) {
-            return isVoiceDocument(message.media.webpage.document);
-        }
-        return message.media != null && message.media.document != null && isVoiceDocument(message.media.document);
-    }
-
-    public static boolean isVideoMessage(TLRPC.Message message) {
-        if (message.media instanceof TLRPC.TL_messageMediaWebPage) {
-            return isVideoDocument(message.media.webpage.document);
-        }
-        return message.media != null && message.media.document != null && isVideoDocument(message.media.document);
-    }
-
-    public static TLRPC.InputStickerSet getInputStickerSet(TLRPC.Message message) {
-        if (message.media != null && message.media.document != null) {
-            for (TLRPC.DocumentAttribute attribute : message.media.document.attributes) {
-                if (attribute instanceof TLRPC.TL_documentAttributeSticker) {
-                    if (attribute.stickerset instanceof TLRPC.TL_inputStickerSetEmpty) {
-                        return null;
-                    }
-                    return attribute.stickerset;
-                }
-            }
-        }
-        return null;
     }
 
     public String getStrickerChar() {
@@ -1431,7 +1526,7 @@ public class MessageObject {
             }
             if (photoHeight > maxHeight) {
                 photoWidth *= maxHeight / photoHeight;
-                photoHeight = (int)maxHeight;
+                photoHeight = (int) maxHeight;
             }
             if (photoWidth > maxWidth) {
                 photoHeight *= maxWidth / photoWidth;
@@ -1611,10 +1706,6 @@ public class MessageObject {
         return isForwardedMessage(messageOwner);
     }
 
-    public static boolean isForwardedMessage(TLRPC.Message message) {
-        return (message.flags & TLRPC.MESSAGE_FLAG_FWD) != 0;
-    }
-
     public boolean isReply() {
         return !(replyMessageObject != null && replyMessageObject.messageOwner instanceof TLRPC.TL_messageEmpty) && (messageOwner.reply_to_msg_id != 0 || messageOwner.reply_to_random_id != 0) && (messageOwner.flags & TLRPC.MESSAGE_FLAG_REPLY) != 0;
     }
@@ -1623,73 +1714,14 @@ public class MessageObject {
         return isMediaEmpty(messageOwner);
     }
 
-    public static boolean isMediaEmpty(TLRPC.Message message) {
-        return message == null || message.media == null || message.media instanceof TLRPC.TL_messageMediaEmpty || message.media instanceof TLRPC.TL_messageMediaWebPage;
-    }
-
     public boolean canEditMessage(TLRPC.Chat chat) {
         return canEditMessage(messageOwner, chat);
     }
 
-    public static boolean canEditMessage(TLRPC.Message message, TLRPC.Chat chat) {
-        if (message == null || message.to_id == null || message.action != null && !(message.action instanceof TLRPC.TL_messageActionEmpty) || isForwardedMessage(message) || message.via_bot_id != 0 || message.id < 0 || Math.abs(message.date - ConnectionsManager.getInstance().getCurrentTime()) > MessagesController.getInstance().maxEditTime) {
-            return false;
-        }
-        if (message.to_id.channel_id == 0) {
-            return message.out && (message.media instanceof TLRPC.TL_messageMediaPhoto ||
-                    message.media instanceof TLRPC.TL_messageMediaDocument && !isStickerMessage(message) ||
-                    message.media instanceof TLRPC.TL_messageMediaEmpty ||
-                    message.media instanceof TLRPC.TL_messageMediaWebPage ||
-                    message.media == null);
-        }
-        if (chat == null && message.to_id.channel_id != 0) {
-            chat = MessagesController.getInstance().getChat(message.to_id.channel_id);
-            if (chat == null) {
-                return false;
-            }
-        }
-        if (chat.megagroup && message.out || !chat.megagroup && (chat.creator || chat.editor && isOut(message)) && message.post) {
-            if (message.media instanceof TLRPC.TL_messageMediaPhoto ||
-                    message.media instanceof TLRPC.TL_messageMediaDocument && !isStickerMessage(message) ||
-                    message.media instanceof TLRPC.TL_messageMediaEmpty ||
-                    message.media instanceof TLRPC.TL_messageMediaWebPage ||
-                    message.media == null) {
-                return true;
-            }
-        }
-        return false;
-    }
-
     public boolean canDeleteMessage(TLRPC.Chat chat) {
-        return canDeleteMessage(messageOwner, chat);
-    }
-
-    public static boolean canDeleteMessage(TLRPC.Message message, TLRPC.Chat chat) {
-        if (message.id < 0) {
-            return true;
-        }
-        if (chat == null && message.to_id.channel_id != 0) {
-            chat = MessagesController.getInstance().getChat(message.to_id.channel_id);
-        }
-        if (ChatObject.isChannel(chat)) {
-            if (message.id == 1) {
-                return false;
-            }
-            if (chat.creator) {
-                return true;
-            } else if (chat.editor) {
-                if (isOut(message) || message.from_id > 0 && !message.post) {
-                    return true;
-                }
-            } else if (chat.moderator) {
-                if (message.from_id > 0 && !message.post) {
-                    return true;
-                }
-            } else if (isOut(message) && message.from_id > 0) {
-                return true;
-            }
-        }
-        return isOut(message) || !ChatObject.isChannel(chat);
+        //    return canDeleteMessage(messageOwner, chat);
+        // Teleh Code
+        return true;
     }
 
     public String getForwardedName() {
@@ -1740,5 +1772,13 @@ public class MessageObject {
                 }
             }
         }
+    }
+
+    public static class TextLayoutBlock {
+        public StaticLayout textLayout;
+        public float textXOffset;
+        public float textYOffset;
+        public int charactersOffset;
+        public int height;
     }
 }

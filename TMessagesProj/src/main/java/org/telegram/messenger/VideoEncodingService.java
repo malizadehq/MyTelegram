@@ -40,16 +40,16 @@ public class VideoEncodingService extends Service implements NotificationCenter.
     @Override
     public void didReceivedNotification(int id, Object... args) {
         if (id == NotificationCenter.FileUploadProgressChanged) {
-            String fileName = (String)args[0];
+            String fileName = (String) args[0];
             if (path != null && path.equals(fileName)) {
                 Float progress = (Float) args[1];
                 Boolean enc = (Boolean) args[2];
-                currentProgress = (int)(progress * 100);
+                currentProgress = (int) (progress * 100);
                 builder.setProgress(100, currentProgress, currentProgress == 0);
                 NotificationManagerCompat.from(ApplicationLoader.applicationContext).notify(4, builder.build());
             }
         } else if (id == NotificationCenter.stopEncodingService) {
-            String filepath = (String)args[0];
+            String filepath = (String) args[0];
             if (filepath == null || filepath.equals(path)) {
                 stopSelf();
             }

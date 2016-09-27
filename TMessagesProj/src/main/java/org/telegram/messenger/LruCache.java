@@ -26,14 +26,16 @@ public class LruCache {
     private final LinkedHashMap<String, BitmapDrawable> map;
     private final LinkedHashMap<String, ArrayList<String>> mapFilters;
 
-    /** Size of this cache in units. Not necessarily the number of elements. */
+    /**
+     * Size of this cache in units. Not necessarily the number of elements.
+     */
     private int size;
     private int maxSize;
 
     /**
      * @param maxSize for caches that do not override {@link #sizeOf}, this is
-     *     the maximum number of entries in the cache. For all other caches,
-     *     this is the maximum sum of the sizes of the entries in this cache.
+     *                the maximum number of entries in the cache. For all other caches,
+     *                this is the maximum sum of the sizes of the entries in this cache.
      */
     public LruCache(int maxSize) {
         if (maxSize <= 0) {
@@ -115,7 +117,7 @@ public class LruCache {
 
     /**
      * @param maxSize the maximum size of the cache before returning. May be -1
-     *     to evict even 0-sized elements.
+     *                to evict even 0-sized elements.
      */
     private void trimToSize(int maxSize, String justAdded) {
         synchronized (this) {
@@ -185,9 +187,9 @@ public class LruCache {
 
         return previous;
     }
-    
-    public boolean contains(String key){
-    	return map.containsKey(key);
+
+    public boolean contains(String key) {
+        return map.containsKey(key);
     }
 
     /**
@@ -195,17 +197,18 @@ public class LruCache {
      * invoked when a value is evicted to make space, removed by a call to
      * {@link #remove}, or replaced by a call to {@link #put}. The default
      * implementation does nothing.
-     *
+     * <p/>
      * <p>The method is called without synchronization: other threads may
      * access the cache while this method is executing.
      *
-     * @param evicted true if the entry is being removed to make space, false
-     *     if the removal was caused by a {@link #put} or {@link #remove}.
+     * @param evicted  true if the entry is being removed to make space, false
+     *                 if the removal was caused by a {@link #put} or {@link #remove}.
      * @param newValue the new value for {@code key}, if it exists. If non-null,
-     *     this removal was caused by a {@link #put}. Otherwise it was caused by
-     *     an eviction or a {@link #remove}.
+     *                 this removal was caused by a {@link #put}. Otherwise it was caused by
+     *                 an eviction or a {@link #remove}.
      */
-    protected void entryRemoved(boolean evicted, String key, BitmapDrawable oldValue, BitmapDrawable newValue) {}
+    protected void entryRemoved(boolean evicted, String key, BitmapDrawable oldValue, BitmapDrawable newValue) {
+    }
 
     private int safeSizeOf(String key, BitmapDrawable value) {
         int result = sizeOf(key, value);
@@ -219,7 +222,7 @@ public class LruCache {
      * Returns the size of the entry for {@code key} and {@code value} in
      * user-defined units.  The default implementation returns 1 so that size
      * is the number of entries and max size is the maximum number of entries.
-     *
+     * <p/>
      * <p>An entry's size must not change while it is in the cache.
      */
     protected int sizeOf(String key, BitmapDrawable value) {

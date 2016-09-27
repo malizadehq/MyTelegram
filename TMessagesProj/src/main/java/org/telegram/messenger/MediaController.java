@@ -78,41 +78,13 @@ import java.util.concurrent.Semaphore;
 
 public class MediaController implements AudioManager.OnAudioFocusChangeListener, NotificationCenter.NotificationCenterDelegate, SensorEventListener {
 
-    private native int startRecord(String path);
-    private native int writeFrame(ByteBuffer frame, int len);
-    private native void stopRecord();
-    private native int openOpusFile(String path);
-    private native int seekOpusFile(float position);
-    private native int isOpusFile(String path);
-    private native void closeOpusFile();
-    private native void readOpusFile(ByteBuffer buffer, int capacity, int[] args);
-    private native long getTotalPcmDuration();
-    public native byte[] getWaveform(String path);
-    public native byte[] getWaveform2(short[] array, int length);
-
-    public static int[] readArgs = new int[3];
-
-    public interface FileDownloadProgressListener {
-        void onFailedDownload(String fileName);
-        void onSuccessDownload(String fileName);
-        void onProgressDownload(String fileName, float progress);
-        void onProgressUpload(String fileName, float progress, boolean isEncrypted);
-        int getObserverTag();
-    }
-
-    private class AudioBuffer {
-        public AudioBuffer(int capacity) {
-            buffer = ByteBuffer.allocateDirect(capacity);
-            bufferBytes = new byte[capacity];
-        }
-
-        ByteBuffer buffer;
-        byte[] bufferBytes;
-        int size;
-        int finished;
-        long pcmOffset;
-    }
-
+    public final static String MIME_TYPE = "video/avc";
+    public static final int AUTODOWNLOAD_MASK_PHOTO = 1;
+    public static final int AUTODOWNLOAD_MASK_AUDIO = 2;
+    public static final int AUTODOWNLOAD_MASK_VIDEO = 4;
+    public static final int AUTODOWNLOAD_MASK_DOCUMENT = 8;
+    public static final int AUTODOWNLOAD_MASK_MUSIC = 16;
+    public static final int AUTODOWNLOAD_MASK_GIF = 32;
     private static final String[] projectionPhotos = {
             MediaStore.Images.Media._ID,
             MediaStore.Images.Media.BUCKET_ID,
@@ -121,7 +93,6 @@ public class MediaController implements AudioManager.OnAudioFocusChangeListener,
             MediaStore.Images.Media.DATE_TAKEN,
             MediaStore.Images.Media.ORIENTATION
     };
-
     private static final String[] projectionVideo = {
             MediaStore.Video.Media._ID,
             MediaStore.Video.Media.BUCKET_ID,
@@ -129,86 +100,30 @@ public class MediaController implements AudioManager.OnAudioFocusChangeListener,
             MediaStore.Video.Media.DATA,
             MediaStore.Video.Media.DATE_TAKEN
     };
-
-    public static class AudioEntry {
-        public long id;
-        public String author;
-        public String title;
-        public String genre;
-        public int duration;
-        public String path;
-        public MessageObject messageObject;
-    }
-
-    public static class AlbumEntry {
-        public int bucketId;
-        public String bucketName;
-        public PhotoEntry coverPhoto;
-        public ArrayList<PhotoEntry> photos = new ArrayList<>();
-        public HashMap<Integer, PhotoEntry> photosByIds = new HashMap<>();
-        public boolean isVideo;
-
-        public AlbumEntry(int bucketId, String bucketName, PhotoEntry coverPhoto, boolean isVideo) {
-            this.bucketId = bucketId;
-            this.bucketName = bucketName;
-            this.coverPhoto = coverPhoto;
-            this.isVideo = isVideo;
-        }
-
-        public void addPhoto(PhotoEntry photoEntry) {
-            photos.add(photoEntry);
-            photosByIds.put(photoEntry.imageId, photoEntry);
-        }
-    }
-
-    public static class PhotoEntry {
-        public int bucketId;
-        public int imageId;
-        public long dateTaken;
-        public String path;
-        public int orientation;
-        public String thumbPath;
-        public String imagePath;
-        public boolean isVideo;
-        public CharSequence caption;
-
-        public PhotoEntry(int bucketId, int imageId, long dateTaken, String path, int orientation, boolean isVideo) {
-            this.bucketId = bucketId;
-            this.imageId = imageId;
-            this.dateTaken = dateTaken;
-            this.path = path;
-            this.orientation = orientation;
-            this.isVideo = isVideo;
-        }
-    }
-
-    public static class SearchImage {
-        public String id;
-        public String imageUrl;
-        public String thumbUrl;
-        public String localUrl;
-        public int width;
-        public int height;
-        public int size;
-        public int type;
-        public int date;
-        public String thumbPath;
-        public String imagePath;
-        public CharSequence caption;
-        public TLRPC.Document document;
-    }
-
-    public final static String MIME_TYPE = "video/avc";
     private final static int PROCESSOR_TYPE_OTHER = 0;
     private final static int PROCESSOR_TYPE_QCOM = 1;
     private final static int PROCESSOR_TYPE_INTEL = 2;
     private final static int PROCESSOR_TYPE_MTK = 3;
     private final static int PROCESSOR_TYPE_SEC = 4;
     private final static int PROCESSOR_TYPE_TI = 5;
+    private static final float VOLUME_DUCK = 0.2f;
+    private static final float VOLUME_NORMAL = 1.0f;
+    private static final int AUDIO_NO_FOCUS_NO_DUCK = 0;
+    private static final int AUDIO_NO_FOCUS_CAN_DUCK = 1;
+    private static final int AUDIO_FOCUSED = 2;
+    public static int[] readArgs = new int[3];
+    public static AlbumEntry allPhotosAlbumEntry;
+    private static volatile MediaController Instance = null;
     private final Object videoConvertSync = new Object();
-
+    private final Object videoQueueSync = new Object();
+    private final Object progressTimerSync = new Object();
+    private final Object playerSync = new Object();
+    private final Object playerObjectSync = new Object();
+    private final Object sync = new Object();
+    public int mobileDataDownloadMask = 0;
+    public int wifiDownloadMask = 0;
+    public int roamingDownloadMask = 0;
     private HashMap<Long, Long> typingTimes = new HashMap<>();
-
     private SensorManager sensorManager;
     private boolean ignoreProximity;
     private PowerManager.WakeLock proximityWakeLock;
@@ -236,37 +151,17 @@ public class MediaController implements AudioManager.OnAudioFocusChangeListener,
     private float[] gravity = new float[3];
     private float[] gravityFast = new float[3];
     private float[] linearAcceleration = new float[3];
-
     private int hasAudioFocus;
     private boolean callInProgress;
     private int audioFocus = AUDIO_NO_FOCUS_NO_DUCK;
     private boolean resumeAudioOnFocusGain;
-
-    private static final float VOLUME_DUCK = 0.2f;
-    private static final float VOLUME_NORMAL = 1.0f;
-    private static final int AUDIO_NO_FOCUS_NO_DUCK = 0;
-    private static final int AUDIO_NO_FOCUS_CAN_DUCK = 1;
-    private static final int AUDIO_FOCUSED  = 2;
-
     private ArrayList<MessageObject> videoConvertQueue = new ArrayList<>();
-    private final Object videoQueueSync = new Object();
     private boolean cancelCurrentVideoConversion = false;
     private boolean videoConvertFirstWrite = true;
     private HashMap<String, MessageObject> generatingWaveform = new HashMap<>();
-
     private boolean voiceMessagesPlaylistUnread;
     private ArrayList<MessageObject> voiceMessagesPlaylist;
     private HashMap<Integer, MessageObject> voiceMessagesPlaylistMap;
-
-    public static final int AUTODOWNLOAD_MASK_PHOTO = 1;
-    public static final int AUTODOWNLOAD_MASK_AUDIO = 2;
-    public static final int AUTODOWNLOAD_MASK_VIDEO = 4;
-    public static final int AUTODOWNLOAD_MASK_DOCUMENT = 8;
-    public static final int AUTODOWNLOAD_MASK_MUSIC = 16;
-    public static final int AUTODOWNLOAD_MASK_GIF = 32;
-    public int mobileDataDownloadMask = 0;
-    public int wifiDownloadMask = 0;
-    public int roamingDownloadMask = 0;
     private int lastCheckMask = 0;
     private ArrayList<DownloadObject> photoDownloadQueue = new ArrayList<>();
     private ArrayList<DownloadObject> audioDownloadQueue = new ArrayList<>();
@@ -275,7 +170,6 @@ public class MediaController implements AudioManager.OnAudioFocusChangeListener,
     private ArrayList<DownloadObject> gifDownloadQueue = new ArrayList<>();
     private ArrayList<DownloadObject> videoDownloadQueue = new ArrayList<>();
     private HashMap<String, DownloadObject> downloadQueueKeys = new HashMap<>();
-
     private boolean saveToGallery = true;
     private boolean autoplayGifs = true;
     private boolean raiseToSpeak = true;
@@ -283,10 +177,7 @@ public class MediaController implements AudioManager.OnAudioFocusChangeListener,
     private boolean directShare = true;
     private boolean shuffleMusic;
     private int repeatMode;
-
     private Runnable refreshGalleryRunnable;
-    public static AlbumEntry allPhotosAlbumEntry;
-
     private HashMap<String, ArrayList<WeakReference<FileDownloadProgressListener>>> loadingFileObservers = new HashMap<>();
     private HashMap<String, ArrayList<MessageObject>> loadingFileMessagesObservers = new HashMap<>();
     private HashMap<Integer, String> observersByTag = new HashMap<>();
@@ -294,7 +185,6 @@ public class MediaController implements AudioManager.OnAudioFocusChangeListener,
     private HashMap<String, FileDownloadProgressListener> addLaterArray = new HashMap<>();
     private ArrayList<FileDownloadProgressListener> deleteLaterArray = new ArrayList<>();
     private int lastTag = 0;
-
     private boolean isPaused = false;
     private MediaPlayer audioPlayer = null;
     private AudioTrack audioTrackPlayer = null;
@@ -306,7 +196,6 @@ public class MediaController implements AudioManager.OnAudioFocusChangeListener,
     private long lastPlayPcm;
     private int ignoreFirstProgress = 0;
     private Timer progressTimer = null;
-    private final Object progressTimerSync = new Object();
     private int buffersWrited;
     private ArrayList<MessageObject> playlist = new ArrayList<>();
     private ArrayList<MessageObject> shuffledPlaylist = new ArrayList<>();
@@ -315,7 +204,6 @@ public class MediaController implements AudioManager.OnAudioFocusChangeListener,
     private boolean downloadingCurrentMessage;
     private boolean playMusicAgain;
     private AudioInfo audioInfo;
-
     private AudioRecord audioRecorder = null;
     private TLRPC.TL_document recordingAudio = null;
     private File recordingAudioFile = null;
@@ -327,18 +215,12 @@ public class MediaController implements AudioManager.OnAudioFocusChangeListener,
     private DispatchQueue playerQueue;
     private ArrayList<AudioBuffer> usedPlayerBuffers = new ArrayList<>();
     private ArrayList<AudioBuffer> freePlayerBuffers = new ArrayList<>();
-    private final Object playerSync = new Object();
-    private final Object playerObjectSync = new Object();
     private short[] recordSamples = new short[1024];
     private long samplesCount;
-
-    private final Object sync = new Object();
-
     private ArrayList<ByteBuffer> recordBuffers = new ArrayList<>();
     private ByteBuffer fileBuffer;
     private int recordBufferSize;
     private int sendAfterDone;
-
     private Runnable recordStartRunnable;
     private DispatchQueue recordQueue;
     private DispatchQueue fileEncodingQueue;
@@ -438,73 +320,6 @@ public class MediaController implements AudioManager.OnAudioFocusChangeListener,
             }
         }
     };
-
-    private class InternalObserver extends ContentObserver {
-        public InternalObserver() {
-            super(null);
-        }
-
-        @Override
-        public void onChange(boolean selfChange) {
-            super.onChange(selfChange);
-            processMediaObserver(MediaStore.Images.Media.INTERNAL_CONTENT_URI);
-        }
-    }
-
-    private class ExternalObserver extends ContentObserver {
-        public ExternalObserver() {
-            super(null);
-        }
-
-        @Override
-        public void onChange(boolean selfChange) {
-            super.onChange(selfChange);
-            processMediaObserver(MediaStore.Images.Media.EXTERNAL_CONTENT_URI);
-        }
-    }
-
-    private class GalleryObserverInternal extends ContentObserver {
-        public GalleryObserverInternal() {
-            super(null);
-        }
-
-        @Override
-        public void onChange(boolean selfChange) {
-            super.onChange(selfChange);
-            if (refreshGalleryRunnable != null) {
-                AndroidUtilities.cancelRunOnUIThread(refreshGalleryRunnable);
-            }
-            AndroidUtilities.runOnUIThread(refreshGalleryRunnable = new Runnable() {
-                @Override
-                public void run() {
-                    refreshGalleryRunnable = null;
-                    loadGalleryPhotosAlbums(0);
-                }
-            }, 2000);
-        }
-    }
-
-    private class GalleryObserverExternal extends ContentObserver {
-        public GalleryObserverExternal() {
-            super(null);
-        }
-
-        @Override
-        public void onChange(boolean selfChange) {
-            super.onChange(selfChange);
-            if (refreshGalleryRunnable != null) {
-                AndroidUtilities.cancelRunOnUIThread(refreshGalleryRunnable);
-            }
-            AndroidUtilities.runOnUIThread(refreshGalleryRunnable = new Runnable() {
-                @Override
-                public void run() {
-                    refreshGalleryRunnable = null;
-                    loadGalleryPhotosAlbums(0);
-                }
-            }, 2000);
-        }
-    }
-
     private ExternalObserver externalObserver = null;
     private InternalObserver internalObserver = null;
     private long lastSecretChatEnterTime = 0;
@@ -514,49 +329,7 @@ public class MediaController implements AudioManager.OnAudioFocusChangeListener,
     private ArrayList<Long> lastSecretChatVisibleMessages = null;
     private int startObserverToken = 0;
     private StopMediaObserverRunnable stopMediaObserverRunnable = null;
-
-    private final class StopMediaObserverRunnable implements Runnable {
-        public int currentObserverToken = 0;
-
-        @Override
-        public void run() {
-            if (currentObserverToken == startObserverToken) {
-                try {
-                    if (internalObserver != null) {
-                        ApplicationLoader.applicationContext.getContentResolver().unregisterContentObserver(internalObserver);
-                        internalObserver = null;
-                    }
-                } catch (Exception e) {
-                    FileLog.e("tmessages", e);
-                }
-                try {
-                    if (externalObserver != null) {
-                        ApplicationLoader.applicationContext.getContentResolver().unregisterContentObserver(externalObserver);
-                        externalObserver = null;
-                    }
-                } catch (Exception e) {
-                    FileLog.e("tmessages", e);
-                }
-            }
-        }
-    }
-
     private String[] mediaProjections = null;
-
-    private static volatile MediaController Instance = null;
-
-    public static MediaController getInstance() {
-        MediaController localInstance = Instance;
-        if (localInstance == null) {
-            synchronized (MediaController.class) {
-                localInstance = Instance;
-                if (localInstance == null) {
-                    Instance = localInstance = new MediaController();
-                }
-            }
-        }
-        return localInstance;
-    }
 
     public MediaController() {
         try {
@@ -699,6 +472,491 @@ public class MediaController implements AudioManager.OnAudioFocusChangeListener,
             FileLog.e("tmessages", e);
         }
     }
+
+    public static MediaController getInstance() {
+        MediaController localInstance = Instance;
+        if (localInstance == null) {
+            synchronized (MediaController.class) {
+                localInstance = Instance;
+                if (localInstance == null) {
+                    Instance = localInstance = new MediaController();
+                }
+            }
+        }
+        return localInstance;
+    }
+
+    public static void saveFile(String fullPath, Context context, final int type, final String name, final String mime) {
+        if (fullPath == null) {
+            return;
+        }
+
+        File file = null;
+        if (fullPath != null && fullPath.length() != 0) {
+            file = new File(fullPath);
+            if (!file.exists()) {
+                file = null;
+            }
+        }
+
+        if (file == null) {
+            return;
+        }
+
+        final File sourceFile = file;
+        if (sourceFile.exists()) {
+            ProgressDialog progressDialog = null;
+            if (context != null) {
+                try {
+                    progressDialog = new ProgressDialog(context);
+                    progressDialog.setMessage(LocaleController.getString("Loading", R.string.Loading));
+                    progressDialog.setCanceledOnTouchOutside(false);
+                    progressDialog.setCancelable(false);
+                    progressDialog.setProgressStyle(ProgressDialog.STYLE_HORIZONTAL);
+                    progressDialog.setMax(100);
+                    progressDialog.show();
+                } catch (Exception e) {
+                    FileLog.e("tmessages", e);
+                }
+            }
+
+            final ProgressDialog finalProgress = progressDialog;
+
+            new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        File destFile = null;
+                        if (type == 0) {
+                            destFile = AndroidUtilities.generatePicturePath();
+                        } else if (type == 1) {
+                            destFile = AndroidUtilities.generateVideoPath();
+                        } else if (type == 2) {
+                            File f = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
+                            f.mkdir();
+                            destFile = new File(f, name);
+                        } else if (type == 3) {
+                            File f = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC);
+                            f.mkdirs();
+                            destFile = new File(f, name);
+                        }
+
+                        if (!destFile.exists()) {
+                            destFile.createNewFile();
+                        }
+                        FileChannel source = null;
+                        FileChannel destination = null;
+                        boolean result = true;
+                        long lastProgress = System.currentTimeMillis() - 500;
+                        try {
+                            source = new FileInputStream(sourceFile).getChannel();
+                            destination = new FileOutputStream(destFile).getChannel();
+                            long size = source.size();
+                            for (long a = 0; a < size; a += 4096) {
+                                destination.transferFrom(source, a, Math.min(4096, size - a));
+                                if (finalProgress != null) {
+                                    if (lastProgress <= System.currentTimeMillis() - 500) {
+                                        lastProgress = System.currentTimeMillis();
+                                        final int progress = (int) ((float) a / (float) size * 100);
+                                        AndroidUtilities.runOnUIThread(new Runnable() {
+                                            @Override
+                                            public void run() {
+                                                try {
+                                                    finalProgress.setProgress(progress);
+                                                } catch (Exception e) {
+                                                    FileLog.e("tmessages", e);
+                                                }
+                                            }
+                                        });
+                                    }
+                                }
+                            }
+                        } catch (Exception e) {
+                            FileLog.e("tmessages", e);
+                            result = false;
+                        } finally {
+                            if (source != null) {
+                                source.close();
+                            }
+                            if (destination != null) {
+                                destination.close();
+                            }
+                        }
+
+                        if (result) {
+                            if (type == 2) {
+                                DownloadManager downloadManager = (DownloadManager) ApplicationLoader.applicationContext.getSystemService(Context.DOWNLOAD_SERVICE);
+                                downloadManager.addCompletedDownload(destFile.getName(), destFile.getName(), false, mime, destFile.getAbsolutePath(), destFile.length(), true);
+                            } else {
+                                AndroidUtilities.addMediaToGallery(Uri.fromFile(destFile));
+                            }
+                        }
+                    } catch (Exception e) {
+                        FileLog.e("tmessages", e);
+                    }
+                    if (finalProgress != null) {
+                        AndroidUtilities.runOnUIThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                try {
+                                    finalProgress.dismiss();
+                                } catch (Exception e) {
+                                    FileLog.e("tmessages", e);
+                                }
+                            }
+                        });
+                    }
+                }
+            }).start();
+        }
+    }
+
+    public static boolean isWebp(Uri uri) {
+        InputStream inputStream = null;
+        try {
+            inputStream = ApplicationLoader.applicationContext.getContentResolver().openInputStream(uri);
+            byte[] header = new byte[12];
+            if (inputStream.read(header, 0, 12) == 12) {
+                String str = new String(header);
+                if (str != null) {
+                    str = str.toLowerCase();
+                    if (str.startsWith("riff") && str.endsWith("webp")) {
+                        return true;
+                    }
+                }
+            }
+        } catch (Exception e) {
+            FileLog.e("tmessages", e);
+        } finally {
+            try {
+                if (inputStream != null) {
+                    inputStream.close();
+                }
+            } catch (Exception e2) {
+                FileLog.e("tmessages", e2);
+            }
+        }
+        return false;
+    }
+
+    public static boolean isGif(Uri uri) {
+        InputStream inputStream = null;
+        try {
+            inputStream = ApplicationLoader.applicationContext.getContentResolver().openInputStream(uri);
+            byte[] header = new byte[3];
+            if (inputStream.read(header, 0, 3) == 3) {
+                String str = new String(header);
+                if (str != null && str.equalsIgnoreCase("gif")) {
+                    return true;
+                }
+            }
+        } catch (Exception e) {
+            FileLog.e("tmessages", e);
+        } finally {
+            try {
+                if (inputStream != null) {
+                    inputStream.close();
+                }
+            } catch (Exception e2) {
+                FileLog.e("tmessages", e2);
+            }
+        }
+        return false;
+    }
+
+    public static String getFileName(Uri uri) {
+        String result = null;
+        if (uri.getScheme().equals("content")) {
+            Cursor cursor = null;
+            try {
+                cursor = ApplicationLoader.applicationContext.getContentResolver().query(uri, new String[]{OpenableColumns.DISPLAY_NAME}, null, null, null);
+                if (cursor.moveToFirst()) {
+                    result = cursor.getString(cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME));
+                }
+            } catch (Exception e) {
+                FileLog.e("tmessages", e);
+            } finally {
+                if (cursor != null) {
+                    cursor.close();
+                }
+            }
+        }
+        if (result == null) {
+            result = uri.getPath();
+            int cut = result.lastIndexOf('/');
+            if (cut != -1) {
+                result = result.substring(cut + 1);
+            }
+        }
+        return result;
+    }
+
+    public static String copyFileToCache(Uri uri, String ext) {
+        InputStream inputStream = null;
+        FileOutputStream output = null;
+        try {
+            String name = getFileName(uri);
+            if (name == null) {
+                int id = UserConfig.lastLocalId;
+                UserConfig.lastLocalId--;
+                UserConfig.saveConfig(false);
+                name = String.format(Locale.US, "%d.%s", id, ext);
+            }
+            inputStream = ApplicationLoader.applicationContext.getContentResolver().openInputStream(uri);
+            File f = new File(FileLoader.getInstance().getDirectory(FileLoader.MEDIA_DIR_CACHE), name);
+            output = new FileOutputStream(f);
+            byte[] buffer = new byte[1024 * 20];
+            int len;
+            while ((len = inputStream.read(buffer)) != -1) {
+                output.write(buffer, 0, len);
+            }
+            return f.getAbsolutePath();
+        } catch (Exception e) {
+            FileLog.e("tmessages", e);
+        } finally {
+            try {
+                if (inputStream != null) {
+                    inputStream.close();
+                }
+            } catch (Exception e2) {
+                FileLog.e("tmessages", e2);
+            }
+            try {
+                if (output != null) {
+                    output.close();
+                }
+            } catch (Exception e2) {
+                FileLog.e("tmessages", e2);
+            }
+        }
+        return null;
+    }
+
+    public static void loadGalleryPhotosAlbums(final int guid) {
+        Thread thread = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                final ArrayList<AlbumEntry> albumsSorted = new ArrayList<>();
+                final ArrayList<AlbumEntry> videoAlbumsSorted = new ArrayList<>();
+                HashMap<Integer, AlbumEntry> albums = new HashMap<>();
+                AlbumEntry allPhotosAlbum = null;
+                String cameraFolder = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM).getAbsolutePath() + "/" + "Camera/";
+                Integer cameraAlbumId = null;
+                Integer cameraAlbumVideoId = null;
+
+                Cursor cursor = null;
+                try {
+                    if (Build.VERSION.SDK_INT < 23 || Build.VERSION.SDK_INT >= 23 && ApplicationLoader.applicationContext.checkSelfPermission(Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED) {
+                        cursor = MediaStore.Images.Media.query(ApplicationLoader.applicationContext.getContentResolver(), MediaStore.Images.Media.EXTERNAL_CONTENT_URI, projectionPhotos, null, null, MediaStore.Images.Media.DATE_TAKEN + " DESC");
+                        if (cursor != null) {
+                            int imageIdColumn = cursor.getColumnIndex(MediaStore.Images.Media._ID);
+                            int bucketIdColumn = cursor.getColumnIndex(MediaStore.Images.Media.BUCKET_ID);
+                            int bucketNameColumn = cursor.getColumnIndex(MediaStore.Images.Media.BUCKET_DISPLAY_NAME);
+                            int dataColumn = cursor.getColumnIndex(MediaStore.Images.Media.DATA);
+                            int dateColumn = cursor.getColumnIndex(MediaStore.Images.Media.DATE_TAKEN);
+                            int orientationColumn = cursor.getColumnIndex(MediaStore.Images.Media.ORIENTATION);
+
+                            while (cursor.moveToNext()) {
+                                int imageId = cursor.getInt(imageIdColumn);
+                                int bucketId = cursor.getInt(bucketIdColumn);
+                                String bucketName = cursor.getString(bucketNameColumn);
+                                String path = cursor.getString(dataColumn);
+                                long dateTaken = cursor.getLong(dateColumn);
+                                int orientation = cursor.getInt(orientationColumn);
+
+                                if (path == null || path.length() == 0) {
+                                    continue;
+                                }
+
+                                PhotoEntry photoEntry = new PhotoEntry(bucketId, imageId, dateTaken, path, orientation, false);
+
+                                if (allPhotosAlbum == null) {
+                                    allPhotosAlbum = new AlbumEntry(0, LocaleController.getString("AllPhotos", R.string.AllPhotos), photoEntry, false);
+                                    albumsSorted.add(0, allPhotosAlbum);
+                                }
+                                if (allPhotosAlbum != null) {
+                                    allPhotosAlbum.addPhoto(photoEntry);
+                                }
+
+                                AlbumEntry albumEntry = albums.get(bucketId);
+                                if (albumEntry == null) {
+                                    albumEntry = new AlbumEntry(bucketId, bucketName, photoEntry, false);
+                                    albums.put(bucketId, albumEntry);
+                                    if (cameraAlbumId == null && cameraFolder != null && path != null && path.startsWith(cameraFolder)) {
+                                        albumsSorted.add(0, albumEntry);
+                                        cameraAlbumId = bucketId;
+                                    } else {
+                                        albumsSorted.add(albumEntry);
+                                    }
+                                }
+
+                                albumEntry.addPhoto(photoEntry);
+                            }
+                        }
+                    }
+                } catch (Throwable e) {
+                    FileLog.e("tmessages", e);
+                } finally {
+                    if (cursor != null) {
+                        try {
+                            cursor.close();
+                        } catch (Exception e) {
+                            FileLog.e("tmessages", e);
+                        }
+                    }
+                }
+
+                try {
+                    if (Build.VERSION.SDK_INT < 23 || Build.VERSION.SDK_INT >= 23 && ApplicationLoader.applicationContext.checkSelfPermission(Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED) {
+                        albums.clear();
+                        AlbumEntry allVideosAlbum = null;
+                        cursor = MediaStore.Images.Media.query(ApplicationLoader.applicationContext.getContentResolver(), MediaStore.Video.Media.EXTERNAL_CONTENT_URI, projectionVideo, null, null, MediaStore.Video.Media.DATE_TAKEN + " DESC");
+                        if (cursor != null) {
+                            int imageIdColumn = cursor.getColumnIndex(MediaStore.Video.Media._ID);
+                            int bucketIdColumn = cursor.getColumnIndex(MediaStore.Video.Media.BUCKET_ID);
+                            int bucketNameColumn = cursor.getColumnIndex(MediaStore.Video.Media.BUCKET_DISPLAY_NAME);
+                            int dataColumn = cursor.getColumnIndex(MediaStore.Video.Media.DATA);
+                            int dateColumn = cursor.getColumnIndex(MediaStore.Video.Media.DATE_TAKEN);
+
+                            while (cursor.moveToNext()) {
+                                int imageId = cursor.getInt(imageIdColumn);
+                                int bucketId = cursor.getInt(bucketIdColumn);
+                                String bucketName = cursor.getString(bucketNameColumn);
+                                String path = cursor.getString(dataColumn);
+                                long dateTaken = cursor.getLong(dateColumn);
+
+                                if (path == null || path.length() == 0) {
+                                    continue;
+                                }
+
+                                PhotoEntry photoEntry = new PhotoEntry(bucketId, imageId, dateTaken, path, 0, true);
+
+                                if (allVideosAlbum == null) {
+                                    allVideosAlbum = new AlbumEntry(0, LocaleController.getString("AllVideo", R.string.AllVideo), photoEntry, true);
+                                    videoAlbumsSorted.add(0, allVideosAlbum);
+                                }
+                                if (allVideosAlbum != null) {
+                                    allVideosAlbum.addPhoto(photoEntry);
+                                }
+
+                                AlbumEntry albumEntry = albums.get(bucketId);
+                                if (albumEntry == null) {
+                                    albumEntry = new AlbumEntry(bucketId, bucketName, photoEntry, true);
+                                    albums.put(bucketId, albumEntry);
+                                    if (cameraAlbumVideoId == null && cameraFolder != null && path != null && path.startsWith(cameraFolder)) {
+                                        videoAlbumsSorted.add(0, albumEntry);
+                                        cameraAlbumVideoId = bucketId;
+                                    } else {
+                                        videoAlbumsSorted.add(albumEntry);
+                                    }
+                                }
+
+                                albumEntry.addPhoto(photoEntry);
+                            }
+                        }
+                    }
+                } catch (Throwable e) {
+                    FileLog.e("tmessages", e);
+                } finally {
+                    if (cursor != null) {
+                        try {
+                            cursor.close();
+                        } catch (Exception e) {
+                            FileLog.e("tmessages", e);
+                        }
+                    }
+                }
+
+                final Integer cameraAlbumIdFinal = cameraAlbumId;
+                final Integer cameraAlbumVideoIdFinal = cameraAlbumVideoId;
+                final AlbumEntry allPhotosAlbumFinal = allPhotosAlbum;
+                AndroidUtilities.runOnUIThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        allPhotosAlbumEntry = allPhotosAlbumFinal;
+                        NotificationCenter.getInstance().postNotificationName(NotificationCenter.albumsDidLoaded, guid, albumsSorted, cameraAlbumIdFinal, videoAlbumsSorted, cameraAlbumVideoIdFinal);
+                    }
+                });
+            }
+        });
+        thread.setPriority(Thread.MIN_PRIORITY);
+        thread.start();
+    }
+
+    @SuppressLint("NewApi")
+    public static MediaCodecInfo selectCodec(String mimeType) {
+        int numCodecs = MediaCodecList.getCodecCount();
+        MediaCodecInfo lastCodecInfo = null;
+        for (int i = 0; i < numCodecs; i++) {
+            MediaCodecInfo codecInfo = MediaCodecList.getCodecInfoAt(i);
+            if (!codecInfo.isEncoder()) {
+                continue;
+            }
+            String[] types = codecInfo.getSupportedTypes();
+            for (String type : types) {
+                if (type.equalsIgnoreCase(mimeType)) {
+                    lastCodecInfo = codecInfo;
+                    if (!lastCodecInfo.getName().equals("OMX.SEC.avc.enc")) {
+                        return lastCodecInfo;
+                    } else if (lastCodecInfo.getName().equals("OMX.SEC.AVC.Encoder")) {
+                        return lastCodecInfo;
+                    }
+                }
+            }
+        }
+        return lastCodecInfo;
+    }
+
+    private static boolean isRecognizedFormat(int colorFormat) {
+        switch (colorFormat) {
+            case MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420Planar:
+            case MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420PackedPlanar:
+            case MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420SemiPlanar:
+            case MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420PackedSemiPlanar:
+            case MediaCodecInfo.CodecCapabilities.COLOR_TI_FormatYUV420PackedSemiPlanar:
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    @SuppressLint("NewApi")
+    public static int selectColorFormat(MediaCodecInfo codecInfo, String mimeType) {
+        MediaCodecInfo.CodecCapabilities capabilities = codecInfo.getCapabilitiesForType(mimeType);
+        int lastColorFormat = 0;
+        for (int i = 0; i < capabilities.colorFormats.length; i++) {
+            int colorFormat = capabilities.colorFormats[i];
+            if (isRecognizedFormat(colorFormat)) {
+                lastColorFormat = colorFormat;
+                if (!(codecInfo.getName().equals("OMX.SEC.AVC.Encoder") && colorFormat == 19)) {
+                    return colorFormat;
+                }
+            }
+        }
+        return lastColorFormat;
+    }
+
+    private native int startRecord(String path);
+
+    private native int writeFrame(ByteBuffer frame, int len);
+
+    private native void stopRecord();
+
+    private native int openOpusFile(String path);
+
+    private native int seekOpusFile(float position);
+
+    private native int isOpusFile(String path);
+
+    private native void closeOpusFile();
+
+    private native void readOpusFile(ByteBuffer buffer, int capacity, int[] args);
+
+    private native long getTotalPcmDuration();
+
+    public native byte[] getWaveform(String path);
+
+    public native byte[] getWaveform2(short[] array, int length);
 
     @Override
     public void onAudioFocusChange(int focusChange) {
@@ -2757,252 +3015,6 @@ public class MediaController implements AudioManager.OnAudioFocusChangeListener,
         });
     }
 
-    public static void saveFile(String fullPath, Context context, final int type, final String name, final String mime) {
-        if (fullPath == null) {
-            return;
-        }
-
-        File file = null;
-        if (fullPath != null && fullPath.length() != 0) {
-            file = new File(fullPath);
-            if (!file.exists()) {
-                file = null;
-            }
-        }
-
-        if (file == null) {
-            return;
-        }
-
-        final File sourceFile = file;
-        if (sourceFile.exists()) {
-            ProgressDialog progressDialog = null;
-            if (context != null) {
-                try {
-                    progressDialog = new ProgressDialog(context);
-                    progressDialog.setMessage(LocaleController.getString("Loading", R.string.Loading));
-                    progressDialog.setCanceledOnTouchOutside(false);
-                    progressDialog.setCancelable(false);
-                    progressDialog.setProgressStyle(ProgressDialog.STYLE_HORIZONTAL);
-                    progressDialog.setMax(100);
-                    progressDialog.show();
-                } catch (Exception e) {
-                    FileLog.e("tmessages", e);
-                }
-            }
-
-            final ProgressDialog finalProgress = progressDialog;
-
-            new Thread(new Runnable() {
-                @Override
-                public void run() {
-                    try {
-                        File destFile = null;
-                        if (type == 0) {
-                            destFile = AndroidUtilities.generatePicturePath();
-                        } else if (type == 1) {
-                            destFile = AndroidUtilities.generateVideoPath();
-                        } else if (type == 2) {
-                            File f = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
-                            f.mkdir();
-                            destFile = new File(f, name);
-                        } else if (type == 3) {
-                            File f = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC);
-                            f.mkdirs();
-                            destFile = new File(f, name);
-                        }
-
-                        if (!destFile.exists()) {
-                            destFile.createNewFile();
-                        }
-                        FileChannel source = null;
-                        FileChannel destination = null;
-                        boolean result = true;
-                        long lastProgress = System.currentTimeMillis() - 500;
-                        try {
-                            source = new FileInputStream(sourceFile).getChannel();
-                            destination = new FileOutputStream(destFile).getChannel();
-                            long size = source.size();
-                            for (long a = 0; a < size; a += 4096) {
-                                destination.transferFrom(source, a, Math.min(4096, size - a));
-                                if (finalProgress != null) {
-                                    if (lastProgress <= System.currentTimeMillis() - 500) {
-                                        lastProgress = System.currentTimeMillis();
-                                        final int progress = (int) ((float) a / (float) size * 100);
-                                        AndroidUtilities.runOnUIThread(new Runnable() {
-                                            @Override
-                                            public void run() {
-                                                try {
-                                                    finalProgress.setProgress(progress);
-                                                } catch (Exception e) {
-                                                    FileLog.e("tmessages", e);
-                                                }
-                                            }
-                                        });
-                                    }
-                                }
-                            }
-                        } catch (Exception e) {
-                            FileLog.e("tmessages", e);
-                            result = false;
-                        } finally {
-                            if (source != null) {
-                                source.close();
-                            }
-                            if (destination != null) {
-                                destination.close();
-                            }
-                        }
-
-                        if (result) {
-                            if (type == 2) {
-                                DownloadManager downloadManager = (DownloadManager) ApplicationLoader.applicationContext.getSystemService(Context.DOWNLOAD_SERVICE);
-                                downloadManager.addCompletedDownload(destFile.getName(), destFile.getName(), false, mime, destFile.getAbsolutePath(), destFile.length(), true);
-                            } else {
-                                AndroidUtilities.addMediaToGallery(Uri.fromFile(destFile));
-                            }
-                        }
-                    } catch (Exception e) {
-                        FileLog.e("tmessages", e);
-                    }
-                    if (finalProgress != null) {
-                        AndroidUtilities.runOnUIThread(new Runnable() {
-                            @Override
-                            public void run() {
-                                try {
-                                    finalProgress.dismiss();
-                                } catch (Exception e) {
-                                    FileLog.e("tmessages", e);
-                                }
-                            }
-                        });
-                    }
-                }
-            }).start();
-        }
-    }
-
-    public static boolean isWebp(Uri uri) {
-        InputStream inputStream = null;
-        try {
-            inputStream = ApplicationLoader.applicationContext.getContentResolver().openInputStream(uri);
-            byte[] header = new byte[12];
-            if (inputStream.read(header, 0, 12) == 12) {
-                String str = new String(header);
-                if (str != null) {
-                    str = str.toLowerCase();
-                    if (str.startsWith("riff") && str.endsWith("webp")) {
-                        return true;
-                    }
-                }
-            }
-        } catch (Exception e) {
-            FileLog.e("tmessages", e);
-        } finally {
-            try {
-                if (inputStream != null) {
-                    inputStream.close();
-                }
-            } catch (Exception e2) {
-                FileLog.e("tmessages", e2);
-            }
-        }
-        return false;
-    }
-
-    public static boolean isGif(Uri uri) {
-        InputStream inputStream = null;
-        try {
-            inputStream = ApplicationLoader.applicationContext.getContentResolver().openInputStream(uri);
-            byte[] header = new byte[3];
-            if (inputStream.read(header, 0, 3) == 3) {
-                String str = new String(header);
-                if (str != null && str.equalsIgnoreCase("gif")) {
-                    return true;
-                }
-            }
-        } catch (Exception e) {
-            FileLog.e("tmessages", e);
-        } finally {
-            try {
-                if (inputStream != null) {
-                    inputStream.close();
-                }
-            } catch (Exception e2) {
-                FileLog.e("tmessages", e2);
-            }
-        }
-        return false;
-    }
-
-    public static String getFileName(Uri uri) {
-        String result = null;
-        if (uri.getScheme().equals("content")) {
-            Cursor cursor = null;
-            try {
-                cursor = ApplicationLoader.applicationContext.getContentResolver().query(uri, new String[]{OpenableColumns.DISPLAY_NAME}, null, null, null);
-                if (cursor.moveToFirst()) {
-                    result = cursor.getString(cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME));
-                }
-            } catch (Exception e) {
-                FileLog.e("tmessages", e);
-            } finally {
-                if (cursor != null) {
-                    cursor.close();
-                }
-            }
-        }
-        if (result == null) {
-            result = uri.getPath();
-            int cut = result.lastIndexOf('/');
-            if (cut != -1) {
-                result = result.substring(cut + 1);
-            }
-        }
-        return result;
-    }
-
-    public static String copyFileToCache(Uri uri, String ext) {
-        InputStream inputStream = null;
-        FileOutputStream output = null;
-        try {
-            String name = getFileName(uri);
-            if (name == null) {
-                int id = UserConfig.lastLocalId;
-                UserConfig.lastLocalId--;
-                UserConfig.saveConfig(false);
-                name = String.format(Locale.US, "%d.%s", id, ext);
-            }
-            inputStream = ApplicationLoader.applicationContext.getContentResolver().openInputStream(uri);
-            File f = new File(FileLoader.getInstance().getDirectory(FileLoader.MEDIA_DIR_CACHE), name);
-            output = new FileOutputStream(f);
-            byte[] buffer = new byte[1024 * 20];
-            int len;
-            while ((len = inputStream.read(buffer)) != -1) {
-                output.write(buffer, 0, len);
-            }
-            return f.getAbsolutePath();
-        } catch (Exception e) {
-            FileLog.e("tmessages", e);
-        } finally {
-            try {
-                if (inputStream != null) {
-                    inputStream.close();
-                }
-            } catch (Exception e2) {
-                FileLog.e("tmessages", e2);
-            }
-            try {
-                if (output != null) {
-                    output.close();
-                }
-            } catch (Exception e2) {
-                FileLog.e("tmessages", e2);
-            }
-        }
-        return null;
-    }
-
     public void toggleSaveToGallery() {
         saveToGallery = !saveToGallery;
         SharedPreferences preferences = ApplicationLoader.applicationContext.getSharedPreferences("mainconfig", Activity.MODE_PRIVATE);
@@ -3092,157 +3104,6 @@ public class MediaController implements AudioManager.OnAudioFocusChangeListener,
         return directShare;
     }
 
-    public static void loadGalleryPhotosAlbums(final int guid) {
-        Thread thread = new Thread(new Runnable() {
-            @Override
-            public void run() {
-                final ArrayList<AlbumEntry> albumsSorted = new ArrayList<>();
-                final ArrayList<AlbumEntry> videoAlbumsSorted = new ArrayList<>();
-                HashMap<Integer, AlbumEntry> albums = new HashMap<>();
-                AlbumEntry allPhotosAlbum = null;
-                String cameraFolder = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM).getAbsolutePath() + "/" + "Camera/";
-                Integer cameraAlbumId = null;
-                Integer cameraAlbumVideoId = null;
-
-                Cursor cursor = null;
-                try {
-                    if (Build.VERSION.SDK_INT < 23 || Build.VERSION.SDK_INT >= 23 && ApplicationLoader.applicationContext.checkSelfPermission(Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED) {
-                        cursor = MediaStore.Images.Media.query(ApplicationLoader.applicationContext.getContentResolver(), MediaStore.Images.Media.EXTERNAL_CONTENT_URI, projectionPhotos, null, null, MediaStore.Images.Media.DATE_TAKEN + " DESC");
-                        if (cursor != null) {
-                            int imageIdColumn = cursor.getColumnIndex(MediaStore.Images.Media._ID);
-                            int bucketIdColumn = cursor.getColumnIndex(MediaStore.Images.Media.BUCKET_ID);
-                            int bucketNameColumn = cursor.getColumnIndex(MediaStore.Images.Media.BUCKET_DISPLAY_NAME);
-                            int dataColumn = cursor.getColumnIndex(MediaStore.Images.Media.DATA);
-                            int dateColumn = cursor.getColumnIndex(MediaStore.Images.Media.DATE_TAKEN);
-                            int orientationColumn = cursor.getColumnIndex(MediaStore.Images.Media.ORIENTATION);
-
-                            while (cursor.moveToNext()) {
-                                int imageId = cursor.getInt(imageIdColumn);
-                                int bucketId = cursor.getInt(bucketIdColumn);
-                                String bucketName = cursor.getString(bucketNameColumn);
-                                String path = cursor.getString(dataColumn);
-                                long dateTaken = cursor.getLong(dateColumn);
-                                int orientation = cursor.getInt(orientationColumn);
-
-                                if (path == null || path.length() == 0) {
-                                    continue;
-                                }
-
-                                PhotoEntry photoEntry = new PhotoEntry(bucketId, imageId, dateTaken, path, orientation, false);
-
-                                if (allPhotosAlbum == null) {
-                                    allPhotosAlbum = new AlbumEntry(0, LocaleController.getString("AllPhotos", R.string.AllPhotos), photoEntry, false);
-                                    albumsSorted.add(0, allPhotosAlbum);
-                                }
-                                if (allPhotosAlbum != null) {
-                                    allPhotosAlbum.addPhoto(photoEntry);
-                                }
-
-                                AlbumEntry albumEntry = albums.get(bucketId);
-                                if (albumEntry == null) {
-                                    albumEntry = new AlbumEntry(bucketId, bucketName, photoEntry, false);
-                                    albums.put(bucketId, albumEntry);
-                                    if (cameraAlbumId == null && cameraFolder != null && path != null && path.startsWith(cameraFolder)) {
-                                        albumsSorted.add(0, albumEntry);
-                                        cameraAlbumId = bucketId;
-                                    } else {
-                                        albumsSorted.add(albumEntry);
-                                    }
-                                }
-
-                                albumEntry.addPhoto(photoEntry);
-                            }
-                        }
-                    }
-                } catch (Throwable e) {
-                    FileLog.e("tmessages", e);
-                } finally {
-                    if (cursor != null) {
-                        try {
-                            cursor.close();
-                        } catch (Exception e) {
-                            FileLog.e("tmessages", e);
-                        }
-                    }
-                }
-
-                try {
-                    if (Build.VERSION.SDK_INT < 23 || Build.VERSION.SDK_INT >= 23 && ApplicationLoader.applicationContext.checkSelfPermission(Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED) {
-                        albums.clear();
-                        AlbumEntry allVideosAlbum = null;
-                        cursor = MediaStore.Images.Media.query(ApplicationLoader.applicationContext.getContentResolver(), MediaStore.Video.Media.EXTERNAL_CONTENT_URI, projectionVideo, null, null, MediaStore.Video.Media.DATE_TAKEN + " DESC");
-                        if (cursor != null) {
-                            int imageIdColumn = cursor.getColumnIndex(MediaStore.Video.Media._ID);
-                            int bucketIdColumn = cursor.getColumnIndex(MediaStore.Video.Media.BUCKET_ID);
-                            int bucketNameColumn = cursor.getColumnIndex(MediaStore.Video.Media.BUCKET_DISPLAY_NAME);
-                            int dataColumn = cursor.getColumnIndex(MediaStore.Video.Media.DATA);
-                            int dateColumn = cursor.getColumnIndex(MediaStore.Video.Media.DATE_TAKEN);
-
-                            while (cursor.moveToNext()) {
-                                int imageId = cursor.getInt(imageIdColumn);
-                                int bucketId = cursor.getInt(bucketIdColumn);
-                                String bucketName = cursor.getString(bucketNameColumn);
-                                String path = cursor.getString(dataColumn);
-                                long dateTaken = cursor.getLong(dateColumn);
-
-                                if (path == null || path.length() == 0) {
-                                    continue;
-                                }
-
-                                PhotoEntry photoEntry = new PhotoEntry(bucketId, imageId, dateTaken, path, 0, true);
-
-                                if (allVideosAlbum == null) {
-                                    allVideosAlbum = new AlbumEntry(0, LocaleController.getString("AllVideo", R.string.AllVideo), photoEntry, true);
-                                    videoAlbumsSorted.add(0, allVideosAlbum);
-                                }
-                                if (allVideosAlbum != null) {
-                                    allVideosAlbum.addPhoto(photoEntry);
-                                }
-
-                                AlbumEntry albumEntry = albums.get(bucketId);
-                                if (albumEntry == null) {
-                                    albumEntry = new AlbumEntry(bucketId, bucketName, photoEntry, true);
-                                    albums.put(bucketId, albumEntry);
-                                    if (cameraAlbumVideoId == null && cameraFolder != null && path != null && path.startsWith(cameraFolder)) {
-                                        videoAlbumsSorted.add(0, albumEntry);
-                                        cameraAlbumVideoId = bucketId;
-                                    } else {
-                                        videoAlbumsSorted.add(albumEntry);
-                                    }
-                                }
-
-                                albumEntry.addPhoto(photoEntry);
-                            }
-                        }
-                    }
-                } catch (Throwable e) {
-                    FileLog.e("tmessages", e);
-                } finally {
-                    if (cursor != null) {
-                        try {
-                            cursor.close();
-                        } catch (Exception e) {
-                            FileLog.e("tmessages", e);
-                        }
-                    }
-                }
-
-                final Integer cameraAlbumIdFinal = cameraAlbumId;
-                final Integer cameraAlbumVideoIdFinal = cameraAlbumVideoId;
-                final AlbumEntry allPhotosAlbumFinal = allPhotosAlbum;
-                AndroidUtilities.runOnUIThread(new Runnable() {
-                    @Override
-                    public void run() {
-                        allPhotosAlbumEntry = allPhotosAlbumFinal;
-                        NotificationCenter.getInstance().postNotificationName(NotificationCenter.albumsDidLoaded, guid, albumsSorted, cameraAlbumIdFinal, videoAlbumsSorted, cameraAlbumVideoIdFinal);
-                    }
-                });
-            }
-        });
-        thread.setPriority(Thread.MIN_PRIORITY);
-        thread.start();
-    }
-
     public void scheduleVideoConvert(MessageObject messageObject) {
         videoConvertQueue.add(messageObject);
         if (videoConvertQueue.size() == 1) {
@@ -3278,59 +3139,6 @@ public class MediaController implements AudioManager.OnAudioFocusChangeListener,
             ApplicationLoader.applicationContext.startService(intent);
             VideoConvertRunnable.runConversion(messageObject);
         }
-    }
-
-    @SuppressLint("NewApi")
-    public static MediaCodecInfo selectCodec(String mimeType) {
-        int numCodecs = MediaCodecList.getCodecCount();
-        MediaCodecInfo lastCodecInfo = null;
-        for (int i = 0; i < numCodecs; i++) {
-            MediaCodecInfo codecInfo = MediaCodecList.getCodecInfoAt(i);
-            if (!codecInfo.isEncoder()) {
-                continue;
-            }
-            String[] types = codecInfo.getSupportedTypes();
-            for (String type : types) {
-                if (type.equalsIgnoreCase(mimeType)) {
-                    lastCodecInfo = codecInfo;
-                    if (!lastCodecInfo.getName().equals("OMX.SEC.avc.enc")) {
-                        return lastCodecInfo;
-                    } else if (lastCodecInfo.getName().equals("OMX.SEC.AVC.Encoder")) {
-                        return lastCodecInfo;
-                    }
-                }
-            }
-        }
-        return lastCodecInfo;
-    }
-
-    private static boolean isRecognizedFormat(int colorFormat) {
-        switch (colorFormat) {
-            case MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420Planar:
-            case MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420PackedPlanar:
-            case MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420SemiPlanar:
-            case MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420PackedSemiPlanar:
-            case MediaCodecInfo.CodecCapabilities.COLOR_TI_FormatYUV420PackedSemiPlanar:
-                return true;
-            default:
-                return false;
-        }
-    }
-
-    @SuppressLint("NewApi")
-    public static int selectColorFormat(MediaCodecInfo codecInfo, String mimeType) {
-        MediaCodecInfo.CodecCapabilities capabilities = codecInfo.getCapabilitiesForType(mimeType);
-        int lastColorFormat = 0;
-        for (int i = 0; i < capabilities.colorFormats.length; i++) {
-            int colorFormat = capabilities.colorFormats[i];
-            if (isRecognizedFormat(colorFormat)) {
-                lastColorFormat = colorFormat;
-                if (!(codecInfo.getName().equals("OMX.SEC.AVC.Encoder") && colorFormat == 19)) {
-                    return colorFormat;
-                }
-            }
-        }
-        return lastColorFormat;
     }
 
     @TargetApi(16)
@@ -3449,36 +3257,6 @@ public class MediaController implements AudioManager.OnAudioFocusChangeListener,
         return -1;
     }
 
-    private static class VideoConvertRunnable implements Runnable {
-
-        private MessageObject messageObject;
-
-        private VideoConvertRunnable(MessageObject message) {
-            messageObject = message;
-        }
-
-        @Override
-        public void run() {
-            MediaController.getInstance().convertVideo(messageObject);
-        }
-
-        public static void runConversion(final MessageObject obj) {
-            new Thread(new Runnable() {
-                @Override
-                public void run() {
-                    try {
-                        VideoConvertRunnable wrapper = new VideoConvertRunnable(obj);
-                        Thread th = new Thread(wrapper, "VideoConvertRunnable");
-                        th.start();
-                        th.join();
-                    } catch (Exception e) {
-                        FileLog.e("tmessages", e);
-                    }
-                }
-            }).start();
-        }
-    }
-
     private void checkConversionCanceled() throws Exception {
         boolean cancelConversion;
         synchronized (videoConvertSync) {
@@ -3487,6 +3265,31 @@ public class MediaController implements AudioManager.OnAudioFocusChangeListener,
         if (cancelConversion) {
             throw new RuntimeException("canceled conversion");
         }
+    }
+
+    public void addLoadingFileObserver2(String fileName, MessageObject messageObject, FileDownloadProgressListener observer) {
+        if (listenerInProgress) {
+            addLaterArray.put(fileName, observer);
+            return;
+        }
+        removeLoadingFileObserver(observer);
+
+        ArrayList<WeakReference<FileDownloadProgressListener>> arrayList = loadingFileObservers.get(fileName);
+        if (arrayList == null) {
+            arrayList = new ArrayList<>();
+            loadingFileObservers.put(fileName, arrayList);
+        }
+        arrayList.add(new WeakReference<>(observer));
+        if (messageObject != null) {
+            ArrayList<MessageObject> messageObjects = loadingFileMessagesObservers.get(fileName);
+            if (messageObjects == null) {
+                messageObjects = new ArrayList<>();
+                loadingFileMessagesObservers.put(fileName, messageObjects);
+            }
+            messageObjects.add(messageObject);
+        }
+
+        observersByTag.put(observer.getObserverTag(), fileName);
     }
 
     @TargetApi(16)
@@ -3930,5 +3733,220 @@ public class MediaController implements AudioManager.OnAudioFocusChangeListener,
         preferences.edit().putBoolean("isPreviousOk", true).commit();
         didWriteData(messageObject, cacheFile, true, error);
         return true;
+    }
+
+    public interface FileDownloadProgressListener {
+        void onFailedDownload(String fileName);
+
+        void onSuccessDownload(String fileName);
+
+        void onProgressDownload(String fileName, float progress);
+
+        void onProgressUpload(String fileName, float progress, boolean isEncrypted);
+
+        int getObserverTag();
+    }
+
+    public static class AudioEntry {
+        public long id;
+        public String author;
+        public String title;
+        public String genre;
+        public int duration;
+        public String path;
+        public MessageObject messageObject;
+    }
+
+    public static class AlbumEntry {
+        public int bucketId;
+        public String bucketName;
+        public PhotoEntry coverPhoto;
+        public ArrayList<PhotoEntry> photos = new ArrayList<>();
+        public HashMap<Integer, PhotoEntry> photosByIds = new HashMap<>();
+        public boolean isVideo;
+
+        public AlbumEntry(int bucketId, String bucketName, PhotoEntry coverPhoto, boolean isVideo) {
+            this.bucketId = bucketId;
+            this.bucketName = bucketName;
+            this.coverPhoto = coverPhoto;
+            this.isVideo = isVideo;
+        }
+
+        public void addPhoto(PhotoEntry photoEntry) {
+            photos.add(photoEntry);
+            photosByIds.put(photoEntry.imageId, photoEntry);
+        }
+    }
+
+    public static class PhotoEntry {
+        public int bucketId;
+        public int imageId;
+        public long dateTaken;
+        public String path;
+        public int orientation;
+        public String thumbPath;
+        public String imagePath;
+        public boolean isVideo;
+        public CharSequence caption;
+
+        public PhotoEntry(int bucketId, int imageId, long dateTaken, String path, int orientation, boolean isVideo) {
+            this.bucketId = bucketId;
+            this.imageId = imageId;
+            this.dateTaken = dateTaken;
+            this.path = path;
+            this.orientation = orientation;
+            this.isVideo = isVideo;
+        }
+    }
+
+    public static class SearchImage {
+        public String id;
+        public String imageUrl;
+        public String thumbUrl;
+        public String localUrl;
+        public int width;
+        public int height;
+        public int size;
+        public int type;
+        public int date;
+        public String thumbPath;
+        public String imagePath;
+        public CharSequence caption;
+        public TLRPC.Document document;
+    }
+
+    private static class VideoConvertRunnable implements Runnable {
+
+        private MessageObject messageObject;
+
+        private VideoConvertRunnable(MessageObject message) {
+            messageObject = message;
+        }
+
+        public static void runConversion(final MessageObject obj) {
+            new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        VideoConvertRunnable wrapper = new VideoConvertRunnable(obj);
+                        Thread th = new Thread(wrapper, "VideoConvertRunnable");
+                        th.start();
+                        th.join();
+                    } catch (Exception e) {
+                        FileLog.e("tmessages", e);
+                    }
+                }
+            }).start();
+        }
+
+        @Override
+        public void run() {
+            MediaController.getInstance().convertVideo(messageObject);
+        }
+    }
+
+    private class AudioBuffer {
+        ByteBuffer buffer;
+        byte[] bufferBytes;
+        int size;
+        int finished;
+        long pcmOffset;
+
+        public AudioBuffer(int capacity) {
+            buffer = ByteBuffer.allocateDirect(capacity);
+            bufferBytes = new byte[capacity];
+        }
+    }
+
+    private class InternalObserver extends ContentObserver {
+        public InternalObserver() {
+            super(null);
+        }
+
+        @Override
+        public void onChange(boolean selfChange) {
+            super.onChange(selfChange);
+            processMediaObserver(MediaStore.Images.Media.INTERNAL_CONTENT_URI);
+        }
+    }
+
+    private class ExternalObserver extends ContentObserver {
+        public ExternalObserver() {
+            super(null);
+        }
+
+        @Override
+        public void onChange(boolean selfChange) {
+            super.onChange(selfChange);
+            processMediaObserver(MediaStore.Images.Media.EXTERNAL_CONTENT_URI);
+        }
+    }
+
+    private class GalleryObserverInternal extends ContentObserver {
+        public GalleryObserverInternal() {
+            super(null);
+        }
+
+        @Override
+        public void onChange(boolean selfChange) {
+            super.onChange(selfChange);
+            if (refreshGalleryRunnable != null) {
+                AndroidUtilities.cancelRunOnUIThread(refreshGalleryRunnable);
+            }
+            AndroidUtilities.runOnUIThread(refreshGalleryRunnable = new Runnable() {
+                @Override
+                public void run() {
+                    refreshGalleryRunnable = null;
+                    loadGalleryPhotosAlbums(0);
+                }
+            }, 2000);
+        }
+    }
+
+    private class GalleryObserverExternal extends ContentObserver {
+        public GalleryObserverExternal() {
+            super(null);
+        }
+
+        @Override
+        public void onChange(boolean selfChange) {
+            super.onChange(selfChange);
+            if (refreshGalleryRunnable != null) {
+                AndroidUtilities.cancelRunOnUIThread(refreshGalleryRunnable);
+            }
+            AndroidUtilities.runOnUIThread(refreshGalleryRunnable = new Runnable() {
+                @Override
+                public void run() {
+                    refreshGalleryRunnable = null;
+                    loadGalleryPhotosAlbums(0);
+                }
+            }, 2000);
+        }
+    }
+
+    private final class StopMediaObserverRunnable implements Runnable {
+        public int currentObserverToken = 0;
+
+        @Override
+        public void run() {
+            if (currentObserverToken == startObserverToken) {
+                try {
+                    if (internalObserver != null) {
+                        ApplicationLoader.applicationContext.getContentResolver().unregisterContentObserver(internalObserver);
+                        internalObserver = null;
+                    }
+                } catch (Exception e) {
+                    FileLog.e("tmessages", e);
+                }
+                try {
+                    if (externalObserver != null) {
+                        ApplicationLoader.applicationContext.getContentResolver().unregisterContentObserver(externalObserver);
+                        externalObserver = null;
+                    }
+                } catch (Exception e) {
+                    FileLog.e("tmessages", e);
+                }
+            }
+        }
     }
 }

@@ -39,37 +39,40 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public class ContactsController {
 
-    private Account currentAccount;
-    private boolean loadingContacts = false;
     private static final Object loadContactsSync = new Object();
-    private boolean ignoreChanges = false;
-    private boolean contactsSyncInProgress = false;
+    private static volatile ContactsController Instance = null;
     private final Object observerLock = new Object();
     public boolean contactsLoaded = false;
+    public HashMap<Integer, Contact> contactsBook = new HashMap<>();
+    public HashMap<String, Contact> contactsBookSPhones = new HashMap<>();
+    public ArrayList<Contact> phoneBookContacts = new ArrayList<>();
+    public ArrayList<TLRPC.TL_contact> contacts = new ArrayList<>();
+    public SparseArray<TLRPC.TL_contact> contactsDict = new SparseArray<>();
+    public HashMap<String, ArrayList<TLRPC.TL_contact>> usersSectionsDict = new HashMap<>();
+    public ArrayList<String> sortedUsersSectionsArray = new ArrayList<>();
+    public HashMap<String, ArrayList<TLRPC.TL_contact>> usersMutualSectionsDict = new HashMap<>();
+    public ArrayList<String> sortedUsersMutualSectionsArray = new ArrayList<>();
+    public HashMap<String, TLRPC.TL_contact> contactsByPhone = new HashMap<>();
+    public HashMap<String, ArrayList<TLRPC.TL_contact>> onlineUsersSectionsDict = new HashMap<>();
+    public ArrayList<String> onlineSortedUsersSectionsArray = new ArrayList<>();
+    public HashMap<String, ArrayList<TLRPC.TL_contact>> onlineUsersMutualSectionsDict = new HashMap<>();
+    public ArrayList<String> onlineSortedUsersMutualSectionsArray = new ArrayList<>();
+    private Account currentAccount;
+    private boolean loadingContacts = false;
+    private boolean ignoreChanges = false;
+    private boolean contactsSyncInProgress = false;
     private boolean contactsBookLoaded = false;
     private String lastContactsVersions = "";
     private ArrayList<Integer> delayedContactsUpdate = new ArrayList<>();
     private String inviteText;
     private boolean updatingInviteText = false;
     private HashMap<String, String> sectionsToReplace = new HashMap<>();
-
     private int loadingDeleteInfo = 0;
     private int deleteAccountTTL;
     private int loadingLastSeenInfo = 0;
     private int loadingGroupInfo = 0;
     private ArrayList<TLRPC.PrivacyRule> privacyRules = null;
     private ArrayList<TLRPC.PrivacyRule> groupPrivacyRules = null;
-
-    public static class Contact {
-        public int id;
-        public ArrayList<String> phones = new ArrayList<>();
-        public ArrayList<String> phoneTypes = new ArrayList<>();
-        public ArrayList<String> shortPhones = new ArrayList<>();
-        public ArrayList<Integer> phoneDeleted = new ArrayList<>();
-        public String first_name;
-        public String last_name;
-    }
-
     private String[] projectionPhones = {
             ContactsContract.CommonDataKinds.Phone.CONTACT_ID,
             ContactsContract.CommonDataKinds.Phone.NUMBER,
@@ -83,37 +86,7 @@ public class ContactsController {
             ContactsContract.Data.DISPLAY_NAME,
             ContactsContract.CommonDataKinds.StructuredName.MIDDLE_NAME
     };
-
-    public HashMap<Integer, Contact> contactsBook = new HashMap<>();
-    public HashMap<String, Contact> contactsBookSPhones = new HashMap<>();
-    public ArrayList<Contact> phoneBookContacts = new ArrayList<>();
-
-    public ArrayList<TLRPC.TL_contact> contacts = new ArrayList<>();
-    public SparseArray<TLRPC.TL_contact> contactsDict = new SparseArray<>();
-    public HashMap<String, ArrayList<TLRPC.TL_contact>> usersSectionsDict = new HashMap<>();
-    public ArrayList<String> sortedUsersSectionsArray = new ArrayList<>();
-
-    public HashMap<String, ArrayList<TLRPC.TL_contact>> usersMutualSectionsDict = new HashMap<>();
-    public ArrayList<String> sortedUsersMutualSectionsArray = new ArrayList<>();
-
-    public HashMap<String, TLRPC.TL_contact> contactsByPhone = new HashMap<>();
-
     private int completedRequestsCount;
-
-    private static volatile ContactsController Instance = null;
-
-    public static ContactsController getInstance() {
-        ContactsController localInstance = Instance;
-        if (localInstance == null) {
-            synchronized (ContactsController.class) {
-                localInstance = Instance;
-                if (localInstance == null) {
-                    Instance = localInstance = new ContactsController();
-                }
-            }
-        }
-        return localInstance;
-    }
 
     public ContactsController() {
         SharedPreferences preferences = ApplicationLoader.applicationContext.getSharedPreferences("mainconfig", Activity.MODE_PRIVATE);
@@ -144,6 +117,54 @@ public class ContactsController {
         sectionsToReplace.put("Ţ", "Y");
     }
 
+    public static ContactsController getInstance() {
+        ContactsController localInstance = Instance;
+        if (localInstance == null) {
+            synchronized (ContactsController.class) {
+                localInstance = Instance;
+                if (localInstance == null) {
+                    Instance = localInstance = new ContactsController();
+                }
+            }
+        }
+        return localInstance;
+    }
+
+    public static String formatName(String firstName, String lastName) {
+        /*if ((firstName == null || firstName.length() == 0) && (lastName == null || lastName.length() == 0)) {
+            return LocaleController.getString("HiddenName", R.string.HiddenName);
+        }*/
+        if (firstName != null) {
+            firstName = firstName.trim();
+        }
+        if (lastName != null) {
+            lastName = lastName.trim();
+        }
+        StringBuilder result = new StringBuilder((firstName != null ? firstName.length() : 0) + (lastName != null ? lastName.length() : 0) + 1);
+        if (LocaleController.nameDisplayOrder == 1) {
+            if (firstName != null && firstName.length() > 0) {
+                result.append(firstName);
+                if (lastName != null && lastName.length() > 0) {
+                    result.append(" ");
+                    result.append(lastName);
+                }
+            } else if (lastName != null && lastName.length() > 0) {
+                result.append(lastName);
+            }
+        } else {
+            if (lastName != null && lastName.length() > 0) {
+                result.append(lastName);
+                if (firstName != null && firstName.length() > 0) {
+                    result.append(" ");
+                    result.append(firstName);
+                }
+            } else if (firstName != null && firstName.length() > 0) {
+                result.append(firstName);
+            }
+        }
+        return result.toString();
+    }
+
     public void cleanup() {
         contactsBook.clear();
         contactsBookSPhones.clear();
@@ -156,6 +177,12 @@ public class ContactsController {
         sortedUsersMutualSectionsArray.clear();
         delayedContactsUpdate.clear();
         contactsByPhone.clear();
+        //Teleh Code
+        onlineUsersSectionsDict.clear();
+        onlineUsersMutualSectionsDict.clear();
+        onlineSortedUsersSectionsArray.clear();
+        onlineSortedUsersMutualSectionsArray.clear();
+        //End Teleh Code
 
         loadingContacts = false;
         contactsSyncInProgress = false;
@@ -1035,6 +1062,13 @@ public class ContactsController {
                         final ArrayList<String> sortedSectionsArrayMutual = new ArrayList<>();
                         HashMap<String, TLRPC.TL_contact> contactsByPhonesDict = null;
 
+                        //Teleh Code
+                        final HashMap<String, ArrayList<TLRPC.TL_contact>> onlineSectionsDict = new HashMap<>();
+                        final HashMap<String, ArrayList<TLRPC.TL_contact>> onlineSectionsDictMutual = new HashMap<>();
+                        final ArrayList<String> onlineSortedSectionsArray = new ArrayList<>();
+                        final ArrayList<String> onlineSortedSectionsArrayMutual = new ArrayList<>();
+                        //End Teleh Code
+
                         if (!contactsBookLoaded) {
                             contactsByPhonesDict = new HashMap<>();
                         }
@@ -1065,6 +1099,28 @@ public class ContactsController {
                             if (replace != null) {
                                 key = replace;
                             }
+
+                            //Teleh Code
+                            if (user.id == UserConfig.getClientUserId() || user.status != null && user.status.expires > ConnectionsManager.getInstance().getCurrentTime() || MessagesController.getInstance().onlinePrivacy.containsKey(user.id)) {
+                                ArrayList<TLRPC.TL_contact> arr = onlineSectionsDict.get(key);
+                                if (arr == null) {
+                                    arr = new ArrayList<>();
+                                    onlineSectionsDict.put(key, arr);
+                                    onlineSortedSectionsArray.add(key);
+                                }
+                                arr.add(value);
+                                if (user.mutual_contact) {
+                                    arr = onlineSectionsDictMutual.get(key);
+                                    if (arr == null) {
+                                        arr = new ArrayList<>();
+                                        onlineSectionsDictMutual.put(key, arr);
+                                        onlineSortedSectionsArrayMutual.add(key);
+                                    }
+                                    arr.add(value);
+                                }
+                            }
+                            //End Teleh Code
+
                             ArrayList<TLRPC.TL_contact> arr = sectionsDict.get(key);
                             if (arr == null) {
                                 arr = new ArrayList<>();
@@ -1082,6 +1138,35 @@ public class ContactsController {
                                 arr.add(value);
                             }
                         }
+
+                        //Teleh Code
+                        Collections.sort(onlineSortedSectionsArray, new Comparator<String>() {
+                            @Override
+                            public int compare(String s, String s2) {
+                                char cv1 = s.charAt(0);
+                                char cv2 = s2.charAt(0);
+                                if (cv1 == '#') {
+                                    return 1;
+                                } else if (cv2 == '#') {
+                                    return -1;
+                                }
+                                return s.compareTo(s2);
+                            }
+                        });
+                        Collections.sort(onlineSortedSectionsArrayMutual, new Comparator<String>() {
+                            @Override
+                            public int compare(String s, String s2) {
+                                char cv1 = s.charAt(0);
+                                char cv2 = s2.charAt(0);
+                                if (cv1 == '#') {
+                                    return 1;
+                                } else if (cv2 == '#') {
+                                    return -1;
+                                }
+                                return s.compareTo(s2);
+                            }
+                        });
+                        //End Teleh Code
 
                         Collections.sort(sortedSectionsArray, new Comparator<String>() {
                             @Override
@@ -1120,6 +1205,12 @@ public class ContactsController {
                                 usersMutualSectionsDict = sectionsDictMutual;
                                 sortedUsersSectionsArray = sortedSectionsArray;
                                 sortedUsersMutualSectionsArray = sortedSectionsArrayMutual;
+                                //Teleh Code
+                                onlineUsersSectionsDict = onlineSectionsDict;
+                                onlineUsersMutualSectionsDict = onlineSectionsDictMutual;
+                                onlineSortedUsersSectionsArray = onlineSortedSectionsArray;
+                                onlineSortedUsersMutualSectionsArray = onlineSortedSectionsArrayMutual;
+                                //End Teleh Code
                                 if (from != 2) {
                                     synchronized (loadContactsSync) {
                                         loadingContacts = false;
@@ -1916,12 +2007,12 @@ public class ContactsController {
         NotificationCenter.getInstance().postNotificationName(NotificationCenter.privacyRulesUpdated);
     }
 
-    public void setDeleteAccountTTL(int ttl) {
-        deleteAccountTTL = ttl;
-    }
-
     public int getDeleteAccountTTL() {
         return deleteAccountTTL;
+    }
+
+    public void setDeleteAccountTTL(int ttl) {
+        deleteAccountTTL = ttl;
     }
 
     public boolean getLoadingDeleteInfo() {
@@ -1954,38 +2045,13 @@ public class ContactsController {
         reloadContactsStatuses();
     }
 
-    public static String formatName(String firstName, String lastName) {
-        /*if ((firstName == null || firstName.length() == 0) && (lastName == null || lastName.length() == 0)) {
-            return LocaleController.getString("HiddenName", R.string.HiddenName);
-        }*/
-        if (firstName != null) {
-            firstName = firstName.trim();
-        }
-        if (lastName != null) {
-            lastName = lastName.trim();
-        }
-        StringBuilder result = new StringBuilder((firstName != null ? firstName.length() : 0) + (lastName != null ? lastName.length() : 0) + 1);
-        if (LocaleController.nameDisplayOrder == 1) {
-            if (firstName != null && firstName.length() > 0) {
-                result.append(firstName);
-                if (lastName != null && lastName.length() > 0) {
-                    result.append(" ");
-                    result.append(lastName);
-                }
-            } else if (lastName != null && lastName.length() > 0) {
-                result.append(lastName);
-            }
-        } else {
-            if (lastName != null && lastName.length() > 0) {
-                result.append(lastName);
-                if (firstName != null && firstName.length() > 0) {
-                    result.append(" ");
-                    result.append(firstName);
-                }
-            } else if (firstName != null && firstName.length() > 0) {
-                result.append(firstName);
-            }
-        }
-        return result.toString();
+    public static class Contact {
+        public int id;
+        public ArrayList<String> phones = new ArrayList<>();
+        public ArrayList<String> phoneTypes = new ArrayList<>();
+        public ArrayList<String> shortPhones = new ArrayList<>();
+        public ArrayList<Integer> phoneDeleted = new ArrayList<>();
+        public String first_name;
+        public String last_name;
     }
 }

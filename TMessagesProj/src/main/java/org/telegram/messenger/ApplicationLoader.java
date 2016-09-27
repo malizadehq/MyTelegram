@@ -10,7 +10,6 @@ package org.telegram.messenger;
 
 import android.app.Activity;
 import android.app.AlarmManager;
-import android.app.Application;
 import android.app.PendingIntent;
 import android.content.BroadcastReceiver;
 import android.content.Context;
@@ -25,35 +24,55 @@ import android.graphics.drawable.Drawable;
 import android.os.Build;
 import android.os.Handler;
 import android.os.PowerManager;
+import android.support.multidex.MultiDexApplication;
 import android.util.Base64;
+import android.util.Log;
 
+import com.google.android.gms.analytics.ExceptionReporter;
+import com.google.android.gms.analytics.GoogleAnalytics;
+import com.google.android.gms.analytics.Tracker;
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.GooglePlayServicesUtil;
+import com.nostra13.universalimageloader.cache.disc.naming.Md5FileNameGenerator;
+import com.nostra13.universalimageloader.core.ImageLoaderConfiguration;
+import com.nostra13.universalimageloader.core.assist.QueueProcessingType;
+import com.onesignal.OSNotification;
+import com.onesignal.OneSignal;
 
+import org.json.JSONObject;
+import org.telegram.SQLite.DatabaseHandler;
 import org.telegram.tgnet.ConnectionsManager;
+import org.telegram.tgnet.RequestDelegate;
 import org.telegram.tgnet.SerializedData;
+import org.telegram.tgnet.TLObject;
 import org.telegram.tgnet.TLRPC;
+import org.telegram.ui.Analytics.AnalyticsExceptionParser;
 import org.telegram.ui.Components.ForegroundDetector;
 
 import java.io.File;
 import java.io.RandomAccessFile;
 
-public class ApplicationLoader extends Application {
+public class ApplicationLoader extends MultiDexApplication {
 
+    private static final Object sync = new Object();
+    public static int i = 0;
+    public static volatile Context applicationContext;
+    public static volatile Handler applicationHandler;
+    public static DatabaseHandler databaseHandler;
+    public static boolean KEEP_ORIGINAL_FILENAME;
+    public static boolean SHOW_ANDROID_EMOJI;
+    public static boolean USE_DEVICE_FONT;
+    public static volatile boolean isScreenOn = false;
+    public static volatile boolean mainInterfacePaused = true;
+    public static String trans = "0";
     private static Drawable cachedWallpaper;
     private static int selectedColor;
     private static boolean isCustomTheme;
-    private static final Object sync = new Object();
-
     private static int serviceMessageColor;
     private static int serviceSelectedMessageColor;
-
-    public static volatile Context applicationContext;
-    public static volatile Handler applicationHandler;
     private static volatile boolean applicationInited = false;
-
-    public static volatile boolean isScreenOn = false;
-    public static volatile boolean mainInterfacePaused = true;
+    private static ApplicationLoader mInstaceApplication;
+    private Tracker mTracker;
 
     public static boolean isCustomTheme() {
         return isCustomTheme;
@@ -61,6 +80,14 @@ public class ApplicationLoader extends Application {
 
     public static int getSelectedColor() {
         return selectedColor;
+    }
+
+    public static synchronized ApplicationLoader getInstance() {
+        if (mInstaceApplication == null) {
+            mInstaceApplication = new ApplicationLoader();
+        }
+
+        return mInstaceApplication;
     }
 
     public static void reloadWallpaper() {
@@ -197,7 +224,7 @@ public class ApplicationLoader extends Application {
         } catch (Exception e) {
             FileLog.e("tmessages", e);
         }
-        return new File("/data/data/org.telegram.messenger/files");
+        return new File("/data/data/com.shaltouk.mytelegram/files");
     }
 
     public static void postInitApplication() {
@@ -224,7 +251,7 @@ public class ApplicationLoader extends Application {
         }
 
         try {
-            PowerManager pm = (PowerManager)ApplicationLoader.applicationContext.getSystemService(Context.POWER_SERVICE);
+            PowerManager pm = (PowerManager) ApplicationLoader.applicationContext.getSystemService(Context.POWER_SERVICE);
             isScreenOn = pm.isScreenOn();
             FileLog.e("tmessages", "screen state = " + isScreenOn);
         } catch (Exception e) {
@@ -245,13 +272,13 @@ public class ApplicationLoader extends Application {
             appVersion = pInfo.versionName + " (" + pInfo.versionCode + ")";
             systemVersion = "SDK " + Build.VERSION.SDK_INT;
         } catch (Exception e) {
-            langCode = "en";
+            langCode = "fa";
             deviceModel = "Android unknown";
             appVersion = "App version unknown";
             systemVersion = "SDK " + Build.VERSION.SDK_INT;
         }
         if (langCode.trim().length() == 0) {
-            langCode = "en";
+            langCode = "fa";
         }
         if (deviceModel.trim().length() == 0) {
             deviceModel = "Android unknown";
@@ -275,7 +302,7 @@ public class ApplicationLoader extends Application {
             SendMessagesHelper.getInstance().checkUnsentMessages();
         }
 
-        ApplicationLoader app = (ApplicationLoader)ApplicationLoader.applicationContext;
+        ApplicationLoader app = (ApplicationLoader) ApplicationLoader.applicationContext;
         app.initPlayServices();
         FileLog.e("tmessages", "app initied");
 
@@ -283,18 +310,46 @@ public class ApplicationLoader extends Application {
         MediaController.getInstance();
     }
 
-    @Override
-    public void onCreate() {
-        super.onCreate();
+    public static void startPushService() {
+        SharedPreferences preferences = applicationContext.getSharedPreferences("Notifications", MODE_PRIVATE);
 
-        applicationContext = getApplicationContext();
-        NativeLoader.initNativeLibs(ApplicationLoader.applicationContext);
-        ConnectionsManager.native_setJava(Build.VERSION.SDK_INT == 14 || Build.VERSION.SDK_INT == 15);
-        new ForegroundDetector(this);
+        if (preferences.getBoolean("pushService", true)) {
+            applicationContext.startService(new Intent(applicationContext, NotificationsService.class));
+        } else {
+            stopPushService();
+        }
+    }
 
-        applicationHandler = new Handler(applicationContext.getMainLooper());
+    public static void stopPushService() {
+        applicationContext.stopService(new Intent(applicationContext, NotificationsService.class));
 
-        startPushService();
+        PendingIntent pintent = PendingIntent.getService(applicationContext, 0, new Intent(applicationContext, NotificationsService.class), 0);
+        AlarmManager alarm = (AlarmManager) applicationContext.getSystemService(Context.ALARM_SERVICE);
+        alarm.cancel(pintent);
+    }
+
+    private void setupUncaughtException() {
+        Thread.UncaughtExceptionHandler uncaughtExceptionHandler = new ExceptionReporter(
+                getDefaultTracker(),
+                Thread.getDefaultUncaughtExceptionHandler(),
+                this);
+
+        if (uncaughtExceptionHandler instanceof ExceptionReporter) {
+            ExceptionReporter exceptionReporter = (ExceptionReporter) uncaughtExceptionHandler;
+            exceptionReporter.setExceptionParser(new AnalyticsExceptionParser());
+
+            Thread.setDefaultUncaughtExceptionHandler(exceptionReporter);
+        }
+    }
+
+    synchronized public Tracker getDefaultTracker() {
+        if (mTracker == null) {
+            GoogleAnalytics analytics = GoogleAnalytics.getInstance(this);
+            // To enable debug logging use: adb shell setprop log.tag.GAv4 DEBUG
+            //TODO fix this
+            mTracker = analytics.newTracker("UA-79407256-1");
+        }
+        return mTracker;
     }
 
     /*public static void sendRegIdToBackend(final String token) {
@@ -316,22 +371,42 @@ public class ApplicationLoader extends Application {
         });
     }*/
 
-    public static void startPushService() {
-        SharedPreferences preferences = applicationContext.getSharedPreferences("Notifications", MODE_PRIVATE);
-
-        if (preferences.getBoolean("pushService", true)) {
-            applicationContext.startService(new Intent(applicationContext, NotificationsService.class));
-        } else {
-            stopPushService();
-        }
+    public void initImageLoader() {
+        ImageLoaderConfiguration.Builder config = new ImageLoaderConfiguration.Builder(getApplicationContext());
+        config.threadPriority(Thread.NORM_PRIORITY - 2);
+        config.denyCacheImageMultipleSizesInMemory();
+        config.diskCacheFileNameGenerator(new Md5FileNameGenerator());
+        config.diskCacheSize(50 * 1024 * 1024); // 50 MiB
+        config.tasksProcessingOrder(QueueProcessingType.LIFO);
+        //config.writeDebugLogs(); // Remove for release app
+        com.nostra13.universalimageloader.core.ImageLoader.getInstance().init(config.build());
     }
 
-    public static void stopPushService() {
-        applicationContext.stopService(new Intent(applicationContext, NotificationsService.class));
+    @Override
+    public void onCreate() {
 
-        PendingIntent pintent = PendingIntent.getService(applicationContext, 0, new Intent(applicationContext, NotificationsService.class), 0);
-        AlarmManager alarm = (AlarmManager)applicationContext.getSystemService(Context.ALARM_SERVICE);
-        alarm.cancel(pintent);
+        super.onCreate();
+        setupUncaughtException();
+        mInstaceApplication = this;
+        if (Build.VERSION.SDK_INT < 11) {
+            java.lang.System.setProperty("java.net.preferIPv4Stack", "true");
+            java.lang.System.setProperty("java.net.preferIPv6Addresses", "false");
+        }
+
+        applicationContext = getApplicationContext();
+   
+        initImageLoader();
+        NativeLoader.initNativeLibs(ApplicationLoader.applicationContext);
+        ConnectionsManager.native_setJava(Build.VERSION.SDK_INT == 14 || Build.VERSION.SDK_INT == 15);
+        new ForegroundDetector(this);
+
+        applicationHandler = new Handler(applicationContext.getMainLooper());
+        databaseHandler = new DatabaseHandler(applicationContext);
+        SharedPreferences plusPreferences = applicationContext.getSharedPreferences("plusconfig", 0);
+        SHOW_ANDROID_EMOJI = plusPreferences.getBoolean("showAndroidEmoji", false);
+        KEEP_ORIGINAL_FILENAME = plusPreferences.getBoolean("keepOriginalFilename", false);
+        USE_DEVICE_FONT = plusPreferences.getBoolean("useDeviceFont", false);
+        startPushService();
     }
 
     @Override

@@ -53,14 +53,16 @@ import java.util.Locale;
 @TargetApi(Build.VERSION_CODES.LOLLIPOP)
 public class MusicBrowserService extends MediaBrowserService implements NotificationCenter.NotificationCenterDelegate {
 
+    public static final String ACTION_CMD = "com.example.android.mediabrowserservice.ACTION_CMD";
+    public static final String CMD_NAME = "CMD_NAME";
+    public static final String CMD_PAUSE = "CMD_PAUSE";
     private static final String AUTO_APP_PACKAGE_NAME = "com.google.android.projection.gearhead";
     private static final String SLOT_RESERVATION_SKIP_TO_NEXT = "com.google.android.gms.car.media.ALWAYS_RESERVE_SPACE_FOR.ACTION_SKIP_TO_NEXT";
     private static final String SLOT_RESERVATION_SKIP_TO_PREV = "com.google.android.gms.car.media.ALWAYS_RESERVE_SPACE_FOR.ACTION_SKIP_TO_PREVIOUS";
     private static final String SLOT_RESERVATION_QUEUE = "com.google.android.gms.car.media.ALWAYS_RESERVE_SPACE_FOR.ACTION_QUEUE";
-
-    private MediaSession mediaSession;
     private static final String MEDIA_ID_ROOT = "__ROOT__";
-
+    private static final int STOP_DELAY = 30000;
+    private MediaSession mediaSession;
     private boolean chatsLoaded;
     private boolean loadingChats;
     private ArrayList<Integer> dialogs = new ArrayList<>();
@@ -68,20 +70,10 @@ public class MusicBrowserService extends MediaBrowserService implements Notifica
     private HashMap<Integer, TLRPC.Chat> chats = new HashMap<>();
     private HashMap<Integer, ArrayList<MessageObject>> musicObjects = new HashMap<>();
     private HashMap<Integer, ArrayList<MediaSession.QueueItem>> musicQueues = new HashMap<>();
-
-    public static final String ACTION_CMD = "com.example.android.mediabrowserservice.ACTION_CMD";
-    public static final String CMD_NAME = "CMD_NAME";
-    public static final String CMD_PAUSE = "CMD_PAUSE";
-
     private Paint roundPaint;
     private RectF bitmapRect;
-
     private boolean serviceStarted;
-
     private int lastSelectedDialog;
-
-    private static final int STOP_DELAY = 30000;
-
     private DelayedStopHandler delayedStopHandler = new DelayedStopHandler(this);
 
     @Override
@@ -357,121 +349,6 @@ public class MusicBrowserService extends MediaBrowserService implements Notifica
         return null;
     }
 
-    private final class MediaSessionCallback extends MediaSession.Callback {
-        @Override
-        public void onPlay() {
-            MessageObject messageObject = MediaController.getInstance().getPlayingMessageObject();
-            if (messageObject == null) {
-                onPlayFromMediaId(lastSelectedDialog + "_" + 0, null);
-            } else {
-                MediaController.getInstance().playAudio(messageObject);
-            }
-        }
-
-        @Override
-        public void onSkipToQueueItem(long queueId) {
-            MediaController.getInstance().playMessageAtIndex((int) queueId);
-            handlePlayRequest();
-        }
-
-        @Override
-        public void onSeekTo(long position) {
-            MessageObject messageObject = MediaController.getInstance().getPlayingMessageObject();
-            if (messageObject != null) {
-                MediaController.getInstance().seekToProgress(messageObject, position / 1000 / (float) messageObject.getDuration());
-            }
-        }
-
-        @Override
-        public void onPlayFromMediaId(String mediaId, Bundle extras) {
-            String args[] = mediaId.split("_");
-            if (args.length != 2) {
-                return;
-            }
-            try {
-                int did = Integer.parseInt(args[0]);
-                int id = Integer.parseInt(args[1]);
-                ArrayList<MessageObject> arrayList = musicObjects.get(did);
-                ArrayList<MediaSession.QueueItem> arrayList1 = musicQueues.get(did);
-                if (arrayList == null || id < 0 || id >= arrayList.size()) {
-                    return;
-                }
-                lastSelectedDialog = did;
-                ApplicationLoader.applicationContext.getSharedPreferences("Notifications", Activity.MODE_PRIVATE).edit().putInt("auto_lastSelectedDialog", did).commit();
-                MediaController.getInstance().setPlaylist(arrayList, arrayList.get(id), false);
-                mediaSession.setQueue(arrayList1);
-                if (did > 0) {
-                    TLRPC.User user = users.get(did);
-                    if (user != null) {
-                        mediaSession.setQueueTitle(ContactsController.formatName(user.first_name, user.last_name));
-                    } else {
-                        mediaSession.setQueueTitle("DELETED USER");
-                    }
-                } else {
-                    TLRPC.Chat chat = chats.get(-did);
-                    if (chat != null) {
-                        mediaSession.setQueueTitle(chat.title);
-                    } else {
-                        mediaSession.setQueueTitle("DELETED CHAT");
-                    }
-                }
-            } catch (Exception e) {
-                FileLog.e("tmessages", e);
-            }
-            handlePlayRequest();
-        }
-
-        @Override
-        public void onPause() {
-            handlePauseRequest();
-        }
-
-        @Override
-        public void onStop() {
-            handleStopRequest(null);
-        }
-
-        @Override
-        public void onSkipToNext() {
-            MediaController.getInstance().playNextMessage();
-        }
-
-        @Override
-        public void onSkipToPrevious() {
-            MediaController.getInstance().playPreviousMessage();
-        }
-
-        @Override
-        public void onPlayFromSearch(String query, Bundle extras) {
-            if (query == null || query.length() == 0) {
-                return;
-            }
-            query = query.toLowerCase();
-            for (int a = 0; a < dialogs.size(); a++) {
-                int did = dialogs.get(a);
-                if (did > 0) {
-                    TLRPC.User user = users.get(did);
-                    if (user == null) {
-                        continue;
-                    }
-                    if (user.first_name != null && user.first_name.startsWith(query) || user.last_name != null && user.last_name.startsWith(query)) {
-                        onPlayFromMediaId(did + "_" + 0, null);
-                        break;
-                    }
-                } else {
-                    TLRPC.Chat chat = chats.get(-did);
-                    if (chat == null) {
-                        continue;
-                    }
-                    if (chat.title != null && chat.title.toLowerCase().contains(query)) {
-                        onPlayFromMediaId(did + "_" + 0, null);
-                        break;
-                    }
-                }
-            }
-        }
-    }
-
     private void updatePlaybackState(String error) {
         long position = PlaybackState.PLAYBACK_POSITION_UNKNOWN;
         MessageObject playingMessageObject = MediaController.getInstance().getPlayingMessageObject();
@@ -587,6 +464,121 @@ public class MusicBrowserService extends MediaBrowserService implements Notifica
                 }
                 service.stopSelf();
                 service.serviceStarted = false;
+            }
+        }
+    }
+
+    private final class MediaSessionCallback extends MediaSession.Callback {
+        @Override
+        public void onPlay() {
+            MessageObject messageObject = MediaController.getInstance().getPlayingMessageObject();
+            if (messageObject == null) {
+                onPlayFromMediaId(lastSelectedDialog + "_" + 0, null);
+            } else {
+                MediaController.getInstance().playAudio(messageObject);
+            }
+        }
+
+        @Override
+        public void onSkipToQueueItem(long queueId) {
+            MediaController.getInstance().playMessageAtIndex((int) queueId);
+            handlePlayRequest();
+        }
+
+        @Override
+        public void onSeekTo(long position) {
+            MessageObject messageObject = MediaController.getInstance().getPlayingMessageObject();
+            if (messageObject != null) {
+                MediaController.getInstance().seekToProgress(messageObject, position / 1000 / (float) messageObject.getDuration());
+            }
+        }
+
+        @Override
+        public void onPlayFromMediaId(String mediaId, Bundle extras) {
+            String args[] = mediaId.split("_");
+            if (args.length != 2) {
+                return;
+            }
+            try {
+                int did = Integer.parseInt(args[0]);
+                int id = Integer.parseInt(args[1]);
+                ArrayList<MessageObject> arrayList = musicObjects.get(did);
+                ArrayList<MediaSession.QueueItem> arrayList1 = musicQueues.get(did);
+                if (arrayList == null || id < 0 || id >= arrayList.size()) {
+                    return;
+                }
+                lastSelectedDialog = did;
+                ApplicationLoader.applicationContext.getSharedPreferences("Notifications", Activity.MODE_PRIVATE).edit().putInt("auto_lastSelectedDialog", did).commit();
+                MediaController.getInstance().setPlaylist(arrayList, arrayList.get(id), false);
+                mediaSession.setQueue(arrayList1);
+                if (did > 0) {
+                    TLRPC.User user = users.get(did);
+                    if (user != null) {
+                        mediaSession.setQueueTitle(ContactsController.formatName(user.first_name, user.last_name));
+                    } else {
+                        mediaSession.setQueueTitle("DELETED USER");
+                    }
+                } else {
+                    TLRPC.Chat chat = chats.get(-did);
+                    if (chat != null) {
+                        mediaSession.setQueueTitle(chat.title);
+                    } else {
+                        mediaSession.setQueueTitle("DELETED CHAT");
+                    }
+                }
+            } catch (Exception e) {
+                FileLog.e("tmessages", e);
+            }
+            handlePlayRequest();
+        }
+
+        @Override
+        public void onPause() {
+            handlePauseRequest();
+        }
+
+        @Override
+        public void onStop() {
+            handleStopRequest(null);
+        }
+
+        @Override
+        public void onSkipToNext() {
+            MediaController.getInstance().playNextMessage();
+        }
+
+        @Override
+        public void onSkipToPrevious() {
+            MediaController.getInstance().playPreviousMessage();
+        }
+
+        @Override
+        public void onPlayFromSearch(String query, Bundle extras) {
+            if (query == null || query.length() == 0) {
+                return;
+            }
+            query = query.toLowerCase();
+            for (int a = 0; a < dialogs.size(); a++) {
+                int did = dialogs.get(a);
+                if (did > 0) {
+                    TLRPC.User user = users.get(did);
+                    if (user == null) {
+                        continue;
+                    }
+                    if (user.first_name != null && user.first_name.startsWith(query) || user.last_name != null && user.last_name.startsWith(query)) {
+                        onPlayFromMediaId(did + "_" + 0, null);
+                        break;
+                    }
+                } else {
+                    TLRPC.Chat chat = chats.get(-did);
+                    if (chat == null) {
+                        continue;
+                    }
+                    if (chat.title != null && chat.title.toLowerCase().contains(query)) {
+                        onPlayFromMediaId(did + "_" + 0, null);
+                        break;
+                    }
+                }
             }
         }
     }

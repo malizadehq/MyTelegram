@@ -2,7 +2,6 @@ package org.telegram.messenger;
 
 import android.app.Activity;
 import android.net.Uri;
-import android.util.Log;
 
 import net.hockeyapp.android.Constants;
 import net.hockeyapp.android.utils.SimpleMultipartEntity;

@@ -25,11 +25,11 @@ import java.security.NoSuchAlgorithmException;
 import java.util.Locale;
 
 public class FileUploadOperation {
+    public int state = 0;
+    public FileUploadOperationDelegate delegate;
     private int uploadChunkSize = 1024 * 32;
     private String uploadingFilePath;
-    public int state = 0;
     private byte[] readBuffer;
-    public FileUploadOperationDelegate delegate;
     private int requestToken = 0;
     private int currentPartNum = 0;
     private long currentFileId;
@@ -50,12 +50,6 @@ public class FileUploadOperation {
     private FileInputStream stream;
     private MessageDigest mdEnc = null;
     private boolean started = false;
-
-    public interface FileUploadOperationDelegate {
-        void didFinishUploadingFile(FileUploadOperation operation, TLRPC.InputFile inputFile, TLRPC.InputEncryptedFile inputEncryptedFile, byte[] key, byte[] iv);
-        void didFailedUploadingFile(FileUploadOperation operation);
-        void didChangedUploadProgress(FileUploadOperation operation, float progress);
-    }
 
     public FileUploadOperation(String location, boolean encrypted, int estimated) {
         uploadingFilePath = location;
@@ -188,7 +182,7 @@ public class FileUploadOperation {
                 fileKey = Utilities.MD5(uploadingFilePath + (isEncrypted ? "enc" : ""));
                 SharedPreferences preferences = ApplicationLoader.applicationContext.getSharedPreferences("uploadinfo", Activity.MODE_PRIVATE);
                 long fileSize = preferences.getLong(fileKey + "_size", 0);
-                uploadStartTime = (int)(System.currentTimeMillis() / 1000);
+                uploadStartTime = (int) (System.currentTimeMillis() / 1000);
                 boolean rewrite = false;
                 if (estimatedSize == 0 && fileSize == totalFileSize) {
                     currentFileId = preferences.getLong(fileKey + "_id", 0);
@@ -417,5 +411,13 @@ public class FileUploadOperation {
                 }
             }
         }, 0, ConnectionsManager.ConnectionTypeUpload);
+    }
+
+    public interface FileUploadOperationDelegate {
+        void didFinishUploadingFile(FileUploadOperation operation, TLRPC.InputFile inputFile, TLRPC.InputEncryptedFile inputEncryptedFile, byte[] key, byte[] iv);
+
+        void didFailedUploadingFile(FileUploadOperation operation);
+
+        void didChangedUploadProgress(FileUploadOperation operation, float progress);
     }
 }

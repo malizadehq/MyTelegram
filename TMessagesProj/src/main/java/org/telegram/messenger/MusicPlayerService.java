@@ -34,12 +34,10 @@ public class MusicPlayerService extends Service implements NotificationCenter.No
     public static final String NOTIFY_PAUSE = "org.telegram.android.musicplayer.pause";
     public static final String NOTIFY_PLAY = "org.telegram.android.musicplayer.play";
     public static final String NOTIFY_NEXT = "org.telegram.android.musicplayer.next";
-
-    private RemoteControlClient remoteControlClient;
-    private AudioManager audioManager;
-
     private static boolean supportBigNotifications = Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN;
     private static boolean supportLockScreenControls = Build.VERSION.SDK_INT >= Build.VERSION_CODES.ICE_CREAM_SANDWICH;
+    private RemoteControlClient remoteControlClient;
+    private AudioManager audioManager;
 
     @Override
     public IBinder onBind(Intent intent) {

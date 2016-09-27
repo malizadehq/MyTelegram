@@ -18,25 +18,12 @@ import java.io.OutputStreamWriter;
 import java.util.Locale;
 
 public class FileLog {
+    private static volatile FileLog Instance = null;
     private OutputStreamWriter streamWriter = null;
     private FastDateFormat dateFormat = null;
     private DispatchQueue logQueue = null;
     private File currentFile = null;
     private File networkFile = null;
-
-    private static volatile FileLog Instance = null;
-    public static FileLog getInstance() {
-        FileLog localInstance = Instance;
-        if (localInstance == null) {
-            synchronized (FileLog.class) {
-                localInstance = Instance;
-                if (localInstance == null) {
-                    Instance = localInstance = new FileLog();
-                }
-            }
-        }
-        return localInstance;
-    }
 
     public FileLog() {
         if (!BuildVars.DEBUG_VERSION) {
@@ -64,6 +51,19 @@ public class FileLog {
         } catch (Exception e) {
             e.printStackTrace();
         }
+    }
+
+    public static FileLog getInstance() {
+        FileLog localInstance = Instance;
+        if (localInstance == null) {
+            synchronized (FileLog.class) {
+                localInstance = Instance;
+                if (localInstance == null) {
+                    Instance = localInstance = new FileLog();
+                }
+            }
+        }
+        return localInstance;
     }
 
     public static String getNetworkLogPath() {
@@ -197,7 +197,7 @@ public class FileLog {
         if (sdCard == null) {
             return;
         }
-        File dir = new File (sdCard.getAbsolutePath() + "/logs");
+        File dir = new File(sdCard.getAbsolutePath() + "/logs");
         File[] files = dir.listFiles();
         if (files != null) {
             for (int a = 0; a < files.length; a++) {

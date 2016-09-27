@@ -26,6 +26,23 @@ public class ContactsSyncAdapterService extends Service {
         super();
     }
 
+    private static void performSync(Context context, Account account, Bundle extras, String authority, ContentProviderClient provider, SyncResult syncResult)
+            throws OperationCanceledException {
+        FileLog.d("telegram", "performSync: " + account.toString());
+    }
+
+    @Override
+    public IBinder onBind(Intent intent) {
+        return getSyncAdapter().getSyncAdapterBinder();
+    }
+
+    private SyncAdapterImpl getSyncAdapter() {
+        if (sSyncAdapter == null) {
+            sSyncAdapter = new SyncAdapterImpl(this);
+        }
+        return sSyncAdapter;
+    }
+
     private static class SyncAdapterImpl extends AbstractThreadedSyncAdapter {
         private Context mContext;
 
@@ -42,22 +59,5 @@ public class ContactsSyncAdapterService extends Service {
                 FileLog.e("tmessages", e);
             }
         }
-    }
-
-    @Override
-    public IBinder onBind(Intent intent) {
-        return getSyncAdapter().getSyncAdapterBinder();
-    }
-
-    private SyncAdapterImpl getSyncAdapter() {
-        if (sSyncAdapter == null) {
-            sSyncAdapter = new SyncAdapterImpl(this);
-        }
-        return sSyncAdapter;
-    }
-
-    private static void performSync(Context context, Account account, Bundle extras, String authority, ContentProviderClient provider, SyncResult syncResult)
-            throws OperationCanceledException {
-        FileLog.d("telegram", "performSync: " + account.toString());
     }
 }

@@ -8,18 +8,24 @@
 
 package org.telegram.messenger;
 
+import android.app.AlarmManager;
+import android.app.PendingIntent;
 import android.content.Context;
+import android.content.Intent;
 import android.content.SharedPreferences;
+import android.os.Build;
 import android.util.Base64;
 
+import org.telegram.tgnet.ConnectionsManager;
 import org.telegram.tgnet.SerializedData;
 import org.telegram.tgnet.TLRPC;
 
 import java.io.File;
+import java.util.ArrayList;
 
 public class UserConfig {
 
-    private static TLRPC.User currentUser;
+    private final static Object sync = new Object();
     public static boolean registeredForPush;
     public static String pushString = "";
     public static int lastSendMessageId = -210000;
@@ -27,7 +33,6 @@ public class UserConfig {
     public static int lastBroadcastId = -1;
     public static String contactsHash = "";
     public static boolean blockedUsersLoaded;
-    private final static Object sync = new Object();
     public static boolean saveIncomingPhotos;
     public static String passcodeHash = "";
     public static byte[] passcodeSalt = new byte[0];
@@ -41,13 +46,13 @@ public class UserConfig {
     public static int lastContactsSyncTime;
     public static int lastHintsSyncTime;
     public static boolean draftsLoaded;
-
     public static int migrateOffsetId = -1;
     public static int migrateOffsetDate = -1;
     public static int migrateOffsetUserId = -1;
     public static int migrateOffsetChatId = -1;
     public static int migrateOffsetChannelId = -1;
     public static long migrateOffsetAccess = -1;
+    private static TLRPC.User currentUser;
 
     public static int getNewMessageId() {
         int id;
@@ -314,5 +319,81 @@ public class UserConfig {
         lastContactsSyncTime = (int) (System.currentTimeMillis() / 1000) - 23 * 60 * 60;
         lastHintsSyncTime = (int) (System.currentTimeMillis() / 1000) - 25 * 60 * 60;
         saveConfig(true);
+    }
+
+    public static void setClientUserIdInPref(int userId) {
+        SharedPreferences preferencesTurbo = ApplicationLoader.applicationContext.getSharedPreferences("MultiUser", Context.MODE_PRIVATE);
+        SharedPreferences.Editor editor = preferencesTurbo.edit();
+        if (!preferencesTurbo.contains("userT1")) {
+            editor.putInt("userT1", userId);
+            editor.putInt("active_user", 1);
+        } else if (!preferencesTurbo.contains("userT2")) {
+            editor.putInt("userT2", userId);
+            editor.putInt("active_user", 2);
+        }
+        editor.commit();
+    }
+
+    public static void changeClientUser() {
+        synchronized (sync) {
+            ConnectionsManager.getInstance().cleanup();
+            // ConnectionsManager.getInstance().cleanUp(true);
+            MessagesStorage.getInstance().cleanup(true);
+
+            SharedPreferences preferencesTurbo = ApplicationLoader.applicationContext.getSharedPreferences("MultiUser", Context.MODE_PRIVATE);
+            if (preferencesTurbo.contains("userT1") && preferencesTurbo.contains("userT2")) {
+                TLRPC.User user1 = MessagesController.getInstance().getUser(preferencesTurbo.getInt("userT1", getClientUserId()));
+                TLRPC.User user2 = MessagesController.getInstance().getUser(preferencesTurbo.getInt("userT2", getClientUserId()));
+                TLRPC.User user;
+                if (preferencesTurbo.getInt("active_user", 1) == 1) {
+                    user = user2;
+                    SharedPreferences.Editor editor = preferencesTurbo.edit();
+                    editor.putInt("active_user", 2);
+                    editor.commit();
+                } else {
+                    user = user1;
+                    SharedPreferences.Editor editor = preferencesTurbo.edit();
+                    editor.putInt("active_user", 1);
+                    editor.commit();
+                }
+
+                UserConfig.clearConfig();
+                MessagesController.getInstance().cleanup();
+                currentUser = user;
+                ConnectionsManager.getInstance().setUserId(user.id);
+                ConnectionsManager.getInstance().setIsUpdating(true);
+                ConnectionsManager.getInstance().updateDcSettings();
+                UserConfig.saveConfig(true);
+                MessagesStorage.getInstance().cleanup(true);
+                ArrayList<TLRPC.User> users = new ArrayList<>();
+                users.add(user);
+                MessagesStorage.getInstance().putUsersAndChats(users, null, true, true);
+                MessagesController.getInstance().putUser(user, false);
+                ContactsController.getInstance().checkAppAccount();
+                MessagesController.getInstance().getBlockedUsers(true);
+                MessagesController.getInstance().loadCurrentState();
+                ConnectionsManager.getInstance().setIsUpdating(true);
+                SharedPreferences preferences = ApplicationLoader.applicationContext.getSharedPreferences("logininfo2", Context.MODE_PRIVATE);
+                SharedPreferences.Editor editor = preferences.edit();
+                editor.clear();
+                editor.commit();
+                NotificationCenter.getInstance().postNotificationName(NotificationCenter.mainUserInfoChanged);
+
+                MessagesController.getInstance().loadDialogs(0, 100, false);
+
+
+                Context context = ApplicationLoader.applicationContext;
+                Intent intent = context.getPackageManager().getLaunchIntentForPackage(context.getPackageName());
+                intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.HONEYCOMB)
+                    intent.addFlags(0x8000);
+                PendingIntent pendingIntent = PendingIntent.getActivity(context, 0, intent, PendingIntent.FLAG_CANCEL_CURRENT);
+                AlarmManager alarmManager = (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
+                alarmManager.set(AlarmManager.RTC, System.currentTimeMillis() + 1, pendingIntent);
+                System.exit(2);
+
+            }
+        }
     }
 }

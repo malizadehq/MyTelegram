@@ -13,31 +13,23 @@ import org.telegram.tgnet.RequestDelegate;
 import org.telegram.tgnet.TLObject;
 import org.telegram.tgnet.TLRPC;
 
-import java.io.RandomAccessFile;
 import java.io.File;
+import java.io.RandomAccessFile;
 import java.nio.channels.FileChannel;
 import java.util.ArrayList;
 import java.util.Scanner;
 
 public class FileLoadOperation {
 
-    private static class RequestInfo {
-        private int requestToken;
-        private int offset;
-        private TLRPC.TL_upload_file response;
-    }
-
     private final static int stateIdle = 0;
     private final static int stateDownloading = 1;
     private final static int stateFailed = 2;
     private final static int stateFinished = 3;
-
     private final static int downloadChunkSize = 1024 * 32;
     private final static int downloadChunkSizeBig = 1024 * 128;
     private final static int maxDownloadRequests = 4;
     private final static int maxDownloadRequestsBig = 2;
     private final static int bigFileSizeFrom = 1024 * 1024;
-
     private int datacenter_id;
     private TLRPC.InputFileLocation location;
     private volatile int state = stateIdle;
@@ -51,27 +43,18 @@ public class FileLoadOperation {
     private int currentMaxDownloadRequests;
     private int requestsCount;
     private int renameRetryCount;
-
     private int nextDownloadOffset;
     private ArrayList<RequestInfo> requestInfos;
     private ArrayList<RequestInfo> delayedRequestInfos;
-
     private File cacheFileTemp;
     private File cacheFileFinal;
     private File cacheIvTemp;
-
     private String ext;
     private RandomAccessFile fileOutputStream;
     private RandomAccessFile fiv;
     private File storePath;
     private File tempPath;
     private boolean isForceRequest;
-
-    public interface FileLoadOperationDelegate {
-        void didFinishLoadingFile(FileLoadOperation operation, File finalFile);
-        void didFailedLoadingFile(FileLoadOperation operation, int state);
-        void didChangedLoadProgress(FileLoadOperation operation, float progress);
-    }
 
     public FileLoadOperation(TLRPC.FileLocation photoLocation, String extension, int size) {
         if (photoLocation instanceof TLRPC.TL_fileEncryptedLocation) {
@@ -156,12 +139,12 @@ public class FileLoadOperation {
         }
     }
 
-    public void setForceRequest(boolean forceRequest) {
-        isForceRequest = forceRequest;
-    }
-
     public boolean isForceRequest() {
         return isForceRequest;
+    }
+
+    public void setForceRequest(boolean forceRequest) {
+        isForceRequest = forceRequest;
     }
 
     public void setPaths(File store, File temp) {
@@ -535,5 +518,19 @@ public class FileLoadOperation {
 
     public void setDelegate(FileLoadOperationDelegate delegate) {
         this.delegate = delegate;
+    }
+
+    public interface FileLoadOperationDelegate {
+        void didFinishLoadingFile(FileLoadOperation operation, File finalFile);
+
+        void didFailedLoadingFile(FileLoadOperation operation, int state);
+
+        void didChangedLoadProgress(FileLoadOperation operation, float progress);
+    }
+
+    private static class RequestInfo {
+        private int requestToken;
+        private int offset;
+        private TLRPC.TL_upload_file response;
     }
 }
