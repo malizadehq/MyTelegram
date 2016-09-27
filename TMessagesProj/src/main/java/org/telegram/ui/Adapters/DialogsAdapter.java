@@ -28,13 +28,6 @@ public class DialogsAdapter extends RecyclerView.Adapter {
     private long openedDialogId;
     private int currentCount;
 
-    private class Holder extends RecyclerView.ViewHolder {
-
-        public Holder(View itemView) {
-            super(itemView);
-        }
-    }
-
     public DialogsAdapter(Context context, int type) {
         mContext = context;
         dialogsType = type;
@@ -56,6 +49,19 @@ public class DialogsAdapter extends RecyclerView.Adapter {
             return MessagesController.getInstance().dialogsServerOnly;
         } else if (dialogsType == 2) {
             return MessagesController.getInstance().dialogsGroupsOnly;
+        } else if (dialogsType == 3) {
+            return MessagesController.getInstance().dialogsChannels;
+        } else if (dialogsType == 4) {
+            return MessagesController.getInstance().dialogsGroups;
+        } else if (dialogsType == 5) {
+            return MessagesController.getInstance().dialogsBots;
+        } else if (dialogsType == 6) {
+            return MessagesController.getInstance().dialogsUsers;
+        } else if (dialogsType == 7) {
+            return MessagesController.getInstance().dialogsMegaGroups;
+        } else if (dialogsType == 8) {
+            return MessagesController.getInstance().dialogsFavs;
+
         }
         return null;
     }
@@ -126,5 +132,12 @@ public class DialogsAdapter extends RecyclerView.Adapter {
             return 1;
         }
         return 0;
+    }
+
+    private class Holder extends RecyclerView.ViewHolder {
+
+        public Holder(View itemView) {
+            super(itemView);
+        }
     }
 }

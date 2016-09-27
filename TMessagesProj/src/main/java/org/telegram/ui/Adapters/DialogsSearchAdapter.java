@@ -19,15 +19,15 @@ import org.telegram.SQLite.SQLitePreparedStatement;
 import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.ChatObject;
 import org.telegram.messenger.ContactsController;
+import org.telegram.messenger.FileLog;
 import org.telegram.messenger.LocaleController;
 import org.telegram.messenger.MessageObject;
 import org.telegram.messenger.MessagesController;
 import org.telegram.messenger.MessagesStorage;
+import org.telegram.messenger.R;
 import org.telegram.messenger.query.SearchQuery;
 import org.telegram.messenger.support.widget.LinearLayoutManager;
 import org.telegram.messenger.support.widget.RecyclerView;
-import org.telegram.messenger.FileLog;
-import org.telegram.messenger.R;
 import org.telegram.tgnet.ConnectionsManager;
 import org.telegram.tgnet.NativeByteBuffer;
 import org.telegram.tgnet.RequestDelegate;
@@ -70,79 +70,6 @@ public class DialogsSearchAdapter extends BaseSearchAdapterRecycler {
 
     private ArrayList<RecentSearchObject> recentSearchObjects = new ArrayList<>();
     private HashMap<Long, RecentSearchObject> recentSearchObjectsById = new HashMap<>();
-
-    private class Holder extends RecyclerView.ViewHolder {
-
-        public Holder(View itemView) {
-            super(itemView);
-        }
-    }
-
-    private class DialogSearchResult {
-        public TLObject object;
-        public int date;
-        public CharSequence name;
-    }
-
-    protected static class RecentSearchObject {
-        TLObject object;
-        int date;
-        long did;
-    }
-
-    public interface DialogsSearchAdapterDelegate {
-        void searchStateChanged(boolean searching);
-        void didPressedOnSubDialog(int did);
-        void needRemoveHint(int did);
-    }
-
-    private class CategoryAdapterRecycler extends RecyclerView.Adapter {
-
-        public void setIndex(int value) {
-            notifyDataSetChanged();
-        }
-
-        @Override
-        public RecyclerView.ViewHolder onCreateViewHolder(ViewGroup parent, int viewType) {
-            View view = new HintDialogCell(mContext);
-            view.setLayoutParams(new RecyclerView.LayoutParams(AndroidUtilities.dp(80), AndroidUtilities.dp(100)));
-            return new Holder(view);
-        }
-
-        @Override
-        public void onBindViewHolder(RecyclerView.ViewHolder holder, int position) {
-            HintDialogCell cell = (HintDialogCell) holder.itemView;
-
-            TLRPC.TL_topPeer peer = SearchQuery.hints.get(position);
-            TLRPC.TL_dialog dialog = new TLRPC.TL_dialog();
-            TLRPC.Chat chat = null;
-            TLRPC.User user = null;
-            int did = 0;
-            if (peer.peer.user_id != 0) {
-                did = peer.peer.user_id;
-                user = MessagesController.getInstance().getUser(peer.peer.user_id);
-            } else if (peer.peer.channel_id != 0) {
-                did = -peer.peer.channel_id;
-                chat = MessagesController.getInstance().getChat(peer.peer.channel_id);
-            } else if (peer.peer.chat_id != 0) {
-                did = -peer.peer.chat_id;
-                chat = MessagesController.getInstance().getChat(peer.peer.chat_id);
-            }
-            cell.setTag(did);
-            String name = "";
-            if (user != null) {
-                name = ContactsController.formatName(user.first_name, user.last_name);
-            } else if (chat != null) {
-                name = chat.title;
-            }
-            cell.setDialog(did, false, name);
-        }
-
-        @Override
-        public int getItemCount() {
-            return SearchQuery.hints.size();
-        }
-    }
 
     public DialogsSearchAdapter(Context context, int messagesSearch, int type) {
         mContext = context;
@@ -385,8 +312,6 @@ public class DialogsSearchAdapter extends BaseSearchAdapterRecycler {
             }
         });
     }
-
-
 
     public void putRecentSearch(final long did, TLObject object) {
         RecentSearchObject recentSearchObject = recentSearchObjectsById.get(did);
@@ -1090,7 +1015,7 @@ public class DialogsSearchAdapter extends BaseSearchAdapterRecycler {
             case 2: {
                 DialogCell cell = (DialogCell) holder.itemView;
                 cell.useSeparator = (position != getItemCount() - 1);
-                MessageObject messageObject = (MessageObject)getItem(position);
+                MessageObject messageObject = (MessageObject) getItem(position);
                 cell.setDialog(messageObject.getDialogId(), messageObject, messageObject.messageOwner.date);
                 break;
             }
@@ -1138,5 +1063,80 @@ public class DialogsSearchAdapter extends BaseSearchAdapterRecycler {
             return 3;
         }
         return 1;
+    }
+
+    public interface DialogsSearchAdapterDelegate {
+        void searchStateChanged(boolean searching);
+
+        void didPressedOnSubDialog(int did);
+
+        void needRemoveHint(int did);
+    }
+
+    protected static class RecentSearchObject {
+        TLObject object;
+        int date;
+        long did;
+    }
+
+    private class Holder extends RecyclerView.ViewHolder {
+
+        public Holder(View itemView) {
+            super(itemView);
+        }
+    }
+
+    private class DialogSearchResult {
+        public TLObject object;
+        public int date;
+        public CharSequence name;
+    }
+
+    private class CategoryAdapterRecycler extends RecyclerView.Adapter {
+
+        public void setIndex(int value) {
+            notifyDataSetChanged();
+        }
+
+        @Override
+        public RecyclerView.ViewHolder onCreateViewHolder(ViewGroup parent, int viewType) {
+            View view = new HintDialogCell(mContext);
+            view.setLayoutParams(new RecyclerView.LayoutParams(AndroidUtilities.dp(80), AndroidUtilities.dp(100)));
+            return new Holder(view);
+        }
+
+        @Override
+        public void onBindViewHolder(RecyclerView.ViewHolder holder, int position) {
+            HintDialogCell cell = (HintDialogCell) holder.itemView;
+
+            TLRPC.TL_topPeer peer = SearchQuery.hints.get(position);
+            TLRPC.TL_dialog dialog = new TLRPC.TL_dialog();
+            TLRPC.Chat chat = null;
+            TLRPC.User user = null;
+            int did = 0;
+            if (peer.peer.user_id != 0) {
+                did = peer.peer.user_id;
+                user = MessagesController.getInstance().getUser(peer.peer.user_id);
+            } else if (peer.peer.channel_id != 0) {
+                did = -peer.peer.channel_id;
+                chat = MessagesController.getInstance().getChat(peer.peer.channel_id);
+            } else if (peer.peer.chat_id != 0) {
+                did = -peer.peer.chat_id;
+                chat = MessagesController.getInstance().getChat(peer.peer.chat_id);
+            }
+            cell.setTag(did);
+            String name = "";
+            if (user != null) {
+                name = ContactsController.formatName(user.first_name, user.last_name);
+            } else if (chat != null) {
+                name = chat.title;
+            }
+            cell.setDialog(did, false, name);
+        }
+
+        @Override
+        public int getItemCount() {
+            return SearchQuery.hints.size();
+        }
     }
 }

@@ -13,15 +13,15 @@ import android.location.Location;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.telegram.messenger.AndroidUtilities;
+import org.telegram.messenger.ApplicationLoader;
+import org.telegram.messenger.BuildVars;
+import org.telegram.messenger.FileLog;
 import org.telegram.messenger.volley.Request;
 import org.telegram.messenger.volley.RequestQueue;
 import org.telegram.messenger.volley.Response;
 import org.telegram.messenger.volley.VolleyError;
 import org.telegram.messenger.volley.toolbox.JsonObjectRequest;
 import org.telegram.messenger.volley.toolbox.Volley;
-import org.telegram.messenger.ApplicationLoader;
-import org.telegram.messenger.BuildVars;
-import org.telegram.messenger.FileLog;
 import org.telegram.tgnet.TLRPC;
 
 import java.net.URLEncoder;
@@ -32,14 +32,10 @@ import java.util.TimerTask;
 
 public class BaseLocationAdapter extends BaseFragmentAdapter {
 
-    public interface BaseLocationAdapterDelegate {
-        void didLoadedSearchResult(ArrayList<TLRPC.TL_messageMediaVenue> places);
-    }
-
-    private RequestQueue requestQueue;
     protected boolean searching;
     protected ArrayList<TLRPC.TL_messageMediaVenue> places = new ArrayList<>();
     protected ArrayList<String> iconUrls = new ArrayList<>();
+    private RequestQueue requestQueue;
     private Location lastSearchLocation;
     private BaseLocationAdapterDelegate delegate;
     private Timer searchTimer;
@@ -104,7 +100,7 @@ public class BaseLocationAdapter extends BaseFragmentAdapter {
         }
         try {
             searching = true;
-            String url = String.format(Locale.US, "https://api.foursquare.com/v2/venues/search/?v=%s&locale=en&limit=25&client_id=%s&client_secret=%s&ll=%s", BuildVars.FOURSQUARE_API_VERSION, BuildVars.FOURSQUARE_API_ID, BuildVars.FOURSQUARE_API_KEY,  String.format(Locale.US, "%f,%f", coordinate.getLatitude(), coordinate.getLongitude()));
+            String url = String.format(Locale.US, "https://api.foursquare.com/v2/venues/search/?v=%s&locale=en&limit=25&client_id=%s&client_secret=%s&ll=%s", BuildVars.FOURSQUARE_API_VERSION, BuildVars.FOURSQUARE_API_ID, BuildVars.FOURSQUARE_API_KEY, String.format(Locale.US, "%f,%f", coordinate.getLatitude(), coordinate.getLongitude()));
             if (query != null && query.length() > 0) {
                 url += "&query=" + URLEncoder.encode(query, "UTF-8");
             }
@@ -219,5 +215,9 @@ public class BaseLocationAdapter extends BaseFragmentAdapter {
             }
         }
         notifyDataSetChanged();
-        }
+    }
+
+    public interface BaseLocationAdapterDelegate {
+        void didLoadedSearchResult(ArrayList<TLRPC.TL_messageMediaVenue> places);
+    }
 }

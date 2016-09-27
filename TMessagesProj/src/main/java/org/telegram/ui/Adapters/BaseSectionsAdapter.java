@@ -20,17 +20,17 @@ public abstract class BaseSectionsAdapter extends BaseFragmentAdapter {
     private int sectionCount;
     private int count;
 
+    public BaseSectionsAdapter() {
+        super();
+        cleanupCache();
+    }
+
     private void cleanupCache() {
         sectionCache = new SparseArray<>();
         sectionPositionCache = new SparseArray<>();
         sectionCountCache = new SparseArray<>();
         count = -1;
         sectionCount = -1;
-    }
-
-    public BaseSectionsAdapter() {
-        super();
-        cleanupCache();
     }
 
     @Override
@@ -143,10 +143,16 @@ public abstract class BaseSectionsAdapter extends BaseFragmentAdapter {
     }
 
     public abstract int getSectionCount();
+
     public abstract int getCountForSection(int section);
+
     public abstract boolean isRowEnabled(int section, int row);
+
     public abstract int getItemViewType(int section, int position);
+
     public abstract Object getItem(int section, int position);
+
     public abstract View getItemView(int section, int position, View convertView, ViewGroup parent);
+
     public abstract View getSectionHeaderView(int section, View convertView, ViewGroup parent);
 }

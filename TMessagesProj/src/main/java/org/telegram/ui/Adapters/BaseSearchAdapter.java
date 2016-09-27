@@ -11,8 +11,8 @@ package org.telegram.ui.Adapters;
 import org.telegram.SQLite.SQLiteCursor;
 import org.telegram.SQLite.SQLitePreparedStatement;
 import org.telegram.messenger.AndroidUtilities;
-import org.telegram.messenger.MessagesStorage;
 import org.telegram.messenger.FileLog;
+import org.telegram.messenger.MessagesStorage;
 import org.telegram.tgnet.ConnectionsManager;
 import org.telegram.tgnet.RequestDelegate;
 import org.telegram.tgnet.TLObject;
@@ -27,19 +27,13 @@ import java.util.regex.Pattern;
 
 public class BaseSearchAdapter extends BaseFragmentAdapter {
 
-    protected static class HashtagObject {
-        String hashtag;
-        int date;
-    }
-
     protected ArrayList<TLObject> globalSearch = new ArrayList<>();
-    private int reqId = 0;
-    private int lastReqId;
     protected String lastFoundUsername = null;
-
     protected ArrayList<HashtagObject> hashtags;
     protected HashMap<String, HashtagObject> hashtagsByText;
     protected boolean hashtagsLoadedFromDb = false;
+    private int reqId = 0;
+    private int lastReqId;
 
     public void queryServerSearch(final String query, final boolean allowChats, final boolean allowBots) {
         if (reqId != 0) {
@@ -216,5 +210,10 @@ public class BaseSearchAdapter extends BaseFragmentAdapter {
         hashtags = arrayList;
         hashtagsByText = hashMap;
         hashtagsLoadedFromDb = true;
+    }
+
+    protected static class HashtagObject {
+        String hashtag;
+        int date;
     }
 }

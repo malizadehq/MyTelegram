@@ -47,19 +47,6 @@ import java.util.HashMap;
 
 public class MentionsAdapter extends BaseSearchAdapterRecycler {
 
-    public interface MentionsAdapterDelegate {
-        void needChangePanelVisibility(boolean show);
-        void onContextSearch(boolean searching);
-        void onContextClick(TLRPC.BotInlineResult result);
-    }
-
-    public class Holder extends RecyclerView.ViewHolder {
-
-        public Holder(View itemView) {
-            super(itemView);
-        }
-    }
-
     private Context mContext;
     private long dialog_id;
     private TLRPC.ChatFull info;
@@ -83,7 +70,6 @@ public class MentionsAdapter extends BaseSearchAdapterRecycler {
     private boolean needBotContext = true;
     private boolean isDarkTheme;
     private int botsCount;
-
     private String searchingContextUsername;
     private String searchingContextQuery;
     private String nextQueryOffset;
@@ -94,9 +80,7 @@ public class MentionsAdapter extends BaseSearchAdapterRecycler {
     private boolean contextMedia;
     private Runnable contextQueryRunnable;
     private Location lastKnownLocation;
-
     private BaseFragment parentFragment;
-
     private SendMessagesHelper.LocationProvider locationProvider = new SendMessagesHelper.LocationProvider(new SendMessagesHelper.LocationProvider.LocationProviderDelegate() {
         @Override
         public void onLocationAcquired(Location location) {
@@ -845,6 +829,21 @@ public class MentionsAdapter extends BaseSearchAdapterRecycler {
                     onLocationUnavailable();
                 }
             }
+        }
+    }
+
+    public interface MentionsAdapterDelegate {
+        void needChangePanelVisibility(boolean show);
+
+        void onContextSearch(boolean searching);
+
+        void onContextClick(TLRPC.BotInlineResult result);
+    }
+
+    public class Holder extends RecyclerView.ViewHolder {
+
+        public Holder(View itemView) {
+            super(itemView);
         }
     }
 }

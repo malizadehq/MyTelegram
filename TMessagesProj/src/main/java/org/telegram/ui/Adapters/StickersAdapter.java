@@ -14,12 +14,12 @@ import android.text.TextUtils;
 import android.view.View;
 import android.view.ViewGroup;
 
+import org.telegram.messenger.FileLoader;
 import org.telegram.messenger.FileLog;
 import org.telegram.messenger.NotificationCenter;
 import org.telegram.messenger.Utilities;
 import org.telegram.messenger.query.StickersQuery;
 import org.telegram.messenger.support.widget.RecyclerView;
-import org.telegram.messenger.FileLoader;
 import org.telegram.tgnet.TLRPC;
 import org.telegram.ui.Cells.StickerCell;
 
@@ -39,17 +39,6 @@ public class StickersAdapter extends RecyclerView.Adapter implements Notificatio
     private boolean visible;
     private ArrayList<Long> newRecentStickers = new ArrayList<>();
     private long recentLoadDate;
-
-    public interface StickersAdapterDelegate {
-        void needChangePanelVisibility(boolean show);
-    }
-
-    private class Holder extends RecyclerView.ViewHolder {
-
-        public Holder(View itemView) {
-            super(itemView);
-        }
-    }
 
     public StickersAdapter(Context context, StickersAdapterDelegate delegate) {
         mContext = context;
@@ -208,5 +197,16 @@ public class StickersAdapter extends RecyclerView.Adapter implements Notificatio
             side = 1;
         }
         ((StickerCell) viewHolder.itemView).setSticker(stickers.get(i), side);
+    }
+
+    public interface StickersAdapterDelegate {
+        void needChangePanelVisibility(boolean show);
+    }
+
+    private class Holder extends RecyclerView.ViewHolder {
+
+        public Holder(View itemView) {
+            super(itemView);
+        }
     }
 }

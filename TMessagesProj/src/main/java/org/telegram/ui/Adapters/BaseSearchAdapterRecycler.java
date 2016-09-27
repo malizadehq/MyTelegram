@@ -11,9 +11,9 @@ package org.telegram.ui.Adapters;
 import org.telegram.SQLite.SQLiteCursor;
 import org.telegram.SQLite.SQLitePreparedStatement;
 import org.telegram.messenger.AndroidUtilities;
+import org.telegram.messenger.FileLog;
 import org.telegram.messenger.MessagesStorage;
 import org.telegram.messenger.support.widget.RecyclerView;
-import org.telegram.messenger.FileLog;
 import org.telegram.tgnet.ConnectionsManager;
 import org.telegram.tgnet.RequestDelegate;
 import org.telegram.tgnet.TLObject;
@@ -28,19 +28,13 @@ import java.util.regex.Pattern;
 
 public abstract class BaseSearchAdapterRecycler extends RecyclerView.Adapter {
 
-    protected static class HashtagObject {
-        String hashtag;
-        int date;
-    }
-
     protected ArrayList<TLObject> globalSearch = new ArrayList<>();
-    private int reqId = 0;
-    private int lastReqId;
     protected String lastFoundUsername = null;
-
     protected ArrayList<HashtagObject> hashtags;
     protected HashMap<String, HashtagObject> hashtagsByText;
     protected boolean hashtagsLoadedFromDb = false;
+    private int reqId = 0;
+    private int lastReqId;
 
     public void queryServerSearch(final String query, final boolean allowChats) {
         if (reqId != 0) {
@@ -214,5 +208,10 @@ public abstract class BaseSearchAdapterRecycler extends RecyclerView.Adapter {
         hashtags = arrayList;
         hashtagsByText = hashMap;
         hashtagsLoadedFromDb = true;
+    }
+
+    protected static class HashtagObject {
+        String hashtag;
+        int date;
     }
 }
