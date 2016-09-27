@@ -9,18 +9,28 @@
 package org.telegram.ui.Cells;
 
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.view.View;
 
 import org.telegram.messenger.AndroidUtilities;
+import org.telegram.messenger.ApplicationLoader;
 import org.telegram.messenger.R;
 
 public class ShadowSectionCell extends View {
 
+    boolean bTheme;
     private int size = 12;
 
     public ShadowSectionCell(Context context) {
         super(context);
         setBackgroundResource(R.drawable.greydivider);
+        bTheme = true;
+    }
+
+    public ShadowSectionCell(Context context, boolean theme) {
+        super(context);
+        setBackgroundResource(R.drawable.greydivider);
+        bTheme = theme;
     }
 
     public void setSize(int value) {
@@ -30,5 +40,17 @@ public class ShadowSectionCell extends View {
     @Override
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
         super.onMeasure(MeasureSpec.makeMeasureSpec(MeasureSpec.getSize(widthMeasureSpec), MeasureSpec.EXACTLY), MeasureSpec.makeMeasureSpec(AndroidUtilities.dp(size), MeasureSpec.EXACTLY));
+        if (bTheme) setTheme();
     }
+
+    private void setTheme() {
+        SharedPreferences preferences = ApplicationLoader.applicationContext.getSharedPreferences(AndroidUtilities.THEME_PREFS, AndroidUtilities.THEME_PREFS_MODE);
+        int shadowColor = preferences.getInt("prefShadowColor", 0xfff0f0f0);
+        if (shadowColor == 0xfff0f0f0) {
+            setBackgroundResource(R.drawable.greydivider);
+        } else {
+            setBackgroundColor(shadowColor);
+        }
+    }
+
 }

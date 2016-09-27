@@ -27,58 +27,6 @@ import org.telegram.ui.Components.LayoutHelper;
 
 public class PhotoPickerSearchCell extends LinearLayout {
 
-    public interface PhotoPickerSearchCellDelegate {
-        void didPressedSearchButton(int index);
-    }
-
-    private class SearchButton extends FrameLayout {
-
-        private TextView textView1;
-        private TextView textView2;
-        private ImageView imageView;
-        private View selector;
-
-        public SearchButton(Context context) {
-            super(context);
-
-            setBackgroundColor(0xff1a1a1a);
-
-            selector = new View(context);
-            selector.setBackgroundResource(R.drawable.list_selector);
-            addView(selector, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT));
-
-            imageView = new ImageView(context);
-            imageView.setScaleType(ImageView.ScaleType.CENTER);
-            addView(imageView, LayoutHelper.createFrame(48, 48, Gravity.LEFT | Gravity.TOP));
-
-            textView1 = new TextView(context);
-            textView1.setGravity(Gravity.CENTER_VERTICAL);
-            textView1.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 14);
-            textView1.setTypeface(AndroidUtilities.getTypeface("fonts/rmedium.ttf"));
-            textView1.setTextColor(0xffffffff);
-            textView1.setSingleLine(true);
-            textView1.setEllipsize(TextUtils.TruncateAt.END);
-            addView(textView1, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.TOP | Gravity.LEFT, 51, 8, 4, 0));
-
-            textView2 = new TextView(context);
-            textView2.setGravity(Gravity.CENTER_VERTICAL);
-            textView2.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 10);
-            textView2.setTypeface(AndroidUtilities.getTypeface("fonts/rmedium.ttf"));
-            textView2.setTextColor(0xff666666);
-            textView2.setSingleLine(true);
-            textView2.setEllipsize(TextUtils.TruncateAt.END);
-            addView(textView2, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.TOP | Gravity.LEFT, 51, 26, 4, 0));
-        }
-
-        @Override
-        public boolean onTouchEvent(MotionEvent event) {
-            if (Build.VERSION.SDK_INT >= 21) {
-                selector.drawableHotspotChanged(event.getX(), event.getY());
-            }
-            return super.onTouchEvent(event);
-        }
-    }
-
     private PhotoPickerSearchCellDelegate delegate;
 
     public PhotoPickerSearchCell(Context context, boolean allowGifs) {
@@ -146,5 +94,57 @@ public class PhotoPickerSearchCell extends LinearLayout {
     @Override
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
         super.onMeasure(widthMeasureSpec, MeasureSpec.makeMeasureSpec(AndroidUtilities.dp(52), MeasureSpec.EXACTLY));
+    }
+
+    public interface PhotoPickerSearchCellDelegate {
+        void didPressedSearchButton(int index);
+    }
+
+    private class SearchButton extends FrameLayout {
+
+        private TextView textView1;
+        private TextView textView2;
+        private ImageView imageView;
+        private View selector;
+
+        public SearchButton(Context context) {
+            super(context);
+
+            setBackgroundColor(0xff1a1a1a);
+
+            selector = new View(context);
+            selector.setBackgroundResource(R.drawable.list_selector);
+            addView(selector, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT));
+
+            imageView = new ImageView(context);
+            imageView.setScaleType(ImageView.ScaleType.CENTER);
+            addView(imageView, LayoutHelper.createFrame(48, 48, Gravity.LEFT | Gravity.TOP));
+
+            textView1 = new TextView(context);
+            textView1.setGravity(Gravity.CENTER_VERTICAL);
+            textView1.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 14);
+            textView1.setTypeface(AndroidUtilities.getTypeface("fonts/rmedium.ttf"));
+            textView1.setTextColor(0xffffffff);
+            textView1.setSingleLine(true);
+            textView1.setEllipsize(TextUtils.TruncateAt.END);
+            addView(textView1, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.TOP | Gravity.LEFT, 51, 8, 4, 0));
+
+            textView2 = new TextView(context);
+            textView2.setGravity(Gravity.CENTER_VERTICAL);
+            textView2.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 10);
+            textView2.setTypeface(AndroidUtilities.getTypeface("fonts/rmedium.ttf"));
+            textView2.setTextColor(0xff666666);
+            textView2.setSingleLine(true);
+            textView2.setEllipsize(TextUtils.TruncateAt.END);
+            addView(textView2, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.TOP | Gravity.LEFT, 51, 26, 4, 0));
+        }
+
+        @Override
+        public boolean onTouchEvent(MotionEvent event) {
+            if (Build.VERSION.SDK_INT >= 21) {
+                selector.drawableHotspotChanged(event.getX(), event.getY());
+            }
+            return super.onTouchEvent(event);
+        }
     }
 }

@@ -24,9 +24,9 @@ import android.widget.TextView;
 
 import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.AnimatorListenerAdapterProxy;
-import org.telegram.messenger.MessageObject;
 import org.telegram.messenger.ApplicationLoader;
 import org.telegram.messenger.FileLoader;
+import org.telegram.messenger.MessageObject;
 import org.telegram.messenger.R;
 import org.telegram.tgnet.TLRPC;
 import org.telegram.ui.Components.BackupImageView;
@@ -42,119 +42,6 @@ public class SharedPhotoVideoCell extends FrameLayout {
     private SharedPhotoVideoCellDelegate delegate;
     private int itemsCount;
     private boolean isFirst;
-
-    public interface SharedPhotoVideoCellDelegate {
-        void didClickItem(SharedPhotoVideoCell cell, int index, MessageObject messageObject, int a);
-        boolean didLongClickItem(SharedPhotoVideoCell cell, int index, MessageObject messageObject, int a);
-    }
-
-    private class PhotoVideoView extends FrameLayout {
-
-        private BackupImageView imageView;
-        private TextView videoTextView;
-        private LinearLayout videoInfoContainer;
-        private View selector;
-        private CheckBox checkBox;
-        private FrameLayout container;
-        private AnimatorSet animator;
-
-        public PhotoVideoView(Context context) {
-            super(context);
-
-            container = new FrameLayout(context);
-            addView(container, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT));
-
-            imageView = new BackupImageView(context);
-            imageView.getImageReceiver().setNeedsQualityThumb(true);
-            imageView.getImageReceiver().setShouldGenerateQualityThumb(true);
-            container.addView(imageView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT));
-
-            videoInfoContainer = new LinearLayout(context);
-            videoInfoContainer.setOrientation(LinearLayout.HORIZONTAL);
-            videoInfoContainer.setBackgroundResource(R.drawable.phototime);
-            videoInfoContainer.setPadding(AndroidUtilities.dp(3), 0, AndroidUtilities.dp(3), 0);
-            videoInfoContainer.setGravity(Gravity.CENTER_VERTICAL);
-            container.addView(videoInfoContainer, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, 16, Gravity.BOTTOM | Gravity.LEFT));
-
-            ImageView imageView1 = new ImageView(context);
-            imageView1.setImageResource(R.drawable.ic_video);
-            videoInfoContainer.addView(imageView1, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT));
-
-            videoTextView = new TextView(context);
-            videoTextView.setTextColor(0xffffffff);
-            videoTextView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 12);
-            videoTextView.setGravity(Gravity.CENTER_VERTICAL);
-            videoInfoContainer.addView(videoTextView, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER_VERTICAL, 4, 0, 0, 1));
-
-            selector = new View(context);
-            selector.setBackgroundResource(R.drawable.list_selector);
-            addView(selector, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT));
-
-            checkBox = new CheckBox(context, R.drawable.round_check2);
-            checkBox.setVisibility(INVISIBLE);
-            addView(checkBox, LayoutHelper.createFrame(22, 22, Gravity.RIGHT | Gravity.TOP, 0, 2, 2, 0));
-        }
-
-        @Override
-        public boolean onTouchEvent(MotionEvent event) {
-            if (Build.VERSION.SDK_INT >= 21) {
-                selector.drawableHotspotChanged(event.getX(), event.getY());
-            }
-            return super.onTouchEvent(event);
-        }
-
-        public void setChecked(final boolean checked, boolean animated) {
-            if (checkBox.getVisibility() != VISIBLE) {
-                checkBox.setVisibility(VISIBLE);
-            }
-            checkBox.setChecked(checked, animated);
-            if (animator != null) {
-                animator.cancel();
-                animator = null;
-            }
-            if (animated) {
-                if (checked) {
-                    setBackgroundColor(0xfff5f5f5);
-                }
-                animator = new AnimatorSet();
-                animator.playTogether(ObjectAnimator.ofFloat(container, "scaleX", checked ? 0.85f : 1.0f),
-                        ObjectAnimator.ofFloat(container, "scaleY", checked ? 0.85f : 1.0f));
-                animator.setDuration(200);
-                animator.addListener(new AnimatorListenerAdapterProxy() {
-                    @Override
-                    public void onAnimationEnd(Animator animation) {
-                        if (animator != null && animator.equals(animation)) {
-                            animator = null;
-                            if (!checked) {
-                                setBackgroundColor(0);
-                            }
-                        }
-                    }
-
-                    @Override
-                    public void onAnimationCancel(Animator animation) {
-                        if (animator != null && animator.equals(animation)) {
-                            animator = null;
-                        }
-                    }
-                });
-                animator.start();
-            } else {
-                setBackgroundColor(checked ? 0xfff5f5f5 : 0);
-                container.setScaleX(checked ? 0.85f : 1.0f);
-                container.setScaleY(checked ? 0.85f : 1.0f);
-            }
-        }
-
-        @Override
-        public void clearAnimation() {
-            super.clearAnimation();
-            if (animator != null) {
-                animator.cancel();
-                animator = null;
-            }
-        }
-    }
 
     public SharedPhotoVideoCell(Context context) {
         super(context);
@@ -287,5 +174,120 @@ public class SharedPhotoVideoCell extends FrameLayout {
         }
 
         super.onMeasure(widthMeasureSpec, MeasureSpec.makeMeasureSpec((isFirst ? 0 : AndroidUtilities.dp(4)) + itemWidth, MeasureSpec.EXACTLY));
+    }
+
+    public interface SharedPhotoVideoCellDelegate {
+        void didClickItem(SharedPhotoVideoCell cell, int index, MessageObject messageObject, int a);
+
+        boolean didLongClickItem(SharedPhotoVideoCell cell, int index, MessageObject messageObject, int a);
+    }
+
+    private class PhotoVideoView extends FrameLayout {
+
+        private BackupImageView imageView;
+        private TextView videoTextView;
+        private LinearLayout videoInfoContainer;
+        private View selector;
+        private CheckBox checkBox;
+        private FrameLayout container;
+        private AnimatorSet animator;
+
+        public PhotoVideoView(Context context) {
+            super(context);
+
+            container = new FrameLayout(context);
+            addView(container, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT));
+
+            imageView = new BackupImageView(context);
+            imageView.getImageReceiver().setNeedsQualityThumb(true);
+            imageView.getImageReceiver().setShouldGenerateQualityThumb(true);
+            container.addView(imageView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT));
+
+            videoInfoContainer = new LinearLayout(context);
+            videoInfoContainer.setOrientation(LinearLayout.HORIZONTAL);
+            videoInfoContainer.setBackgroundResource(R.drawable.phototime);
+            videoInfoContainer.setPadding(AndroidUtilities.dp(3), 0, AndroidUtilities.dp(3), 0);
+            videoInfoContainer.setGravity(Gravity.CENTER_VERTICAL);
+            container.addView(videoInfoContainer, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, 16, Gravity.BOTTOM | Gravity.LEFT));
+
+            ImageView imageView1 = new ImageView(context);
+            imageView1.setImageResource(R.drawable.ic_video);
+            videoInfoContainer.addView(imageView1, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT));
+
+            videoTextView = new TextView(context);
+            videoTextView.setTextColor(0xffffffff);
+            videoTextView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 12);
+            videoTextView.setGravity(Gravity.CENTER_VERTICAL);
+            videoTextView.setTypeface(AndroidUtilities.getTypeface("fonts/rmedium.ttf"));
+            videoInfoContainer.addView(videoTextView, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER_VERTICAL, 4, 0, 0, 1));
+
+            selector = new View(context);
+            selector.setBackgroundResource(R.drawable.list_selector);
+            addView(selector, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT));
+
+            checkBox = new CheckBox(context, R.drawable.round_check2);
+            checkBox.setVisibility(INVISIBLE);
+            addView(checkBox, LayoutHelper.createFrame(22, 22, Gravity.RIGHT | Gravity.TOP, 0, 2, 2, 0));
+        }
+
+        @Override
+        public boolean onTouchEvent(MotionEvent event) {
+            if (Build.VERSION.SDK_INT >= 21) {
+                selector.drawableHotspotChanged(event.getX(), event.getY());
+            }
+            return super.onTouchEvent(event);
+        }
+
+        public void setChecked(final boolean checked, boolean animated) {
+            if (checkBox.getVisibility() != VISIBLE) {
+                checkBox.setVisibility(VISIBLE);
+            }
+            checkBox.setChecked(checked, animated);
+            if (animator != null) {
+                animator.cancel();
+                animator = null;
+            }
+            if (animated) {
+                if (checked) {
+                    setBackgroundColor(0xfff5f5f5);
+                }
+                animator = new AnimatorSet();
+                animator.playTogether(ObjectAnimator.ofFloat(container, "scaleX", checked ? 0.85f : 1.0f),
+                        ObjectAnimator.ofFloat(container, "scaleY", checked ? 0.85f : 1.0f));
+                animator.setDuration(200);
+                animator.addListener(new AnimatorListenerAdapterProxy() {
+                    @Override
+                    public void onAnimationEnd(Animator animation) {
+                        if (animator != null && animator.equals(animation)) {
+                            animator = null;
+                            if (!checked) {
+                                setBackgroundColor(0);
+                            }
+                        }
+                    }
+
+                    @Override
+                    public void onAnimationCancel(Animator animation) {
+                        if (animator != null && animator.equals(animation)) {
+                            animator = null;
+                        }
+                    }
+                });
+                animator.start();
+            } else {
+                setBackgroundColor(checked ? 0xfff5f5f5 : 0);
+                container.setScaleX(checked ? 0.85f : 1.0f);
+                container.setScaleY(checked ? 0.85f : 1.0f);
+            }
+        }
+
+        @Override
+        public void clearAnimation() {
+            super.clearAnimation();
+            if (animator != null) {
+                animator.cancel();
+                animator = null;
+            }
+        }
     }
 }

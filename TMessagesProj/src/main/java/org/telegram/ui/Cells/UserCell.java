@@ -14,20 +14,21 @@ import android.widget.FrameLayout;
 import android.widget.ImageView;
 
 import org.telegram.messenger.AndroidUtilities;
+import org.telegram.messenger.ApplicationLoader;
 import org.telegram.messenger.LocaleController;
 import org.telegram.messenger.MessagesController;
-import org.telegram.messenger.UserObject;
 import org.telegram.messenger.R;
+import org.telegram.messenger.UserConfig;
+import org.telegram.messenger.UserObject;
 import org.telegram.tgnet.ConnectionsManager;
 import org.telegram.tgnet.TLObject;
 import org.telegram.tgnet.TLRPC;
-import org.telegram.messenger.UserConfig;
 import org.telegram.ui.Components.AvatarDrawable;
 import org.telegram.ui.Components.BackupImageView;
 import org.telegram.ui.Components.CheckBox;
 import org.telegram.ui.Components.CheckBoxSquare;
 import org.telegram.ui.Components.LayoutHelper;
-import org.telegram.ui.ActionBar.SimpleTextView;
+import org.telegram.ui.Components.SimpleTextView;
 
 public class UserCell extends FrameLayout {
 
@@ -46,9 +47,11 @@ public class UserCell extends FrameLayout {
     private CharSequence currrntStatus;
     private int currentDrawable;
 
-    private String lastName;
-    private int lastStatus;
-    private TLRPC.FileLocation lastAvatar;
+    private String lastName = null;
+    private int lastStatus = 0;
+    private TLRPC.FileLocation lastAvatar = null;
+    private ImageView creatorImage;
+    private ImageView hasMyPhoneImageView;
 
     private int statusColor = 0xffa8a8a8;
     private int statusOnlineColor = 0xff3b84c0;
@@ -65,11 +68,13 @@ public class UserCell extends FrameLayout {
         nameTextView = new SimpleTextView(context);
         nameTextView.setTextColor(0xff212121);
         nameTextView.setTextSize(17);
+        nameTextView.setTypeface(AndroidUtilities.getTypeface("fonts/rmedium.ttf"));
         nameTextView.setGravity((LocaleController.isRTL ? Gravity.RIGHT : Gravity.LEFT) | Gravity.TOP);
         addView(nameTextView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, 20, (LocaleController.isRTL ? Gravity.RIGHT : Gravity.LEFT) | Gravity.TOP, LocaleController.isRTL ? 28 + (checkbox == 2 ? 18 : 0) : (68 + padding), 11.5f, LocaleController.isRTL ? (68 + padding) : 28 + (checkbox == 2 ? 18 : 0), 0));
 
         statusTextView = new SimpleTextView(context);
         statusTextView.setTextSize(14);
+        statusTextView.setTypeface(AndroidUtilities.getTypeface("fonts/rmedium.ttf"));
         statusTextView.setGravity((LocaleController.isRTL ? Gravity.RIGHT : Gravity.LEFT) | Gravity.TOP);
         addView(statusTextView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, 20, (LocaleController.isRTL ? Gravity.RIGHT : Gravity.LEFT) | Gravity.TOP, LocaleController.isRTL ? 28 : (68 + padding), 34.5f, LocaleController.isRTL ? (68 + padding) : 28, 0));
 
@@ -77,6 +82,11 @@ public class UserCell extends FrameLayout {
         imageView.setScaleType(ImageView.ScaleType.CENTER);
         imageView.setVisibility(GONE);
         addView(imageView, LayoutHelper.createFrame(LayoutParams.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, (LocaleController.isRTL ? Gravity.RIGHT : Gravity.LEFT) | Gravity.CENTER_VERTICAL, LocaleController.isRTL ? 0 : 16, 0, LocaleController.isRTL ? 16 : 0, 0));
+        this.hasMyPhoneImageView = new ImageView(context);
+        this.hasMyPhoneImageView.setScaleType(ImageView.ScaleType.CENTER);
+        this.hasMyPhoneImageView.setImageResource(R.drawable.menu_mutual);
+        this.hasMyPhoneImageView.setVisibility(GONE);
+        addView(this.hasMyPhoneImageView, LayoutHelper.createFrame(-2, -2.0f, (LocaleController.isRTL ? 3 : 5) | 16, 16.0f, 0.0f, 16.0f, 0.0f));
 
         if (checkbox == 2) {
             checkBoxBig = new CheckBoxSquare(context);
@@ -86,24 +96,31 @@ public class UserCell extends FrameLayout {
             checkBox.setVisibility(INVISIBLE);
             addView(checkBox, LayoutHelper.createFrame(22, 22, (LocaleController.isRTL ? Gravity.RIGHT : Gravity.LEFT) | Gravity.TOP, LocaleController.isRTL ? 0 : 37 + padding, 38, LocaleController.isRTL ? 37 + padding : 0, 0));
         }
-
+        if (admin) {
+            creatorImage = new ImageView(context);
+            creatorImage.setImageResource(R.drawable.admin_creator_star);
+            addView(creatorImage, LayoutHelper.createFrame(16, 16, (LocaleController.isRTL ? Gravity.LEFT : Gravity.RIGHT) | Gravity.TOP, LocaleController.isRTL ? 24 : 0, 13.5f, LocaleController.isRTL ? 0 : 24, 0));
+        }
         if (admin) {
             adminImage = new ImageView(context);
+            adminImage.setImageResource(R.drawable.admin_star);
             addView(adminImage, LayoutHelper.createFrame(16, 16, (LocaleController.isRTL ? Gravity.LEFT : Gravity.RIGHT) | Gravity.TOP, LocaleController.isRTL ? 24 : 0, 13.5f, LocaleController.isRTL ? 0 : 24, 0));
         }
     }
 
-    public void setIsAdmin(int value) {
+    public void setIsCreator(boolean value) {
+        if (this.adminImage != null) {
+            creatorImage.setVisibility(value ? VISIBLE : GONE);
+            nameTextView.setPadding(LocaleController.isRTL && value ? AndroidUtilities.dp(16) : 0, 0, !LocaleController.isRTL && value ? AndroidUtilities.dp(16) : 0, 0);
+        }
+    }
+
+    public void setIsAdmin(boolean value) {
         if (adminImage == null) {
             return;
         }
-        adminImage.setVisibility(value != 0 ? VISIBLE : GONE);
-        nameTextView.setPadding(LocaleController.isRTL && value != 0 ? AndroidUtilities.dp(16) : 0, 0, !LocaleController.isRTL && value != 0 ? AndroidUtilities.dp(16) : 0, 0);
-        if (value == 1) {
-            adminImage.setImageResource(R.drawable.admin_star);
-        } else if (value == 2) {
-            adminImage.setImageResource(R.drawable.admin_star2);
-        }
+        adminImage.setVisibility(value ? VISIBLE : GONE);
+        nameTextView.setPadding(LocaleController.isRTL && value ? AndroidUtilities.dp(16) : 0, 0, !LocaleController.isRTL && value ? AndroidUtilities.dp(16) : 0, 0);
     }
 
     public void setData(TLObject user, CharSequence name, CharSequence status, int resId) {
@@ -115,6 +132,13 @@ public class UserCell extends FrameLayout {
             statusTextView.setText("");
             avatarImageView.setImageDrawable(null);
             return;
+        }
+        if (!ApplicationLoader.applicationContext.getSharedPreferences("mainconfig", 0).getBoolean("mutual_contact", true)) {
+            this.hasMyPhoneImageView.setVisibility(GONE);
+        } else if (((TLRPC.User) user).mutual_contact) {
+            this.hasMyPhoneImageView.setVisibility(VISIBLE);
+        } else {
+            this.hasMyPhoneImageView.setVisibility(GONE);
         }
         currrntStatus = status;
         currentName = name;
@@ -253,10 +277,17 @@ public class UserCell extends FrameLayout {
             imageView.setImageResource(currentDrawable);
         }
         avatarImageView.setImage(photo, "50_50", avatarDrawable);
+        int radius = AndroidUtilities.dp((float) ApplicationLoader.applicationContext.getSharedPreferences("telehtheme", 0).getInt("theme_contact_avatar_radius", 32));
+        avatarImageView.setRoundRadius(radius);
+        //    avatarDrawable.setRoundRadius(radius);
     }
 
     @Override
     public boolean hasOverlappingRendering() {
         return false;
+    }
+
+    public void setNameTextColor(int color) {
+        nameTextView.setTextColor(color);
     }
 }

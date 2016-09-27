@@ -24,10 +24,10 @@ import org.telegram.ui.Components.RadioButton;
 
 public class RadioButtonCell extends FrameLayout {
 
+    private static Paint paint;
     private TextView textView;
     private TextView valueTextView;
     private RadioButton radioButton;
-    private static Paint paint;
     private boolean needDivider;
 
     public RadioButtonCell(Context context) {
@@ -51,6 +51,7 @@ public class RadioButtonCell extends FrameLayout {
         textView.setMaxLines(1);
         textView.setSingleLine(true);
         textView.setGravity((LocaleController.isRTL ? Gravity.RIGHT : Gravity.LEFT) | Gravity.CENTER_VERTICAL);
+        textView.setTypeface(AndroidUtilities.getTypeface("fonts/rmedium.ttf"));
         addView(textView, LayoutHelper.createFrame(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, (LocaleController.isRTL ? Gravity.RIGHT : Gravity.LEFT) | Gravity.TOP, (LocaleController.isRTL ? 17 : 51), 10, (LocaleController.isRTL ? 51 : 17), 0));
 
         valueTextView = new TextView(context);
@@ -61,6 +62,7 @@ public class RadioButtonCell extends FrameLayout {
         valueTextView.setMaxLines(0);
         valueTextView.setSingleLine(false);
         valueTextView.setPadding(0, 0, 0, AndroidUtilities.dp(12));
+        valueTextView.setTypeface(AndroidUtilities.getTypeface("fonts/rmedium.ttf"));
         addView(valueTextView, LayoutHelper.createFrame(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, (LocaleController.isRTL ? Gravity.RIGHT : Gravity.LEFT) | Gravity.TOP, (LocaleController.isRTL ? 17 : 51), 35, (LocaleController.isRTL ? 51 : 17), 0));
     }
 

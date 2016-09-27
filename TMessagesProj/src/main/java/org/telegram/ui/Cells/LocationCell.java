@@ -28,11 +28,11 @@ import org.telegram.ui.Components.LayoutHelper;
 
 public class LocationCell extends FrameLayout {
 
+    private static Paint paint;
     private TextView nameTextView;
     private TextView addressTextView;
     private BackupImageView imageView;
     private boolean needDivider;
-    private static Paint paint;
 
     public LocationCell(Context context) {
         super(context);
@@ -65,6 +65,7 @@ public class LocationCell extends FrameLayout {
         addressTextView.setEllipsize(TextUtils.TruncateAt.END);
         addressTextView.setSingleLine(true);
         addressTextView.setTextColor(0xff999999);
+        addressTextView.setTypeface(AndroidUtilities.getTypeface("fonts/rmedium.ttf"));
         addressTextView.setGravity(LocaleController.isRTL ? Gravity.RIGHT : Gravity.LEFT);
         addView(addressTextView, LayoutHelper.createFrame(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.TOP | (LocaleController.isRTL ? Gravity.RIGHT : Gravity.LEFT), (LocaleController.isRTL ? 16 : 72), 30, (LocaleController.isRTL ? 72 : 16), 0));
     }

@@ -26,18 +26,13 @@ import org.telegram.ui.PhotoViewer;
 
 public class PhotoAttachPhotoCell extends FrameLayout {
 
+    private static Rect rect = new Rect();
     private BackupImageView imageView;
     private FrameLayout checkFrame;
     private CheckBox checkBox;
     private boolean isLast;
     private boolean pressed;
-    private static Rect rect = new Rect();
     private PhotoAttachPhotoCellDelegate delegate;
-
-    public interface PhotoAttachPhotoCellDelegate {
-        void onCheckClick(PhotoAttachPhotoCell v);
-    }
-
     private MediaController.PhotoEntry photoEntry;
 
     public PhotoAttachPhotoCell(Context context) {
@@ -137,5 +132,9 @@ public class PhotoAttachPhotoCell extends FrameLayout {
         }
 
         return result;
+    }
+
+    public interface PhotoAttachPhotoCellDelegate {
+        void onCheckClick(PhotoAttachPhotoCell v);
     }
 }

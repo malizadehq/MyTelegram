@@ -27,64 +27,10 @@ import org.telegram.ui.Components.LayoutHelper;
 
 public class PhotoPickerAlbumsCell extends FrameLayout {
 
-    public interface PhotoPickerAlbumsCellDelegate {
-        void didSelectAlbum(MediaController.AlbumEntry albumEntry);
-    }
-
     private AlbumView[] albumViews;
     private MediaController.AlbumEntry[] albumEntries;
     private int albumsCount;
     private PhotoPickerAlbumsCellDelegate delegate;
-
-    private class AlbumView extends FrameLayout {
-
-        private BackupImageView imageView;
-        private TextView nameTextView;
-        private TextView countTextView;
-        private View selector;
-
-        public AlbumView(Context context) {
-            super(context);
-
-            imageView = new BackupImageView(context);
-            addView(imageView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT));
-
-            LinearLayout linearLayout = new LinearLayout(context);
-            linearLayout.setOrientation(LinearLayout.HORIZONTAL);
-            linearLayout.setBackgroundColor(0x7f000000);
-            addView(linearLayout, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, 28, Gravity.LEFT | Gravity.BOTTOM));
-
-            nameTextView = new TextView(context);
-            nameTextView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 13);
-            nameTextView.setTextColor(0xffffffff);
-            nameTextView.setSingleLine(true);
-            nameTextView.setEllipsize(TextUtils.TruncateAt.END);
-            nameTextView.setMaxLines(1);
-            nameTextView.setGravity(Gravity.CENTER_VERTICAL);
-            linearLayout.addView(nameTextView, LayoutHelper.createLinear(0, LayoutHelper.MATCH_PARENT, 1.0f, 8, 0, 0, 0));
-
-            countTextView = new TextView(context);
-            countTextView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 13);
-            countTextView.setTextColor(0xffaaaaaa);
-            countTextView.setSingleLine(true);
-            countTextView.setEllipsize(TextUtils.TruncateAt.END);
-            countTextView.setMaxLines(1);
-            countTextView.setGravity(Gravity.CENTER_VERTICAL);
-            linearLayout.addView(countTextView, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.MATCH_PARENT, 4, 0, 4, 0));
-
-            selector = new View(context);
-            selector.setBackgroundResource(R.drawable.list_selector);
-            addView(selector, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT));
-        }
-
-        @Override
-        public boolean onTouchEvent(MotionEvent event) {
-            if (Build.VERSION.SDK_INT >= 21) {
-                selector.drawableHotspotChanged(event.getX(), event.getY());
-            }
-            return super.onTouchEvent(event);
-        }
-    }
 
     public PhotoPickerAlbumsCell(Context context) {
         super(context);
@@ -160,5 +106,61 @@ public class PhotoPickerAlbumsCell extends FrameLayout {
         }
 
         super.onMeasure(widthMeasureSpec, MeasureSpec.makeMeasureSpec(AndroidUtilities.dp(4) + itemWidth, MeasureSpec.EXACTLY));
+    }
+
+    public interface PhotoPickerAlbumsCellDelegate {
+        void didSelectAlbum(MediaController.AlbumEntry albumEntry);
+    }
+
+    private class AlbumView extends FrameLayout {
+
+        private BackupImageView imageView;
+        private TextView nameTextView;
+        private TextView countTextView;
+        private View selector;
+
+        public AlbumView(Context context) {
+            super(context);
+
+            imageView = new BackupImageView(context);
+            addView(imageView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT));
+
+            LinearLayout linearLayout = new LinearLayout(context);
+            linearLayout.setOrientation(LinearLayout.HORIZONTAL);
+            linearLayout.setBackgroundColor(0x7f000000);
+            addView(linearLayout, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, 28, Gravity.LEFT | Gravity.BOTTOM));
+
+            nameTextView = new TextView(context);
+            nameTextView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 13);
+            nameTextView.setTextColor(0xffffffff);
+            nameTextView.setSingleLine(true);
+            nameTextView.setEllipsize(TextUtils.TruncateAt.END);
+            nameTextView.setMaxLines(1);
+            nameTextView.setGravity(Gravity.CENTER_VERTICAL);
+            nameTextView.setTypeface(AndroidUtilities.getTypeface("fonts/rmedium.ttf"));
+            linearLayout.addView(nameTextView, LayoutHelper.createLinear(0, LayoutHelper.MATCH_PARENT, 1.0f, 8, 0, 0, 0));
+
+            countTextView = new TextView(context);
+            countTextView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 13);
+            countTextView.setTextColor(0xffaaaaaa);
+            countTextView.setSingleLine(true);
+            countTextView.setEllipsize(TextUtils.TruncateAt.END);
+            countTextView.setMaxLines(1);
+            countTextView.setGravity(Gravity.CENTER_VERTICAL);
+            countTextView.setTypeface(AndroidUtilities.getTypeface("fonts/rmedium.ttf"));
+            linearLayout.addView(countTextView, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.MATCH_PARENT, 4, 0, 4, 0));
+
+            selector = new View(context);
+            selector.setBackgroundResource(R.drawable.list_selector);
+            addView(selector, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT));
+        }
+
+        @Override
+        public boolean onTouchEvent(MotionEvent event) {
+            if (Build.VERSION.SDK_INT >= 21) {
+                selector.drawableHotspotChanged(event.getX(), event.getY());
+            }
+            return super.onTouchEvent(event);
+        }
     }
 }

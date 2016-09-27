@@ -24,20 +24,20 @@ import android.view.MotionEvent;
 import android.widget.FrameLayout;
 
 import org.telegram.messenger.AndroidUtilities;
+import org.telegram.messenger.FileLoader;
+import org.telegram.messenger.FileLog;
 import org.telegram.messenger.ImageReceiver;
 import org.telegram.messenger.LocaleController;
 import org.telegram.messenger.MediaController;
 import org.telegram.messenger.MessageObject;
-import org.telegram.messenger.FileLoader;
-import org.telegram.messenger.FileLog;
 import org.telegram.messenger.R;
 import org.telegram.messenger.browser.Browser;
 import org.telegram.tgnet.TLRPC;
+import org.telegram.ui.ActionBar.Theme;
 import org.telegram.ui.Components.CheckBox;
 import org.telegram.ui.Components.LayoutHelper;
 import org.telegram.ui.Components.LetterDrawable;
 import org.telegram.ui.Components.LinkPath;
-import org.telegram.ui.ActionBar.Theme;
 
 import java.io.File;
 import java.util.ArrayList;
@@ -45,43 +45,29 @@ import java.util.Locale;
 
 public class SharedLinkCell extends FrameLayout {
 
-    public interface SharedLinkCellDelegate {
-        void needOpenWebView(TLRPC.WebPage webPage);
-        boolean canPerformActions();
-    }
-
+    private static Paint urlPaint;
+    private static TextPaint titleTextPaint;
+    private static TextPaint descriptionTextPaint;
+    private static Paint paint;
+    ArrayList<String> links = new ArrayList<>();
     private boolean linkPreviewPressed;
     private LinkPath urlPath = new LinkPath();
-    private static Paint urlPaint;
     private int pressedLink;
-
     private ImageReceiver linkImageView;
     private boolean drawLinkImageView;
     private LetterDrawable letterDrawable;
     private CheckBox checkBox;
-
     private SharedLinkCellDelegate delegate;
-
     private boolean needDivider;
-
-    ArrayList<String> links = new ArrayList<>();
     private int linkY;
     private ArrayList<StaticLayout> linkLayout = new ArrayList<>();
-
     private int titleY = AndroidUtilities.dp(7);
     private StaticLayout titleLayout;
-
     private int descriptionY = AndroidUtilities.dp(27);
     private StaticLayout descriptionLayout;
-
     private int description2Y = AndroidUtilities.dp(27);
     private StaticLayout descriptionLayout2;
-
     private MessageObject message;
-
-    private static TextPaint titleTextPaint;
-    private static TextPaint descriptionTextPaint;
-    private static Paint paint;
 
     public SharedLinkCell(Context context) {
         super(context);
@@ -94,6 +80,7 @@ public class SharedLinkCell extends FrameLayout {
 
             descriptionTextPaint = new TextPaint(Paint.ANTI_ALIAS_FLAG);
             descriptionTextPaint.setTextSize(AndroidUtilities.dp(16));
+            descriptionTextPaint.setTypeface(AndroidUtilities.getTypeface("fonts/rmedium.ttf"));
 
             paint = new Paint();
             paint.setColor(0xffd9d9d9);
@@ -490,5 +477,11 @@ public class SharedLinkCell extends FrameLayout {
                 canvas.drawLine(AndroidUtilities.dp(AndroidUtilities.leftBaseline), getMeasuredHeight() - 1, getMeasuredWidth(), getMeasuredHeight() - 1, paint);
             }
         }
+    }
+
+    public interface SharedLinkCellDelegate {
+        void needOpenWebView(TLRPC.WebPage webPage);
+
+        boolean canPerformActions();
     }
 }

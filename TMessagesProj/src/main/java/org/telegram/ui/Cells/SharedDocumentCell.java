@@ -20,12 +20,12 @@ import android.widget.ImageView;
 import android.widget.TextView;
 
 import org.telegram.messenger.AndroidUtilities;
+import org.telegram.messenger.FileLoader;
 import org.telegram.messenger.ImageLoader;
 import org.telegram.messenger.ImageReceiver;
 import org.telegram.messenger.LocaleController;
 import org.telegram.messenger.MediaController;
 import org.telegram.messenger.MessageObject;
-import org.telegram.messenger.FileLoader;
 import org.telegram.messenger.R;
 import org.telegram.tgnet.TLRPC;
 import org.telegram.ui.Components.BackupImageView;
@@ -38,6 +38,7 @@ import java.util.Date;
 
 public class SharedDocumentCell extends FrameLayout implements MediaController.FileDownloadProgressListener {
 
+    private static Paint paint;
     private ImageView placeholderImabeView;
     private BackupImageView thumbImageView;
     private TextView nameTextView;
@@ -46,11 +47,7 @@ public class SharedDocumentCell extends FrameLayout implements MediaController.F
     private ImageView statusImageView;
     private LineProgressView progressView;
     private CheckBox checkBox;
-
     private boolean needDivider;
-
-    private static Paint paint;
-
     private int TAG;
 
     private MessageObject message;
@@ -120,6 +117,7 @@ public class SharedDocumentCell extends FrameLayout implements MediaController.F
         dateTextView.setLines(1);
         dateTextView.setMaxLines(1);
         dateTextView.setSingleLine(true);
+        dateTextView.setTypeface(AndroidUtilities.getTypeface("fonts/rmedium.ttf"));
         dateTextView.setEllipsize(TextUtils.TruncateAt.END);
         dateTextView.setGravity((LocaleController.isRTL ? Gravity.RIGHT : Gravity.LEFT) | Gravity.CENTER_VERTICAL);
         addView(dateTextView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, (LocaleController.isRTL ? Gravity.RIGHT : Gravity.LEFT) | Gravity.TOP, LocaleController.isRTL ? 8 : 72, 30, LocaleController.isRTL ? 72 : 8, 0));
@@ -141,7 +139,7 @@ public class SharedDocumentCell extends FrameLayout implements MediaController.F
                 color = 1;
             } else if (name.contains(".pdf") || name.contains(".ppt") || name.contains(".key")) {
                 color = 2;
-            } else if (name.contains(".zip") || name.contains(".rar") || name.contains(".ai") || name.contains(".mp3")  || name.contains(".mov") || name.contains(".avi")) {
+            } else if (name.contains(".zip") || name.contains(".rar") || name.contains(".ai") || name.contains(".mp3") || name.contains(".mov") || name.contains(".avi")) {
                 color = 3;
             }
             if (color == -1) {
@@ -176,7 +174,7 @@ public class SharedDocumentCell extends FrameLayout implements MediaController.F
         if (thumb != null || resId != 0) {
             if (thumb != null) {
                 thumbImageView.setImage(thumb, "40_40", null);
-            } else  {
+            } else {
                 thumbImageView.setImageResource(resId);
             }
             thumbImageView.setVisibility(VISIBLE);

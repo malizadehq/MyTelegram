@@ -35,9 +35,9 @@ import org.telegram.messenger.MessageObject;
 import org.telegram.messenger.R;
 import org.telegram.messenger.Utilities;
 import org.telegram.tgnet.TLRPC;
+import org.telegram.ui.ActionBar.Theme;
 import org.telegram.ui.Components.LetterDrawable;
 import org.telegram.ui.Components.RadialProgress;
-import org.telegram.ui.ActionBar.Theme;
 
 import java.io.File;
 import java.util.ArrayList;
@@ -54,38 +54,27 @@ public class ContextLinkCell extends View implements MediaController.FileDownloa
     private final static int DOCUMENT_ATTACH_TYPE_STICKER = 6;
     private final static int DOCUMENT_ATTACH_TYPE_PHOTO = 7;
     private final static int DOCUMENT_ATTACH_TYPE_GEO = 8;
-
-    public interface ContextLinkCellDelegate {
-        void didPressedImage(ContextLinkCell cell);
-    }
-
-    private ImageReceiver linkImageView;
-    private boolean drawLinkImageView;
-    private LetterDrawable letterDrawable;
-
-    private boolean needDivider;
-    private boolean buttonPressed;
-    private boolean needShadow;
-
-    private int linkY;
-    private StaticLayout linkLayout;
-
-    private int titleY = AndroidUtilities.dp(7);
-    private StaticLayout titleLayout;
-
-    private int descriptionY = AndroidUtilities.dp(27);
-    private StaticLayout descriptionLayout;
-
-    private TLRPC.BotInlineResult inlineResult;
-    private TLRPC.Document documentAttach;
-    private int documentAttachType;
-    private boolean mediaWebpage;
-
     private static TextPaint titleTextPaint;
     private static TextPaint descriptionTextPaint;
     private static Paint paint;
     private static Drawable shadowDrawable;
-
+    private static AccelerateInterpolator interpolator = new AccelerateInterpolator(0.5f);
+    private ImageReceiver linkImageView;
+    private boolean drawLinkImageView;
+    private LetterDrawable letterDrawable;
+    private boolean needDivider;
+    private boolean buttonPressed;
+    private boolean needShadow;
+    private int linkY;
+    private StaticLayout linkLayout;
+    private int titleY = AndroidUtilities.dp(7);
+    private StaticLayout titleLayout;
+    private int descriptionY = AndroidUtilities.dp(27);
+    private StaticLayout descriptionLayout;
+    private TLRPC.BotInlineResult inlineResult;
+    private TLRPC.Document documentAttach;
+    private int documentAttachType;
+    private boolean mediaWebpage;
     private int TAG;
     private int buttonState;
     private RadialProgress radialProgress;
@@ -94,8 +83,6 @@ public class ContextLinkCell extends View implements MediaController.FileDownloa
     private boolean scaled;
     private float scale;
     private long time = 0;
-    private static AccelerateInterpolator interpolator = new AccelerateInterpolator(0.5f);
-
     private ContextLinkCellDelegate delegate;
 
     public ContextLinkCell(Context context) {
@@ -106,10 +93,11 @@ public class ContextLinkCell extends View implements MediaController.FileDownloa
             titleTextPaint.setTypeface(AndroidUtilities.getTypeface("fonts/rmedium.ttf"));
             titleTextPaint.setColor(0xff212121);
             titleTextPaint.setTextSize(AndroidUtilities.dp(15));
+            titleTextPaint.setTypeface(AndroidUtilities.getTypeface("fonts/rmedium.ttf"));
 
             descriptionTextPaint = new TextPaint(Paint.ANTI_ALIAS_FLAG);
             descriptionTextPaint.setTextSize(AndroidUtilities.dp(13));
-
+            descriptionTextPaint.setTypeface(AndroidUtilities.getTypeface("fonts/rmedium.ttf"));
             paint = new Paint();
             paint.setColor(0xffd9d9d9);
             paint.setStrokeWidth(1);
@@ -298,16 +286,16 @@ public class ContextLinkCell extends View implements MediaController.FileDownloa
         if (mediaWebpage) {
             setBackgroundDrawable(null);
             //if (inlineResult == null) {
-                width = viewWidth;
-                int height = MeasureSpec.getSize(heightMeasureSpec);
-                if (height == 0) {
-                    height = AndroidUtilities.dp(100);
-                }
-                setMeasuredDimension(width, height);
-                int x = (width - AndroidUtilities.dp(24)) / 2;
-                int y = (height - AndroidUtilities.dp(24)) / 2;
-                radialProgress.setProgressRect(x, y, x + AndroidUtilities.dp(24), y + AndroidUtilities.dp(24));
-                linkImageView.setImageCoords(0, 0, width, height);
+            width = viewWidth;
+            int height = MeasureSpec.getSize(heightMeasureSpec);
+            if (height == 0) {
+                height = AndroidUtilities.dp(100);
+            }
+            setMeasuredDimension(width, height);
+            int x = (width - AndroidUtilities.dp(24)) / 2;
+            int y = (height - AndroidUtilities.dp(24)) / 2;
+            radialProgress.setProgressRect(x, y, x + AndroidUtilities.dp(24), y + AndroidUtilities.dp(24));
+            linkImageView.setImageCoords(0, 0, width, height);
             /*} else {
                 setMeasuredDimension(width + AndroidUtilities.dp(5), AndroidUtilities.dp(90));
                 int x = AndroidUtilities.dp(5) + (width - AndroidUtilities.dp(24)) / 2;
@@ -638,5 +626,9 @@ public class ContextLinkCell extends View implements MediaController.FileDownloa
     @Override
     public int getObserverTag() {
         return TAG;
+    }
+
+    public interface ContextLinkCellDelegate {
+        void didPressedImage(ContextLinkCell cell);
     }
 }

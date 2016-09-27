@@ -9,6 +9,7 @@
 package org.telegram.ui.Cells;
 
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.util.TypedValue;
@@ -17,14 +18,15 @@ import android.widget.FrameLayout;
 import android.widget.TextView;
 
 import org.telegram.messenger.AndroidUtilities;
+import org.telegram.messenger.ApplicationLoader;
 import org.telegram.messenger.LocaleController;
 import org.telegram.ui.Components.LayoutHelper;
 
 public class TextDetailSettingsCell extends FrameLayout {
 
+    private static Paint paint;
     private TextView textView;
     private TextView valueTextView;
-    private static Paint paint;
     private boolean needDivider;
     private boolean multiline;
 
@@ -44,6 +46,7 @@ public class TextDetailSettingsCell extends FrameLayout {
         textView.setMaxLines(1);
         textView.setSingleLine(true);
         textView.setGravity((LocaleController.isRTL ? Gravity.RIGHT : Gravity.LEFT) | Gravity.CENTER_VERTICAL);
+        textView.setTypeface(AndroidUtilities.getTypeface("fonts/rmedium.ttf"));
         addView(textView, LayoutHelper.createFrame(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, (LocaleController.isRTL ? Gravity.RIGHT : Gravity.LEFT) | Gravity.TOP, 17, 10, 17, 0));
 
         valueTextView = new TextView(context);
@@ -54,6 +57,8 @@ public class TextDetailSettingsCell extends FrameLayout {
         valueTextView.setMaxLines(1);
         valueTextView.setSingleLine(true);
         valueTextView.setPadding(0, 0, 0, 0);
+        valueTextView.setTypeface(AndroidUtilities.getTypeface("fonts/rmedium.ttf"));
+
         addView(valueTextView, LayoutHelper.createFrame(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, (LocaleController.isRTL ? Gravity.RIGHT : Gravity.LEFT) | Gravity.TOP, 17, 35, 17, 0));
     }
 
@@ -64,6 +69,7 @@ public class TextDetailSettingsCell extends FrameLayout {
         } else {
             super.onMeasure(widthMeasureSpec, MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED));
         }
+        setTheme();
     }
 
     public void setMultilineDetail(boolean value) {
@@ -81,6 +87,23 @@ public class TextDetailSettingsCell extends FrameLayout {
         }
     }
 
+    public void setMultilineText(boolean value) {
+        multiline = value;
+        if (value) {
+            textView.setLines(0);
+            textView.setMaxLines(0);
+            textView.setSingleLine(false);
+            textView.setPadding(0, 0, 0, AndroidUtilities.dp(35));
+            removeView(valueTextView);
+            addView(valueTextView, LayoutHelper.createFrame(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, (LocaleController.isRTL ? Gravity.RIGHT : Gravity.LEFT) | Gravity.BOTTOM, 17, 0, 17, 12));
+        } else {
+            textView.setLines(1);
+            textView.setMaxLines(1);
+            textView.setSingleLine(true);
+            textView.setPadding(0, 0, 0, 0);
+        }
+    }
+
     public void setTextAndValue(String text, String value, boolean divider) {
         textView.setText(text);
         valueTextView.setText(value);
@@ -88,10 +111,34 @@ public class TextDetailSettingsCell extends FrameLayout {
         setWillNotDraw(!divider);
     }
 
+    public void setTitleColor(int color) {
+        textView.setTextColor(color);
+    }
+
+    public void setSummaryColor(int color) {
+        valueTextView.setTextColor(color);
+    }
+
+    public void setDividerColor(int color) {
+        paint.setColor(color);
+    }
+
     @Override
     protected void onDraw(Canvas canvas) {
         if (needDivider) {
             canvas.drawLine(getPaddingLeft(), getHeight() - 1, getWidth() - getPaddingRight(), getHeight() - 1, paint);
         }
+    }
+
+    private void setTheme() {
+        SharedPreferences preferences = ApplicationLoader.applicationContext.getSharedPreferences(AndroidUtilities.THEME_PREFS, AndroidUtilities.THEME_PREFS_MODE);
+        int bgColor = preferences.getInt("prefBGColor", 0xffffffff);
+        setBackgroundColor(bgColor);
+        int divColor = preferences.getInt("prefDividerColor", 0xffd9d9d9);
+        int titleColor = preferences.getInt("prefTitleColor", 0xff212121);
+        int summaryColor = preferences.getInt("prefSummaryColor", 0xff8a8a8a);
+        textView.setTextColor(titleColor);
+        valueTextView.setTextColor(summaryColor);
+        paint.setColor(divColor);
     }
 }

@@ -27,8 +27,8 @@ public class PhotoPickerPhotoCell extends FrameLayout {
     public BackupImageView photoImage;
     public FrameLayout checkFrame;
     public CheckBox checkBox;
-    private AnimatorSet animator;
     public int itemWidth;
+    private AnimatorSet animator;
 
     public PhotoPickerPhotoCell(Context context) {
         super(context);

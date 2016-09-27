@@ -12,6 +12,7 @@ import android.annotation.SuppressLint;
 import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.Paint;
+import android.graphics.PorterDuff;
 import android.os.Build;
 import android.text.Layout;
 import android.text.Spannable;
@@ -31,9 +32,9 @@ import org.telegram.messenger.FileLog;
 import org.telegram.messenger.LocaleController;
 import org.telegram.messenger.MessageObject;
 import org.telegram.messenger.browser.Browser;
+import org.telegram.ui.ActionBar.Theme;
 import org.telegram.ui.Components.LayoutHelper;
 import org.telegram.ui.Components.LinkPath;
-import org.telegram.ui.ActionBar.Theme;
 import org.telegram.ui.Components.URLSpanNoUnderline;
 
 public class AboutLinkCell extends FrameLayout {
@@ -53,18 +54,16 @@ public class AboutLinkCell extends FrameLayout {
 
     private AboutLinkCellDelegate delegate;
 
-    public interface AboutLinkCellDelegate {
-        void didPressUrl(String url);
-    }
-
     public AboutLinkCell(Context context) {
         super(context);
 
         textPaint = new TextPaint(Paint.ANTI_ALIAS_FLAG);
         textPaint.setTextSize(AndroidUtilities.dp(16));
         textPaint.setColor(0xff000000);
-        textPaint.linkColor = Theme.MSG_LINK_TEXT_COLOR;
+        textPaint.setTypeface(AndroidUtilities.getTypeface("fonts/rmedium.ttf"));
 
+        textPaint.linkColor = Theme.MSG_LINK_TEXT_COLOR;
+        textPaint.setTypeface(AndroidUtilities.getTypeface("fonts/rmedium.ttf"));
         urlPaint = new Paint();
         urlPaint.setColor(Theme.MSG_LINK_SELECT_BACKGROUND_COLOR);
 
@@ -204,4 +203,18 @@ public class AboutLinkCell extends FrameLayout {
         }
         canvas.restore();
     }
+
+    //Teleh
+    public void setIconColor(int color) {
+        imageView.setColorFilter(color, PorterDuff.Mode.SRC_IN);
+    }
+
+    public void setTextColor(int color) {
+        textPaint.setColor(color);
+    }
+
+    public interface AboutLinkCellDelegate {
+        void didPressUrl(String url);
+    }
+    //End Teleh
 }

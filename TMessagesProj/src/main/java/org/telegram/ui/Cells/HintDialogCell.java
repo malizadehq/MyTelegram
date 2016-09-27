@@ -34,14 +34,12 @@ import org.telegram.ui.Components.LayoutHelper;
 
 public class HintDialogCell extends FrameLayout {
 
-    private BackupImageView imageView;
-    private TextView nameTextView;
-    private AvatarDrawable avatarDrawable = new AvatarDrawable();
-
     private static Drawable countDrawable;
     private static Drawable countDrawableGrey;
     private static TextPaint countPaint;
-
+    private BackupImageView imageView;
+    private TextView nameTextView;
+    private AvatarDrawable avatarDrawable = new AvatarDrawable();
     private int lastUnreadCount;
     private int countWidth;
     private StaticLayout countLayout;

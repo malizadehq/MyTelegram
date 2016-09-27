@@ -22,30 +22,22 @@ import android.view.SoundEffectConstants;
 
 import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.ApplicationLoader;
+import org.telegram.messenger.FileLoader;
+import org.telegram.messenger.FileLog;
 import org.telegram.messenger.ImageReceiver;
 import org.telegram.messenger.MessageObject;
 import org.telegram.messenger.MessagesController;
-import org.telegram.messenger.FileLoader;
-import org.telegram.messenger.FileLog;
-import org.telegram.tgnet.TLRPC;
 import org.telegram.messenger.UserConfig;
+import org.telegram.tgnet.TLRPC;
 import org.telegram.ui.ActionBar.Theme;
-import org.telegram.ui.PhotoViewer;
 import org.telegram.ui.Components.AvatarDrawable;
+import org.telegram.ui.PhotoViewer;
 
 public class ChatActionCell extends BaseCell {
 
-    public interface ChatActionCellDelegate {
-        void didClickedImage(ChatActionCell cell);
-        void didLongPressed(ChatActionCell cell);
-        void needOpenUserProfile(int uid);
-    }
-
     private static TextPaint textPaint;
     private static Paint backPaint;
-
     private URLSpan pressedLink;
-
     private ImageReceiver imageReceiver;
     private AvatarDrawable avatarDrawable;
     private StaticLayout textLayout;
@@ -56,11 +48,8 @@ public class ChatActionCell extends BaseCell {
     private int textXLeft = 0;
     private int previousWidth = 0;
     private boolean imagePressed = false;
-
     private boolean hasReplyMessage;
-
     private MessageObject currentMessageObject;
-
     private ChatActionCellDelegate delegate;
 
     public ChatActionCell(Context context) {
@@ -79,10 +68,16 @@ public class ChatActionCell extends BaseCell {
         imageReceiver.setRoundRadius(AndroidUtilities.dp(32));
         avatarDrawable = new AvatarDrawable();
         textPaint.setTextSize(AndroidUtilities.dp(MessagesController.getInstance().fontSize - 2));
+        textPaint.setTypeface(AndroidUtilities.getTypeface("fonts/rmedium.ttf"));
+
     }
 
     public void setDelegate(ChatActionCellDelegate delegate) {
         this.delegate = delegate;
+    }
+
+    public MessageObject getMessageObject() {
+        return currentMessageObject;
     }
 
     public void setMessageObject(MessageObject messageObject) {
@@ -119,13 +114,9 @@ public class ChatActionCell extends BaseCell {
             }
             imageReceiver.setVisible(!PhotoViewer.getInstance().isShowingImage(currentMessageObject), false);
         } else {
-            imageReceiver.setImageBitmap((Bitmap)null);
+            imageReceiver.setImageBitmap((Bitmap) null);
         }
         requestLayout();
-    }
-
-    public MessageObject getMessageObject() {
-        return currentMessageObject;
     }
 
     public ImageReceiver getPhotoImage() {
@@ -181,7 +172,7 @@ public class ChatActionCell extends BaseCell {
                     y -= textY;
                     x -= textXLeft;
 
-                    final int line = textLayout.getLineForVertical((int)y);
+                    final int line = textLayout.getLineForVertical((int) y);
                     final int off = textLayout.getOffsetForHorizontal(line, x);
                     final float left = textLayout.getLineLeft(line);
                     if (left <= x && left + textLayout.getLineWidth(line) >= x && currentMessageObject.messageText instanceof Spannable) {
@@ -241,12 +232,12 @@ public class ChatActionCell extends BaseCell {
                         if (lineWidth > maxWidth) {
                             lineWidth = maxWidth;
                         }
-                        textHeight = (int)Math.max(textHeight, Math.ceil(textLayout.getLineBottom(a)));
+                        textHeight = (int) Math.max(textHeight, Math.ceil(textLayout.getLineBottom(a)));
                     } catch (Exception e) {
                         FileLog.e("tmessages", e);
                         return;
                     }
-                    textWidth = (int)Math.max(textWidth, Math.ceil(lineWidth));
+                    textWidth = (int) Math.max(textWidth, Math.ceil(lineWidth));
                 }
             } catch (Exception e) {
                 FileLog.e("tmessages", e);
@@ -410,5 +401,13 @@ public class ChatActionCell extends BaseCell {
             textLayout.draw(canvas);
             canvas.restore();
         }
+    }
+
+    public interface ChatActionCellDelegate {
+        void didClickedImage(ChatActionCell cell);
+
+        void didLongPressed(ChatActionCell cell);
+
+        void needOpenUserProfile(int uid);
     }
 }

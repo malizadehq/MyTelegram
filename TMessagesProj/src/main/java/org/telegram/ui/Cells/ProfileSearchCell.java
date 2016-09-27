@@ -25,14 +25,14 @@ import org.telegram.messenger.ChatObject;
 import org.telegram.messenger.ImageReceiver;
 import org.telegram.messenger.LocaleController;
 import org.telegram.messenger.MessagesController;
-import org.telegram.messenger.UserObject;
 import org.telegram.messenger.R;
+import org.telegram.messenger.UserConfig;
+import org.telegram.messenger.UserObject;
 import org.telegram.tgnet.ConnectionsManager;
 import org.telegram.tgnet.TLObject;
 import org.telegram.tgnet.TLRPC;
-import org.telegram.messenger.UserConfig;
-import org.telegram.ui.Components.AvatarDrawable;
 import org.telegram.ui.ActionBar.Theme;
+import org.telegram.ui.Components.AvatarDrawable;
 
 public class ProfileSearchCell extends BaseCell {
 
@@ -49,24 +49,19 @@ public class ProfileSearchCell extends BaseCell {
     private static Drawable countDrawableGrey;
     private static Drawable checkDrawable;
     private static Paint linePaint;
-
+    public boolean useSeparator = false;
+    public float drawAlpha = 1;
     private CharSequence currentName;
     private ImageReceiver avatarImage;
     private AvatarDrawable avatarDrawable;
     private CharSequence subLabel;
-
     private TLRPC.User user = null;
     private TLRPC.Chat chat = null;
     private TLRPC.EncryptedChat encryptedChat = null;
     private long dialog_id;
-
     private String lastName = null;
     private int lastStatus = 0;
     private TLRPC.FileLocation lastAvatar = null;
-
-    public boolean useSeparator = false;
-    public float drawAlpha = 1;
-
     private int nameLeft;
     private int nameTop;
     private StaticLayout nameLayout;
@@ -106,10 +101,12 @@ public class ProfileSearchCell extends BaseCell {
             onlinePaint = new TextPaint(TextPaint.ANTI_ALIAS_FLAG);
             onlinePaint.setTextSize(AndroidUtilities.dp(16));
             onlinePaint.setColor(Theme.MSG_LINK_TEXT_COLOR);
+            onlinePaint.setTypeface(AndroidUtilities.getTypeface("fonts/rmedium.ttf"));
 
             offlinePaint = new TextPaint(TextPaint.ANTI_ALIAS_FLAG);
             offlinePaint.setTextSize(AndroidUtilities.dp(16));
             offlinePaint.setColor(0xff999999);
+            offlinePaint.setTypeface(AndroidUtilities.getTypeface("fonts/rmedium.ttf"));
 
             linePaint = new Paint();
             linePaint.setColor(0xffdcdcdc);
@@ -503,7 +500,7 @@ public class ProfileSearchCell extends BaseCell {
         }
 
         if (drawAlpha != 1) {
-            canvas.saveLayerAlpha(0, 0, canvas.getWidth(), canvas.getHeight(), (int)(255 * drawAlpha), Canvas.HAS_ALPHA_LAYER_SAVE_FLAG);
+            canvas.saveLayerAlpha(0, 0, canvas.getWidth(), canvas.getHeight(), (int) (255 * drawAlpha), Canvas.HAS_ALPHA_LAYER_SAVE_FLAG);
         }
 
         if (drawNameLock) {

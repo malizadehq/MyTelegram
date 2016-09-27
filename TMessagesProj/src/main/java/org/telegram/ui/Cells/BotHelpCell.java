@@ -24,13 +24,13 @@ import android.view.View;
 
 import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.Emoji;
+import org.telegram.messenger.FileLog;
 import org.telegram.messenger.LocaleController;
 import org.telegram.messenger.MessageObject;
-import org.telegram.messenger.FileLog;
 import org.telegram.messenger.R;
 import org.telegram.messenger.browser.Browser;
-import org.telegram.ui.Components.LinkPath;
 import org.telegram.ui.ActionBar.Theme;
+import org.telegram.ui.Components.LinkPath;
 import org.telegram.ui.Components.TypefaceSpan;
 import org.telegram.ui.Components.URLSpanNoUnderline;
 
@@ -51,10 +51,6 @@ public class BotHelpCell extends View {
 
     private BotHelpCellDelegate delegate;
 
-    public interface BotHelpCellDelegate {
-        void didPressUrl(String url);
-    }
-
     public BotHelpCell(Context context) {
         super(context);
 
@@ -62,6 +58,7 @@ public class BotHelpCell extends View {
         textPaint.setTextSize(AndroidUtilities.dp(16));
         textPaint.setColor(0xff000000);
         textPaint.linkColor = Theme.MSG_LINK_TEXT_COLOR;
+        textPaint.setTypeface(AndroidUtilities.getTypeface("fonts/rmedium.ttf"));
 
         urlPaint = new Paint();
         urlPaint.setColor(Theme.MSG_LINK_SELECT_BACKGROUND_COLOR);
@@ -205,5 +202,9 @@ public class BotHelpCell extends View {
             textLayout.draw(canvas);
         }
         canvas.restore();
+    }
+
+    public interface BotHelpCellDelegate {
+        void didPressUrl(String url);
     }
 }

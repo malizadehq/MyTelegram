@@ -16,8 +16,8 @@ import android.widget.ImageView;
 import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.LocaleController;
 import org.telegram.messenger.R;
-import org.telegram.ui.Components.LayoutHelper;
 import org.telegram.ui.ActionBar.SimpleTextView;
+import org.telegram.ui.Components.LayoutHelper;
 
 public class SendLocationCell extends FrameLayout {
 
@@ -41,6 +41,7 @@ public class SendLocationCell extends FrameLayout {
         accurateTextView = new SimpleTextView(context);
         accurateTextView.setTextSize(14);
         accurateTextView.setTextColor(0xff999999);
+        accurateTextView.setTypeface(AndroidUtilities.getTypeface("fonts/rmedium.ttf"));
         accurateTextView.setGravity(LocaleController.isRTL ? Gravity.RIGHT : Gravity.LEFT);
         addView(accurateTextView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, 20, Gravity.TOP | (LocaleController.isRTL ? Gravity.RIGHT : Gravity.LEFT), LocaleController.isRTL ? 16 : 73, 37, LocaleController.isRTL ? 73 : 16, 0));
     }

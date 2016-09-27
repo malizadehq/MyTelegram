@@ -9,6 +9,7 @@
 package org.telegram.ui.Cells;
 
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.text.TextUtils;
@@ -18,15 +19,16 @@ import android.widget.FrameLayout;
 import android.widget.TextView;
 
 import org.telegram.messenger.AndroidUtilities;
+import org.telegram.messenger.ApplicationLoader;
 import org.telegram.messenger.LocaleController;
 import org.telegram.ui.Components.LayoutHelper;
 import org.telegram.ui.Components.RadioButton;
 
 public class RadioCell extends FrameLayout {
 
+    private static Paint paint;
     private TextView textView;
     private RadioButton radioButton;
-    private static Paint paint;
     private boolean needDivider;
 
     public RadioCell(Context context) {
@@ -46,6 +48,7 @@ public class RadioCell extends FrameLayout {
         textView.setSingleLine(true);
         textView.setEllipsize(TextUtils.TruncateAt.END);
         textView.setGravity((LocaleController.isRTL ? Gravity.RIGHT : Gravity.LEFT) | Gravity.CENTER_VERTICAL);
+        textView.setTypeface(AndroidUtilities.getTypeface("fonts/rmedium.ttf"));
         addView(textView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT, (LocaleController.isRTL ? Gravity.RIGHT : Gravity.LEFT) | Gravity.TOP, 17, 0, 17, 0));
 
         radioButton = new RadioButton(context);
@@ -61,6 +64,7 @@ public class RadioCell extends FrameLayout {
         int availableWidth = getMeasuredWidth() - getPaddingLeft() - getPaddingRight() - AndroidUtilities.dp(34);
         radioButton.measure(MeasureSpec.makeMeasureSpec(AndroidUtilities.dp(22), MeasureSpec.AT_MOST), MeasureSpec.makeMeasureSpec(AndroidUtilities.dp(22), MeasureSpec.EXACTLY));
         textView.measure(MeasureSpec.makeMeasureSpec(availableWidth, MeasureSpec.EXACTLY), MeasureSpec.makeMeasureSpec(getMeasuredHeight(), MeasureSpec.EXACTLY));
+
     }
 
     public void setTextColor(int color) {
@@ -83,5 +87,18 @@ public class RadioCell extends FrameLayout {
         if (needDivider) {
             canvas.drawLine(getPaddingLeft(), getHeight() - 1, getWidth() - getPaddingRight(), getHeight() - 1, paint);
         }
+        setTheme();
+    }
+
+    private void setTheme() {
+        SharedPreferences preferences = ApplicationLoader.applicationContext.getSharedPreferences(AndroidUtilities.THEME_PREFS, AndroidUtilities.THEME_PREFS_MODE);
+        //int summaryColor = preferences.getInt("profileSummaryColor", 0xff212121);
+        int summaryColor = preferences.getInt("prefSummaryColor", 0xff212121);
+        //int shadowColor = preferences.getInt("prefShadowColor", 0xfff0f0f0);
+        String tag = getTag() != null ? getTag().toString() : "";
+        if (tag.contains("Pref")) {
+            textView.setTextColor(summaryColor);
+        }
+
     }
 }

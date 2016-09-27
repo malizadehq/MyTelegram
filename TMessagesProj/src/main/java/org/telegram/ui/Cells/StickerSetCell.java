@@ -33,6 +33,7 @@ import java.util.ArrayList;
 
 public class StickerSetCell extends FrameLayout {
 
+    private static Paint paint;
     private TextView textView;
     private TextView valueTextView;
     private BackupImageView imageView;
@@ -40,8 +41,6 @@ public class StickerSetCell extends FrameLayout {
     private ImageView optionsButton;
     private TLRPC.TL_messages_stickerSet stickersSet;
     private Rect rect = new Rect();
-
-    private static Paint paint;
 
     public StickerSetCell(Context context) {
         super(context);
@@ -58,12 +57,14 @@ public class StickerSetCell extends FrameLayout {
         textView.setMaxLines(1);
         textView.setSingleLine(true);
         textView.setEllipsize(TextUtils.TruncateAt.END);
+        textView.setTypeface(AndroidUtilities.getTypeface("fonts/rmedium.ttf"));
         textView.setGravity(LocaleController.isRTL ? Gravity.RIGHT : Gravity.LEFT);
         addView(textView, LayoutHelper.createFrame(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, LocaleController.isRTL ? Gravity.RIGHT : Gravity.LEFT, LocaleController.isRTL ? 40 : 71, 10, LocaleController.isRTL ? 71 : 40, 0));
 
         valueTextView = new TextView(context);
         valueTextView.setTextColor(0xff8a8a8a);
         valueTextView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 13);
+        valueTextView.setTypeface(AndroidUtilities.getTypeface("fonts/rmedium.ttf"));
         valueTextView.setLines(1);
         valueTextView.setMaxLines(1);
         valueTextView.setSingleLine(true);

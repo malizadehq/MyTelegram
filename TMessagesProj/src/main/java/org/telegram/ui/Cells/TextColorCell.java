@@ -9,6 +9,7 @@
 package org.telegram.ui.Cells;
 
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.graphics.PorterDuff;
@@ -20,18 +21,18 @@ import android.widget.FrameLayout;
 import android.widget.TextView;
 
 import org.telegram.messenger.AndroidUtilities;
+import org.telegram.messenger.ApplicationLoader;
 import org.telegram.messenger.LocaleController;
 import org.telegram.messenger.R;
 import org.telegram.ui.Components.LayoutHelper;
 
 public class TextColorCell extends FrameLayout {
 
+    private static Paint paint;
     private TextView textView;
     private boolean needDivider;
     private int currentColor;
-
     private Drawable colorDrawable;
-    private static Paint paint;
 
     public TextColorCell(Context context) {
         super(context);
@@ -50,6 +51,7 @@ public class TextColorCell extends FrameLayout {
         textView.setLines(1);
         textView.setMaxLines(1);
         textView.setSingleLine(true);
+        textView.setTypeface(AndroidUtilities.getTypeface("fonts/rmedium.ttf"));
         textView.setGravity((LocaleController.isRTL ? Gravity.RIGHT : Gravity.LEFT) | Gravity.CENTER_VERTICAL);
         addView(textView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT, (LocaleController.isRTL ? Gravity.RIGHT : Gravity.LEFT) | Gravity.TOP, 17, 0, 17, 0));
     }
@@ -84,5 +86,17 @@ public class TextColorCell extends FrameLayout {
             colorDrawable.setBounds(x, y, x + colorDrawable.getIntrinsicWidth(), y + colorDrawable.getIntrinsicHeight());
             colorDrawable.draw(canvas);
         }
+        setTheme();
+    }
+
+    private void setTheme() {
+        SharedPreferences preferences = ApplicationLoader.applicationContext.getSharedPreferences(AndroidUtilities.THEME_PREFS, AndroidUtilities.THEME_PREFS_MODE);
+        int bgColor = preferences.getInt("prefBGColor", 0xffffffff);
+        setBackgroundColor(bgColor);
+        int divColor = preferences.getInt("prefDividerColor", 0xffd9d9d9);
+        int titleColor = preferences.getInt("prefTitleColor", 0xff212121);
+        textView.setTextColor(titleColor);
+        textView.setTextColor(AndroidUtilities.getIntColor("themeColor"));
+        paint.setColor(divColor);
     }
 }

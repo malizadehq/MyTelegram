@@ -26,6 +26,7 @@ import org.telegram.ui.Components.LayoutHelper;
 
 public class StickerEmojiCell extends FrameLayout {
 
+    private static AccelerateInterpolator interpolator = new AccelerateInterpolator(0.5f);
     private BackupImageView imageView;
     private TLRPC.Document sticker;
     private TextView emojiTextView;
@@ -35,7 +36,6 @@ public class StickerEmojiCell extends FrameLayout {
     private boolean scaled;
     private float scale;
     private long time = 0;
-    private static AccelerateInterpolator interpolator = new AccelerateInterpolator(0.5f);
 
     public StickerEmojiCell(Context context) {
         super(context);
@@ -46,6 +46,7 @@ public class StickerEmojiCell extends FrameLayout {
 
         emojiTextView = new TextView(context);
         emojiTextView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 16);
+        emojiTextView.setTypeface(AndroidUtilities.getTypeface("fonts/rmedium.ttf"));
         addView(emojiTextView, LayoutHelper.createFrame(28, 28, Gravity.BOTTOM | Gravity.RIGHT));
     }
 

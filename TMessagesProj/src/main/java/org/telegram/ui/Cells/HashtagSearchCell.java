@@ -22,8 +22,8 @@ import org.telegram.messenger.R;
 
 public class HashtagSearchCell extends TextView {
 
-    private boolean needDivider;
     private static Paint paint;
+    private boolean needDivider;
 
     public HashtagSearchCell(Context context) {
         super(context);

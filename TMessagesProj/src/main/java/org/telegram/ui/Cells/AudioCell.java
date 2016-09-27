@@ -31,22 +31,16 @@ import java.util.ArrayList;
 
 public class AudioCell extends FrameLayout {
 
+    private static Paint paint;
     private ImageView playButton;
     private TextView titleTextView;
     private TextView authorTextView;
     private TextView genreTextView;
     private TextView timeTextView;
     private CheckBox checkBox;
-
     private MediaController.AudioEntry audioEntry;
     private boolean needDivider;
-    private static Paint paint;
-
     private AudioCellDelegate delegate;
-
-    public interface AudioCellDelegate {
-        void startedPlayingAudio(MessageObject messageObject);
-    }
 
     public AudioCell(Context context) {
         super(context);
@@ -95,6 +89,7 @@ public class AudioCell extends FrameLayout {
         genreTextView = new TextView(context);
         genreTextView.setTextColor(0xff8a8a8a);
         genreTextView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 14);
+        genreTextView.setTypeface(AndroidUtilities.getTypeface("fonts/rmedium.ttf"));
         genreTextView.setLines(1);
         genreTextView.setMaxLines(1);
         genreTextView.setSingleLine(true);
@@ -105,6 +100,8 @@ public class AudioCell extends FrameLayout {
         authorTextView = new TextView(context);
         authorTextView.setTextColor(0xff8a8a8a);
         authorTextView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 14);
+        authorTextView.setTypeface(AndroidUtilities.getTypeface("fonts/rmedium.ttf"));
+
         authorTextView.setLines(1);
         authorTextView.setMaxLines(1);
         authorTextView.setSingleLine(true);
@@ -115,6 +112,7 @@ public class AudioCell extends FrameLayout {
         timeTextView = new TextView(context);
         timeTextView.setTextColor(0xff999999);
         timeTextView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 13);
+        timeTextView.setTypeface(AndroidUtilities.getTypeface("fonts/rmedium.ttf"));
         timeTextView.setLines(1);
         timeTextView.setMaxLines(1);
         timeTextView.setSingleLine(true);
@@ -165,5 +163,9 @@ public class AudioCell extends FrameLayout {
         if (needDivider) {
             canvas.drawLine(AndroidUtilities.dp(72), getHeight() - 1, getWidth(), getHeight() - 1, paint);
         }
+    }
+
+    public interface AudioCellDelegate {
+        void startedPlayingAudio(MessageObject messageObject);
     }
 }
