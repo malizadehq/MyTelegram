@@ -9,6 +9,7 @@
 package org.telegram.ui.Components;
 
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.os.Build;
 import android.os.Bundle;
 import android.text.TextUtils;
@@ -18,6 +19,7 @@ import android.widget.FrameLayout;
 import android.widget.ImageView;
 
 import org.telegram.messenger.AndroidUtilities;
+import org.telegram.messenger.ApplicationLoader;
 import org.telegram.messenger.ChatObject;
 import org.telegram.messenger.FileLog;
 import org.telegram.messenger.LocaleController;
@@ -50,13 +52,16 @@ public class ChatAvatarContainer extends FrameLayout {
     public ChatAvatarContainer(Context context, ChatActivity chatActivity, boolean needTime) {
         super(context);
         parentFragment = chatActivity;
+        SharedPreferences themePreferences = ApplicationLoader.applicationContext.getSharedPreferences("telehtheme", 0);
 
         avatarImageView = new BackupImageView(context);
-        avatarImageView.setRoundRadius(AndroidUtilities.dp(21));
+        avatarImageView.setRoundRadius(AndroidUtilities.dp((float) themePreferences.getInt("theme_chat_action_aradius", 21)));
+
         addView(avatarImageView);
 
         titleTextView = new SimpleTextView(context);
-        titleTextView.setTextColor(Theme.ACTION_BAR_TITLE_COLOR);
+        int titleColor = themePreferences.getInt("theme_chat_action_tcolor", themePreferences.getInt("theme_chat_action_icolor", Theme.ACTION_BAR_TITLE_COLOR));
+        titleTextView.setTextColor(titleColor);
         titleTextView.setTextSize(18);
         titleTextView.setGravity(Gravity.LEFT);
         titleTextView.setTypeface(AndroidUtilities.getTypeface("fonts/rmedium.ttf"));
@@ -67,6 +72,7 @@ public class ChatAvatarContainer extends FrameLayout {
         subtitleTextView = new SimpleTextView(context);
         subtitleTextView.setTextColor(Theme.ACTION_BAR_SUBTITLE_COLOR);
         subtitleTextView.setTextSize(14);
+        subtitleTextView.setTypeface(AndroidUtilities.getTypeface("fonts/rmedium.ttf"));
         subtitleTextView.setGravity(Gravity.LEFT);
         addView(subtitleTextView);
 
@@ -311,5 +317,21 @@ public class ChatAvatarContainer extends FrameLayout {
                 }
             }
         }
+    }
+
+    public void setTitleColor(int color) {
+        titleTextView.setTextColor(color);
+    }
+
+    public void setTitleSize(int size) {
+        titleTextView.setTextSize(size);
+    }
+
+    public void setSubtitleColor(int color) {
+        subtitleTextView.setTextColor(color);
+    }
+
+    public void setSubtitleSize(int size) {
+        subtitleTextView.setTextSize(size);
     }
 }

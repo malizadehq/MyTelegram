@@ -44,19 +44,6 @@ import java.util.regex.Pattern;
 
 public class WebFrameLayout extends FrameLayout {
 
-    private WebView webView;
-    private BottomSheet dialog;
-    private View customView;
-    private FrameLayout fullscreenVideoContainer;
-    private WebChromeClient.CustomViewCallback customViewCallback;
-    private ProgressBar progressBar;
-
-    private int width;
-    private int height;
-    private String openUrl;
-    private boolean hasDescription;
-    private String embedUrl;
-
     final static Pattern youtubeIdRegex = Pattern.compile("(?:youtube(?:-nocookie)?\\.com\\/(?:[^\\/\\n\\s]+\\/\\S+\\/|(?:v|e(?:mbed)?)\\/|\\S*?[?&]v=)|youtu\\.be\\/)([a-zA-Z0-9_-]{11})");
     private final String youtubeFrame = "<!DOCTYPE html><html><head><style>" +
             "body { margin: 0; width:100%%; height:100%%;  background-color:#000; }" +
@@ -108,6 +95,17 @@ public class WebFrameLayout extends FrameLayout {
             "    </script>" +
             "</body>" +
             "</html>";
+    private WebView webView;
+    private BottomSheet dialog;
+    private View customView;
+    private FrameLayout fullscreenVideoContainer;
+    private WebChromeClient.CustomViewCallback customViewCallback;
+    private ProgressBar progressBar;
+    private int width;
+    private int height;
+    private String openUrl;
+    private boolean hasDescription;
+    private String embedUrl;
 
     @SuppressLint("SetJavaScriptEnabled")
     public WebFrameLayout(Context context, final BottomSheet parentDialog, String title, String descripton, String originalUrl, final String url, int w, int h) {

@@ -18,12 +18,12 @@ import android.view.MotionEvent;
 import android.view.SoundEffectConstants;
 
 import org.telegram.messenger.AndroidUtilities;
+import org.telegram.messenger.FileLoader;
 import org.telegram.messenger.ImageLoader;
 import org.telegram.messenger.MediaController;
-import org.telegram.messenger.MessagesController;
-import org.telegram.messenger.FileLoader;
-import org.telegram.messenger.R;
 import org.telegram.messenger.MessageObject;
+import org.telegram.messenger.MessagesController;
+import org.telegram.messenger.R;
 import org.telegram.tgnet.TLRPC;
 import org.telegram.ui.ActionBar.Theme;
 import org.telegram.ui.Cells.BaseCell;
@@ -32,27 +32,22 @@ import java.io.File;
 
 public class PopupAudioView extends BaseCell implements SeekBar.SeekBarDelegate, MediaController.FileDownloadProgressListener {
 
-    private boolean wasLayout = false;
-    protected MessageObject currentMessageObject;
-
     private static Drawable backgroundMediaDrawableIn;
-
     private static Drawable[][] statesDrawable = new Drawable[8][2];
     private static TextPaint timePaint;
-
+    protected MessageObject currentMessageObject;
+    int timeWidth = 0;
+    private boolean wasLayout = false;
     private SeekBar seekBar;
     private ProgressView progressView;
     private int seekBarX;
     private int seekBarY;
-
     private int buttonState = 0;
     private int buttonX;
     private int buttonY;
     private int buttonPressed = 0;
-
     private StaticLayout timeLayout;
     private int timeX;
-    int timeWidth = 0;
     private String lastTimeString = null;
 
     private int TAG;
@@ -90,6 +85,10 @@ public class PopupAudioView extends BaseCell implements SeekBar.SeekBarDelegate,
         progressView = new ProgressView();
     }
 
+    public final MessageObject getMessageObject() {
+        return currentMessageObject;
+    }
+
     public void setMessageObject(MessageObject messageObject) {
         if (currentMessageObject != messageObject) {
             seekBar.setColors(Theme.MSG_IN_AUDIO_SEEKBAR_COLOR, Theme.MSG_IN_AUDIO_SEEKBAR_FILL_COLOR, Theme.MSG_IN_AUDIO_SEEKBAR_SELECTED_COLOR);
@@ -101,10 +100,6 @@ public class PopupAudioView extends BaseCell implements SeekBar.SeekBarDelegate,
             requestLayout();
         }
         updateButtonState();
-    }
-
-    public final MessageObject getMessageObject() {
-        return currentMessageObject;
     }
 
     @Override
@@ -281,7 +276,7 @@ public class PopupAudioView extends BaseCell implements SeekBar.SeekBarDelegate,
         }
         String timeString = String.format("%02d:%02d", duration / 60, duration % 60);
         if (lastTimeString == null || lastTimeString != null && !lastTimeString.equals(timeString)) {
-            timeWidth = (int)Math.ceil(timePaint.measureText(timeString));
+            timeWidth = (int) Math.ceil(timePaint.measureText(timeString));
             timeLayout = new StaticLayout(timeString, timePaint, timeWidth, Layout.Alignment.ALIGN_NORMAL, 1.0f, 0.0f, false);
         }
         invalidate();

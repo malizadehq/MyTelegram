@@ -9,8 +9,10 @@
 package org.telegram.ui.Components;
 
 import android.annotation.SuppressLint;
+import android.app.Activity;
 import android.content.Context;
-import android.graphics.*;
+import android.content.SharedPreferences;
+import android.graphics.Canvas;
 import android.graphics.drawable.Drawable;
 import android.os.Build;
 import android.text.Editable;
@@ -72,7 +74,7 @@ public class ShareAlert extends BottomSheet {
     private GridLayoutManager layoutManager;
     private ShareDialogsAdapter listAdapter;
     private ShareSearchAdapter searchAdapter;
-    private MessageObject sendingMessageObject;
+    private ArrayList<MessageObject> sendingMessageObject;
     private EmptyTextProgressView searchEmptyView;
     private Drawable shadowDrawable;
     private HashMap<Long, TLRPC.TL_dialog> selectedDialogs = new HashMap<>();
@@ -86,7 +88,7 @@ public class ShareAlert extends BottomSheet {
     private int scrollOffsetY;
     private int topBeforeSwitch;
 
-    public ShareAlert(final Context context, final MessageObject messageObject, boolean publicChannel) {
+    public ShareAlert(final Context context, final ArrayList<MessageObject> messageObject, boolean publicChannel, final ChatActivityEnterView chatActivityEnterView) {
         super(context, true);
 
         shadowDrawable = context.getResources().getDrawable(R.drawable.sheet_shadow);
@@ -95,28 +97,41 @@ public class ShareAlert extends BottomSheet {
         searchAdapter = new ShareSearchAdapter(context);
         isPublicChannel = publicChannel;
 
-        if (publicChannel) {
-            loadingLink = true;
-            TLRPC.TL_channels_exportMessageLink req = new TLRPC.TL_channels_exportMessageLink();
-            req.id = messageObject.getId();
-            req.channel = MessagesController.getInputChannel(messageObject.messageOwner.to_id.channel_id);
-            ConnectionsManager.getInstance().sendRequest(req, new RequestDelegate() {
-                @Override
-                public void run(final TLObject response, TLRPC.TL_error error) {
-                    AndroidUtilities.runOnUIThread(new Runnable() {
-                        @Override
-                        public void run() {
-                            if (response != null) {
-                                exportedMessageLink = (TLRPC.TL_exportedMessageLink) response;
-                                if (copyLinkOnEnd) {
-                                    copyLink(context);
+        //Teleh Code
+        final CharSequence caption;
+        if (chatActivityEnterView != null) {
+            caption = chatActivityEnterView.getFieldText();
+            chatActivityEnterView.setFieldText("");
+            chatActivityEnterView.showSendButton();
+        } else {
+            caption = "";
+        }
+
+        for (MessageObject object : sendingMessageObject) {
+            if (publicChannel) {
+                loadingLink = true;
+                TLRPC.TL_channels_exportMessageLink req = new TLRPC.TL_channels_exportMessageLink();
+                req.id = object.getId();
+                req.channel = MessagesController.getInputChannel(object.messageOwner.to_id.channel_id);
+                ConnectionsManager.getInstance().sendRequest(req, new RequestDelegate() {
+                    @Override
+                    public void run(final TLObject response, TLRPC.TL_error error) {
+                        AndroidUtilities.runOnUIThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                if (response != null) {
+                                    exportedMessageLink = (TLRPC.TL_exportedMessageLink) response;
+                                    if (copyLinkOnEnd) {
+                                        copyLink(context);
+                                    }
                                 }
+                                loadingLink = false;
                             }
-                            loadingLink = false;
-                        }
-                    });
-                }
-            });
+                        });
+
+                    }
+                });
+            }
         }
 
         containerView = new FrameLayout(context) {
@@ -194,22 +209,41 @@ public class ShareAlert extends BottomSheet {
         doneButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                if (selectedDialogs.isEmpty() && isPublicChannel) {
-                    if (loadingLink) {
-                        copyLinkOnEnd = true;
-                        Toast.makeText(ShareAlert.this.getContext(), LocaleController.getString("Loading", R.string.Loading), Toast.LENGTH_SHORT).show();
+                //Teleh Code
+                if (chatActivityEnterView == null) {
+                    SharedPreferences preferences = ApplicationLoader.applicationContext.getSharedPreferences("mainconfig", Activity.MODE_PRIVATE);
+                    int forwardType = preferences.getInt("forward_type", 1);
+
+                    if (forwardType == 1) {
+                        for (HashMap.Entry<Long, TLRPC.TL_dialog> entry : selectedDialogs.entrySet()) {
+                            SendMessagesHelper.getInstance().sendMessage(sendingMessageObject, entry.getKey());
+                        }
+                    } else if (forwardType == 2) {
+                        for (HashMap.Entry<Long, TLRPC.TL_dialog> entry : selectedDialogs.entrySet()) {
+                            for (MessageObject object : sendingMessageObject) {
+                                SendMessagesHelper.getInstance().telehProcessForwardFromMyName(object.caption, object, entry.getKey());
+                            }
+                        }
                     } else {
-                        copyLink(ShareAlert.this.getContext());
+                        for (HashMap.Entry<Long, TLRPC.TL_dialog> entry : selectedDialogs.entrySet()) {
+                            for (MessageObject object : sendingMessageObject) {
+                                SendMessagesHelper.getInstance().processForwardFromMyName(object, entry.getKey());
+                            }
+                        }
                     }
-                    dismiss();
                 } else {
-                    ArrayList<MessageObject> arrayList = new ArrayList<>();
-                    arrayList.add(sendingMessageObject);
                     for (HashMap.Entry<Long, TLRPC.TL_dialog> entry : selectedDialogs.entrySet()) {
-                        SendMessagesHelper.getInstance().sendMessage(arrayList, entry.getKey());
+                        for (MessageObject object : sendingMessageObject) {
+                            if (object.messageOwner.media != null && !(object.messageOwner.media instanceof TLRPC.TL_messageMediaEmpty) && !(object.messageOwner.media instanceof TLRPC.TL_messageMediaWebPage)) {
+                                SendMessagesHelper.getInstance().telehProcessForwardFromMyName(caption, object, entry.getKey());
+                            } else {
+                                object.messageOwner.message = caption.toString();
+                                SendMessagesHelper.getInstance().telehProcessForwardFromMyName(null, object, entry.getKey());
+                            }
+                        }
                     }
-                    dismiss();
                 }
+                dismiss();
             }
         });
 
@@ -248,6 +282,8 @@ public class ShareAlert extends BottomSheet {
         nameTextView.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
         AndroidUtilities.clearCursorDrawable(nameTextView);
         nameTextView.setTextColor(Theme.SHARE_SHEET_EDIT_TEXT_COLOR);
+        //Teleh Code
+        nameTextView.setTypeface(AndroidUtilities.getTypeface("fonts/rmedium.ttf"));
         frameLayout.addView(nameTextView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT, Gravity.TOP | Gravity.LEFT, 48, 2, 96, 0));
         nameTextView.addTextChangedListener(new TextWatcher() {
             @Override
@@ -507,13 +543,6 @@ public class ShareAlert extends BottomSheet {
         private int reqId = 0;
         private int lastReqId;
         private int lastSearchId = 0;
-
-        private class DialogSearchResult {
-            public TLRPC.TL_dialog dialog = new TLRPC.TL_dialog();
-            public TLObject object;
-            public int date;
-            public CharSequence name;
-        }
 
         public ShareSearchAdapter(Context context) {
             this.context = context;
@@ -816,6 +845,13 @@ public class ShareAlert extends BottomSheet {
         @Override
         public int getItemViewType(int i) {
             return 0;
+        }
+
+        private class DialogSearchResult {
+            public TLRPC.TL_dialog dialog = new TLRPC.TL_dialog();
+            public TLObject object;
+            public int date;
+            public CharSequence name;
         }
     }
 }

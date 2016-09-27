@@ -18,18 +18,16 @@ import org.telegram.messenger.AndroidUtilities;
 
 public class LineProgressView extends View {
 
+    private static DecelerateInterpolator decelerateInterpolator = null;
+    private static Paint progressPaint = null;
     private long lastUpdateTime = 0;
     private float currentProgress = 0;
     private float animationProgressStart = 0;
     private long currentProgressTime = 0;
     private float animatedProgressValue = 0;
     private float animatedAlphaValue = 1.0f;
-
     private int backColor;
     private int progressColor = 0xff36a2ee;
-
-    private static DecelerateInterpolator decelerateInterpolator = null;
-    private static Paint progressPaint = null;
 
     public LineProgressView(Context context) {
         super(context);
@@ -105,7 +103,7 @@ public class LineProgressView extends View {
         }
 
         progressPaint.setColor(progressColor);
-        progressPaint.setAlpha((int)(255 * animatedAlphaValue));
+        progressPaint.setAlpha((int) (255 * animatedAlphaValue));
         canvas.drawRect(0, 0, getWidth() * animatedProgressValue, getHeight(), progressPaint);
         updateAnimation();
     }

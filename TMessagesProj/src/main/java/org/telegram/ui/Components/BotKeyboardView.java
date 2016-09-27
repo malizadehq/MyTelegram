@@ -33,10 +33,6 @@ public class BotKeyboardView extends LinearLayout {
     private int buttonHeight;
     private ArrayList<TextView> buttonViews = new ArrayList<>();
 
-    public interface BotKeyboardViewDelegate {
-        void didPressedButton(TLRPC.KeyboardButton button);
-    }
-
     public BotKeyboardView(Context context) {
         super(context);
 
@@ -107,6 +103,7 @@ public class BotKeyboardView extends LinearLayout {
                     textView.setGravity(Gravity.CENTER);
                     textView.setBackgroundResource(R.drawable.bot_keyboard_states);
                     textView.setPadding(AndroidUtilities.dp(4), 0, AndroidUtilities.dp(4), 0);
+                    textView.setTypeface(AndroidUtilities.getTypeface("fonts/rmedium.ttf"));
                     textView.setText(Emoji.replaceEmoji(button.text, textView.getPaint().getFontMetricsInt(), AndroidUtilities.dp(16), false));
                     layout.addView(textView, LayoutHelper.createLinear(0, LayoutHelper.MATCH_PARENT, weight, 0, 0, b != row.buttons.size() - 1 ? 10 : 0, 0));
                     textView.setOnClickListener(new OnClickListener() {
@@ -123,5 +120,9 @@ public class BotKeyboardView extends LinearLayout {
 
     public int getKeyboardHeight() {
         return isFullSize ? panelHeight : botButtons.rows.size() * AndroidUtilities.dp(buttonHeight) + AndroidUtilities.dp(30) + (botButtons.rows.size() - 1) * AndroidUtilities.dp(10);
+    }
+
+    public interface BotKeyboardViewDelegate {
+        void didPressedButton(TLRPC.KeyboardButton button);
     }
 }

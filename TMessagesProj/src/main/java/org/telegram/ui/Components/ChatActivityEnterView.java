@@ -15,13 +15,18 @@ import android.animation.ObjectAnimator;
 import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.app.Dialog;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.graphics.Canvas;
+import android.graphics.Color;
 import android.graphics.Paint;
+import android.graphics.PorterDuff;
+import android.graphics.Typeface;
 import android.graphics.drawable.Drawable;
+import android.graphics.drawable.GradientDrawable;
 import android.media.AudioManager;
 import android.os.Build;
 import android.os.Bundle;
@@ -46,6 +51,7 @@ import android.view.ViewGroup;
 import android.view.animation.AccelerateInterpolator;
 import android.view.animation.DecelerateInterpolator;
 import android.view.inputmethod.EditorInfo;
+import android.widget.Button;
 import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
@@ -55,25 +61,25 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import org.telegram.messenger.AndroidUtilities;
+import org.telegram.messenger.AnimatorListenerAdapterProxy;
+import org.telegram.messenger.ApplicationLoader;
 import org.telegram.messenger.ChatObject;
 import org.telegram.messenger.Emoji;
+import org.telegram.messenger.FileLog;
 import org.telegram.messenger.LocaleController;
 import org.telegram.messenger.MediaController;
 import org.telegram.messenger.MessageObject;
 import org.telegram.messenger.MessagesController;
-import org.telegram.messenger.NotificationsController;
-import org.telegram.messenger.SendMessagesHelper;
-import org.telegram.messenger.FileLog;
 import org.telegram.messenger.NotificationCenter;
+import org.telegram.messenger.NotificationsController;
 import org.telegram.messenger.R;
+import org.telegram.messenger.SendMessagesHelper;
+import org.telegram.messenger.UserConfig;
 import org.telegram.messenger.query.DraftQuery;
 import org.telegram.messenger.query.MessagesQuery;
 import org.telegram.tgnet.ConnectionsManager;
 import org.telegram.tgnet.TLRPC;
-import org.telegram.messenger.UserConfig;
 import org.telegram.ui.ActionBar.ActionBar;
-import org.telegram.messenger.AnimatorListenerAdapterProxy;
-import org.telegram.messenger.ApplicationLoader;
 import org.telegram.ui.ActionBar.Theme;
 import org.telegram.ui.ChatActivity;
 import org.telegram.ui.DialogsActivity;
@@ -85,205 +91,6 @@ import java.util.ArrayList;
 import java.util.Locale;
 
 public class ChatActivityEnterView extends FrameLayout implements NotificationCenter.NotificationCenterDelegate, SizeNotifierFrameLayout.SizeNotifierFrameLayoutDelegate, StickersAlert.StickersAlertDelegate {
-
-    public interface ChatActivityEnterViewDelegate {
-        void onMessageSend(CharSequence message);
-        void needSendTyping();
-        void onTextChanged(CharSequence text, boolean bigChange);
-        void onAttachButtonHidden();
-        void onAttachButtonShow();
-        void onWindowSizeChanged(int size);
-        void onStickersTab(boolean opened);
-        void onMessageEditEnd(boolean loading);
-    }
-
-    private class SeekBarWaveformView extends View {
-
-        private SeekBarWaveform seekBarWaveform;
-
-        public SeekBarWaveformView(Context context) {
-            super(context);
-            seekBarWaveform = new SeekBarWaveform(context);
-            seekBarWaveform.setColors(0xffa2cef8, 0xffffffff, 0xffa2cef8);
-            seekBarWaveform.setDelegate(new SeekBar.SeekBarDelegate() {
-                @Override
-                public void onSeekBarDrag(float progress) {
-                    if (audioToSendMessageObject != null) {
-                        audioToSendMessageObject.audioProgress = progress;
-                        MediaController.getInstance().seekToProgress(audioToSendMessageObject, progress);
-                    }
-                }
-            });
-        }
-
-        public void setWaveform(byte[] waveform) {
-            seekBarWaveform.setWaveform(waveform);
-            invalidate();
-        }
-
-        public void setProgress(float progress) {
-            seekBarWaveform.setProgress(progress);
-            invalidate();
-        }
-
-        public boolean isDragging() {
-            return seekBarWaveform.isDragging();
-        }
-
-        @Override
-        public boolean onTouchEvent(MotionEvent event) {
-            boolean result = seekBarWaveform.onTouch(event.getAction(), event.getX(), event.getY());
-            if (result) {
-                if (event.getAction() == MotionEvent.ACTION_DOWN) {
-                    requestDisallowInterceptTouchEvent(true);
-                }
-                invalidate();
-            }
-            return result || super.onTouchEvent(event);
-        }
-
-        @Override
-        protected void onLayout(boolean changed, int left, int top, int right, int bottom) {
-            super.onLayout(changed, left, top, right, bottom);
-            seekBarWaveform.setSize(right - left, bottom - top);
-        }
-
-        @Override
-        protected void onDraw(Canvas canvas) {
-            super.onDraw(canvas);
-            seekBarWaveform.draw(canvas);
-        }
-    }
-
-    private class EditTextCaption extends EditText {
-
-        private String caption;
-        private StaticLayout captionLayout;
-        private int userNameLength;
-        private int xOffset;
-        private int yOffset;
-        private Object editor;
-        private Field editorField;
-        private Drawable[] mCursorDrawable;
-        private Field mCursorDrawableField;
-        private int triesCount = 0;
-
-        public EditTextCaption(Context context) {
-            super(context);
-
-            try {
-                Field field = TextView.class.getDeclaredField("mEditor");
-                field.setAccessible(true);
-                editor = field.get(this);
-                Class editorClass = Class.forName("android.widget.Editor");
-                editorField = editorClass.getDeclaredField("mShowCursor");
-                editorField.setAccessible(true);
-                mCursorDrawableField = editorClass.getDeclaredField("mCursorDrawable");
-                mCursorDrawableField.setAccessible(true);
-                mCursorDrawable = (Drawable[]) mCursorDrawableField.get(editor);
-            } catch (Throwable e) {
-                //
-            }
-        }
-
-        public void setCaption(String value) {
-            if ((caption == null || caption.length() == 0) && (value == null || value.length() == 0) || caption != null && value != null && caption.equals(value)) {
-                return;
-            }
-            caption = value;
-            if (caption != null) {
-                caption = caption.replace('\n', ' ');
-            }
-            requestLayout();
-        }
-
-        @SuppressLint("DrawAllocation")
-        @Override
-        protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
-            try {
-                super.onMeasure(widthMeasureSpec, heightMeasureSpec);
-            } catch (Exception e) {
-                setMeasuredDimension(MeasureSpec.getSize(widthMeasureSpec), AndroidUtilities.dp(51));
-                FileLog.e("tmessages", e);
-            }
-
-
-            captionLayout = null;
-
-            if (caption != null && caption.length() > 0) {
-                CharSequence text = getText();
-                if (text.length() > 1 && text.charAt(0) == '@') {
-                    int index = TextUtils.indexOf(text, ' ');
-                    if (index != -1) {
-                        TextPaint paint = getPaint();
-                        CharSequence str = text.subSequence(0, index + 1);
-                        int size = (int) Math.ceil(paint.measureText(text, 0, index + 1));
-                        int width = getMeasuredWidth() - getPaddingLeft() - getPaddingRight();
-                        userNameLength = str.length();
-                        CharSequence captionFinal = TextUtils.ellipsize(caption, paint, width - size, TextUtils.TruncateAt.END);
-                        xOffset = size;
-                        try {
-                            captionLayout = new StaticLayout(captionFinal, getPaint(), width - size, Layout.Alignment.ALIGN_NORMAL, 1.0f, 0.0f, false);
-                            if (captionLayout.getLineCount() > 0) {
-                                xOffset += -captionLayout.getLineLeft(0);
-                            }
-                            yOffset = (getMeasuredHeight() - captionLayout.getLineBottom(0)) / 2 + AndroidUtilities.dp(0.5f);
-                        } catch (Exception e) {
-                            FileLog.e("tmessages", e);
-                        }
-                    }
-                }
-            }
-        }
-
-        @Override
-        protected void onDraw(Canvas canvas) {
-            try {
-                super.onDraw(canvas);
-                if (captionLayout != null && userNameLength == length()) {
-                    Paint paint = getPaint();
-                    int oldColor = getPaint().getColor();
-                    paint.setColor(0xffb2b2b2);
-                    canvas.save();
-                    canvas.translate(xOffset, yOffset);
-                    captionLayout.draw(canvas);
-                    canvas.restore();
-                    paint.setColor(oldColor);
-                }
-            } catch (Exception e) {
-                FileLog.e("tmessages", e);
-            }
-
-            try {
-                if (editorField != null && mCursorDrawable != null && mCursorDrawable[0] != null) {
-                    long mShowCursor = editorField.getLong(editor);
-                    boolean showCursor = (SystemClock.uptimeMillis() - mShowCursor) % (2 * 500) < 500;
-                    if (showCursor) {
-                        canvas.save();
-                        canvas.translate(0, getPaddingTop());
-                        mCursorDrawable[0].draw(canvas);
-                        canvas.restore();
-                    }
-                }
-            } catch (Throwable e) {
-                //ignore
-            }
-        }
-
-        @Override
-        public boolean onTouchEvent(MotionEvent event) {
-            if (isPopupShowing() && event.getAction() == MotionEvent.ACTION_DOWN) {
-                showPopup(AndroidUtilities.usingHardwareInput ? 0 : 2, 0);
-                openKeyboardInternal();
-            }
-            try {
-                return super.onTouchEvent(event);
-            } catch (Exception e) {
-                FileLog.e("tmessages", e);
-            }
-            return false;
-        }
-    }
 
     private EditTextCaption messageEditText;
     private ImageView sendButton;
@@ -307,35 +114,29 @@ public class ChatActivityEnterView extends FrameLayout implements NotificationCe
     private View topView;
     private PopupWindow botKeyboardPopup;
     private BotKeyboardView botKeyboardView;
+    private ImageView asAdminButton;
     private ImageView notifyButton;
     private RecordCircle recordCircle;
     private CloseProgressDrawable2 progressDrawable;
     private Drawable backgroundDrawable;
-
     private MessageObject editingMessageObject;
     private int editingMessageReqId;
     private boolean editingCaption;
-
     private int currentPopupContentType = -1;
-
     private boolean silent;
     private boolean canWriteToChannel;
-
     private boolean isPaused = true;
     private boolean showKeyboardOnResume;
-
     private MessageObject botButtonsMessageObject;
     private TLRPC.TL_replyKeyboardMarkup botReplyMarkup;
     private int botCount;
     private boolean hasBotCommands;
-
     private PowerManager.WakeLock mWakeLock;
     private AnimatorSet runningAnimation;
     private AnimatorSet runningAnimation2;
     private AnimatorSet runningAnimationAudio;
     private int runningAnimationType;
     private int audioInterfaceState;
-
     private int keyboardHeight;
     private int keyboardHeightLand;
     private boolean keyboardVisible;
@@ -349,10 +150,8 @@ public class ChatActivityEnterView extends FrameLayout implements NotificationCe
     private boolean forceShowSendButton;
     private boolean allowStickers;
     private boolean allowGifs;
-
     private int lastSizeChangeValue1;
     private boolean lastSizeChangeValue2;
-
     private Activity parentActivity;
     private ChatActivity parentFragment;
     private long dialog_id;
@@ -363,19 +162,15 @@ public class ChatActivityEnterView extends FrameLayout implements NotificationCe
     private TLRPC.WebPage messageWebPage;
     private boolean messageWebPageSearch = true;
     private ChatActivityEnterViewDelegate delegate;
-
     private TLRPC.TL_document audioToSend;
     private String audioToSendPath;
     private MessageObject audioToSendMessageObject;
-
     private boolean topViewShowed;
     private boolean needShowTopView;
     private boolean allowShowTopView;
     private AnimatorSet currentTopViewAnimation;
-
     private MessageObject pendingMessageObject;
     private TLRPC.KeyboardButton pendingLocationButton;
-
     private boolean waitingForKeyboardOpen;
     private Runnable openKeyboardRunnable = new Runnable() {
         @Override
@@ -389,125 +184,7 @@ public class ChatActivityEnterView extends FrameLayout implements NotificationCe
         }
     };
 
-    private class RecordDot extends View {
-
-        private Drawable dotDrawable;
-        private float alpha;
-        private long lastUpdateTime;
-        private boolean isIncr;
-
-        public RecordDot(Context context) {
-            super(context);
-
-            dotDrawable = getResources().getDrawable(R.drawable.rec);
-        }
-
-        public void resetAlpha() {
-            alpha = 1.0f;
-            lastUpdateTime = System.currentTimeMillis();
-            isIncr = false;
-            invalidate();
-        }
-
-        @Override
-        protected void onDraw(Canvas canvas) {
-            dotDrawable.setBounds(0, 0, AndroidUtilities.dp(11), AndroidUtilities.dp(11));
-            dotDrawable.setAlpha((int) (255 * alpha));
-            long dt = (System.currentTimeMillis() - lastUpdateTime);
-            if (!isIncr) {
-                alpha -= dt / 400.0f;
-                if (alpha <= 0) {
-                    alpha = 0;
-                    isIncr = true;
-                }
-            } else {
-                alpha += dt / 400.0f;
-                if (alpha >= 1) {
-                    alpha = 1;
-                    isIncr = false;
-                }
-            }
-            lastUpdateTime = System.currentTimeMillis();
-            dotDrawable.draw(canvas);
-            invalidate();
-        }
-    }
-
-    private class RecordCircle extends View {
-
-        private Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
-        private Paint paintRecord = new Paint(Paint.ANTI_ALIAS_FLAG);
-        private Drawable micDrawable;
-        private float scale;
-        private float amplitude;
-        private float animateToAmplitude;
-        private float animateAmplitudeDiff;
-        private long lastUpdateTime;
-
-        public RecordCircle(Context context) {
-            super(context);
-            paint.setColor(0xff5795cc);
-            paintRecord.setColor(0x0d000000);
-            micDrawable = getResources().getDrawable(R.drawable.mic_pressed);
-        }
-
-        public void setAmplitude(double value) {
-            animateToAmplitude = (float) Math.min(100, value) / 100.0f;
-            animateAmplitudeDiff = (animateToAmplitude - amplitude) / 150.0f;
-            lastUpdateTime = System.currentTimeMillis();
-            invalidate();
-        }
-
-        public float getScale() {
-            return scale;
-        }
-
-        public void setScale(float value) {
-            scale = value;
-            invalidate();
-        }
-
-        @Override
-        protected void onDraw(Canvas canvas) {
-            int cx = getMeasuredWidth() / 2;
-            int cy = getMeasuredHeight() / 2;
-            float sc;
-            float alpha;
-            if (scale <= 0.5f) {
-                alpha = sc = scale / 0.5f;
-            } else if (scale <= 0.75f) {
-                sc = 1.0f - (scale - 0.5f) / 0.25f * 0.1f;
-                alpha = 1;
-            } else {
-                sc = 0.9f + (scale - 0.75f) / 0.25f * 0.1f;
-                alpha = 1;
-            }
-            long dt = System.currentTimeMillis() - lastUpdateTime;
-            if (animateToAmplitude != amplitude) {
-                amplitude += animateAmplitudeDiff * dt;
-                if (animateAmplitudeDiff > 0) {
-                    if (amplitude > animateToAmplitude) {
-                        amplitude = animateToAmplitude;
-                    }
-                } else {
-                    if (amplitude < animateToAmplitude) {
-                        amplitude = animateToAmplitude;
-                    }
-                }
-                invalidate();
-            }
-            lastUpdateTime = System.currentTimeMillis();
-            if (amplitude != 0) {
-                canvas.drawCircle(getMeasuredWidth() / 2.0f, getMeasuredHeight() / 2.0f, (AndroidUtilities.dp(42) + AndroidUtilities.dp(20) * amplitude) * scale, paintRecord);
-            }
-            canvas.drawCircle(getMeasuredWidth() / 2.0f, getMeasuredHeight() / 2.0f, AndroidUtilities.dp(42) * sc, paint);
-            micDrawable.setBounds(cx - micDrawable.getIntrinsicWidth() / 2, cy - micDrawable.getIntrinsicHeight() / 2, cx + micDrawable.getIntrinsicWidth() / 2, cy + micDrawable.getIntrinsicHeight() / 2);
-            micDrawable.setAlpha((int) (255 * alpha));
-            micDrawable.draw(canvas);
-        }
-    }
-
-    public ChatActivityEnterView(Activity context, SizeNotifierFrameLayout parent, ChatActivity fragment, boolean isChat) {
+    public ChatActivityEnterView(final Activity context, SizeNotifierFrameLayout parent, ChatActivity fragment, boolean isChat) {
         super(context);
         backgroundDrawable = context.getResources().getDrawable(R.drawable.compose_panel);
         setFocusable(true);
@@ -541,6 +218,12 @@ public class ChatActivityEnterView extends FrameLayout implements NotificationCe
 
         emojiButton = new ImageView(context);
         emojiButton.setImageResource(R.drawable.ic_msg_panel_smiles);
+        SharedPreferences themePrefs = ApplicationLoader.applicationContext.getSharedPreferences(AndroidUtilities.THEME_PREFS, AndroidUtilities.THEME_PREFS_MODE);
+        int def = themePrefs.getInt("themeColor", AndroidUtilities.defColor);
+        final int color = themePrefs.getInt("chatEditTextIconsColor", 0xffadadad);
+        //emoji.setColorFilter(color, PorterDuff.Mode.SRC_IN);
+        //emojiButton.setImageDrawable(emoji);
+        emojiButton.setColorFilter(color, PorterDuff.Mode.SRC_IN);
         emojiButton.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
         emojiButton.setPadding(0, AndroidUtilities.dp(1), 0, 0);
         if (Build.VERSION.SDK_INT >= 21) {
@@ -760,6 +443,8 @@ public class ChatActivityEnterView extends FrameLayout implements NotificationCe
         ImageView imageView = new ImageView(context);
         imageView.setScaleType(ImageView.ScaleType.CENTER);
         imageView.setImageResource(R.drawable.ic_ab_fwd_delete);
+        int iconColor = themePrefs.getInt("chatEditTextIconsColor", 0xff737373);
+        imageView.setColorFilter(iconColor, PorterDuff.Mode.SRC_IN);
         recordedAudioPanel.addView(imageView, LayoutHelper.createFrame(48, 48));
         imageView.setOnClickListener(new OnClickListener() {
             @Override
@@ -778,6 +463,15 @@ public class ChatActivityEnterView extends FrameLayout implements NotificationCe
 
         View view = new View(context);
         view.setBackgroundResource(R.drawable.recorded);
+
+        int bgColor = themePrefs.getInt("chatEditTextBGColor", 0xffffffff);
+        bgColor = Color.argb(0xff, Color.red(bgColor), Color.green(bgColor), Color.blue(bgColor));
+        if (bgColor == 0xffffffff) {
+            view.getBackground().setColorFilter(def, PorterDuff.Mode.SRC_IN);
+        } else {
+            view.getBackground().setColorFilter(AndroidUtilities.setDarkColor(bgColor, 0x25), PorterDuff.Mode.SRC_IN);
+        }
+
         recordedAudioPanel.addView(view, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, 32, Gravity.CENTER_VERTICAL | Gravity.LEFT, 48, 0, 0, 0));
 
         recordedAudioSeekBar = new SeekBarWaveformView(context);
@@ -849,7 +543,8 @@ public class ChatActivityEnterView extends FrameLayout implements NotificationCe
         audioSendButton = new ImageView(context);
         audioSendButton.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
         audioSendButton.setImageResource(R.drawable.mic);
-        audioSendButton.setBackgroundColor(0xffffffff);
+        audioSendButton.setColorFilter(color, PorterDuff.Mode.SRC_IN);
+        audioSendButton.setBackgroundColor(0x00000000);
         audioSendButton.setSoundEffectsEnabled(false);
         audioSendButton.setPadding(0, 0, AndroidUtilities.dp(4), 0);
         sendButtonContainer.addView(audioSendButton, LayoutHelper.createFrame(48, 48));
@@ -857,6 +552,7 @@ public class ChatActivityEnterView extends FrameLayout implements NotificationCe
             @Override
             public boolean onTouch(View view, MotionEvent motionEvent) {
                 if (motionEvent.getAction() == MotionEvent.ACTION_DOWN) {
+                    audioSendButton.setColorFilter(0xffda564d, PorterDuff.Mode.SRC_IN);
                     if (parentFragment != null) {
                         if (Build.VERSION.SDK_INT >= 23 && parentActivity.checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
                             parentActivity.requestPermissions(new String[]{Manifest.permission.RECORD_AUDIO}, 3);
@@ -884,8 +580,41 @@ public class ChatActivityEnterView extends FrameLayout implements NotificationCe
                     updateAudioRecordIntefrace();
                     audioSendButton.getParent().requestDisallowInterceptTouchEvent(true);
                 } else if (motionEvent.getAction() == MotionEvent.ACTION_UP || motionEvent.getAction() == MotionEvent.ACTION_CANCEL) {
+                    //Teleh Code
+                    audioSendButton.setColorFilter(color, PorterDuff.Mode.SRC_IN);
+//End Teleh Code
                     startedDraggingX = -1;
-                    MediaController.getInstance().stopRecording(1);
+                    //Teleh Code
+                    SharedPreferences preferences = ApplicationLoader.applicationContext.getSharedPreferences("mainconfig", Activity.MODE_PRIVATE);
+                    boolean confirmatinAudio = preferences.getBoolean("confirmatin_audio", true);
+                    if (confirmatinAudio) {
+                        AlertDialog.Builder builder = new AlertDialog.Builder(getContext());
+                        builder.setTitle(LocaleController.getString("AppName", R.string.AppName));
+                        builder.setMessage(LocaleController.getString("AreYouSureYouWantToSendAudio", R.string.AreYouSureYouWantToSendAudio));
+                        builder.setPositiveButton(LocaleController.getString("OK", R.string.OK), new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialogInterface, int i) {
+                                MediaController.getInstance().stopRecording(1);
+                            }
+                        });
+                        builder.setNegativeButton(LocaleController.getString("Cancel", R.string.Cancel), new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialogInterface, int i) {
+                                MediaController.getInstance().stopRecording(0);
+                            }
+                        });
+                        Dialog visibleDialog = builder.create();
+                        visibleDialog.show();
+                        TextView textView = (TextView) visibleDialog.findViewById(android.R.id.message);
+                        Button button1 = (Button) visibleDialog.findViewById(android.R.id.button1);
+                        Button button2 = (Button) visibleDialog.findViewById(android.R.id.button2);
+                        textView.setTypeface(AndroidUtilities.getTypeface("fonts/rmedium.ttf"));
+                        button1.setTypeface(AndroidUtilities.getTypeface("fonts/rmedium.ttf"));
+                        button2.setTypeface(AndroidUtilities.getTypeface("fonts/rmedium.ttf"));
+                    } else {
+                        MediaController.getInstance().stopRecording(1);
+                    }
+                    //End Of Teleh Code
                     recordingAudio = false;
                     updateAudioRecordIntefrace();
                 } else if (motionEvent.getAction() == MotionEvent.ACTION_MOVE && recordingAudio) {
@@ -966,6 +695,7 @@ public class ChatActivityEnterView extends FrameLayout implements NotificationCe
         sendButton.setVisibility(INVISIBLE);
         sendButton.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
         sendButton.setImageResource(R.drawable.ic_send);
+        sendButton.setColorFilter(themePrefs.getInt("chatSendIconColor", themePrefs.getInt("chatEditTextIconsColor", def)), PorterDuff.Mode.SRC_IN);
         sendButton.setSoundEffectsEnabled(false);
         sendButton.setScaleX(0.1f);
         sendButton.setScaleY(0.1f);
@@ -983,6 +713,8 @@ public class ChatActivityEnterView extends FrameLayout implements NotificationCe
         keyboardHeightLand = sharedPreferences.getInt("kbd_height_land3", AndroidUtilities.dp(200));
 
         checkSendButton(false);
+        updateTheme();
+
     }
 
     @Override
@@ -1853,19 +1585,6 @@ public class ChatActivityEnterView extends FrameLayout implements NotificationCe
         updateFieldHint();
     }
 
-    public void setFieldText(CharSequence text) {
-        if (messageEditText == null) {
-            return;
-        }
-        ignoreTextChange = true;
-        messageEditText.setText(text);
-        messageEditText.setSelection(messageEditText.getText().length());
-        ignoreTextChange = false;
-        if (delegate != null) {
-            delegate.onTextChanged(messageEditText.getText(), true);
-        }
-    }
-
     public void setSelection(int start) {
         if (messageEditText == null) {
             return;
@@ -1938,6 +1657,19 @@ public class ChatActivityEnterView extends FrameLayout implements NotificationCe
         return null;
     }
 
+    public void setFieldText(CharSequence text) {
+        if (messageEditText == null) {
+            return;
+        }
+        ignoreTextChange = true;
+        messageEditText.setText(text);
+        messageEditText.setSelection(messageEditText.getText().length());
+        ignoreTextChange = false;
+        if (delegate != null) {
+            delegate.onTextChanged(messageEditText.getText(), true);
+        }
+    }
+
     public void addToAttachLayout(View view) {
         if (attachButton == null) {
             return;
@@ -1960,6 +1692,10 @@ public class ChatActivityEnterView extends FrameLayout implements NotificationCe
             if (botButton.getVisibility() != VISIBLE) {
                 botButton.setVisibility(VISIBLE);
             }
+            //Teleh//
+            SharedPreferences themePrefs = ApplicationLoader.applicationContext.getSharedPreferences(AndroidUtilities.THEME_PREFS, AndroidUtilities.THEME_PREFS_MODE);
+            int color = themePrefs.getInt("chatEditTextIconsColor", 0xffadadad);
+            //End Teleh
             if (botReplyMarkup != null) {
                 if (isPopupShowing() && currentPopupContentType == 1) {
                     botButton.setImageResource(R.drawable.ic_msg_panel_kb);
@@ -1969,6 +1705,8 @@ public class ChatActivityEnterView extends FrameLayout implements NotificationCe
             } else {
                 botButton.setImageResource(R.drawable.bot_keyboard);
             }
+            botButton.setColorFilter(color, PorterDuff.Mode.SRC_IN);
+
         } else {
             botButton.setVisibility(GONE);
         }
@@ -2171,9 +1909,50 @@ public class ChatActivityEnterView extends FrameLayout implements NotificationCe
                 }
             }
 
-            public void onStickerSelected(TLRPC.Document sticker) {
-                ChatActivityEnterView.this.onStickerSelected(sticker);
+            //Teleh Code
+            public void onStickerSelected(final TLRPC.Document sticker) {
+                SharedPreferences preferences = ApplicationLoader.applicationContext.getSharedPreferences("mainconfig", Activity.MODE_PRIVATE);
+                boolean previewSticker = preferences.getBoolean("preview_sticker", false);
+                if (previewSticker) {
+                    BackupImageView imageView = new BackupImageView(getContext());
+                    imageView.setAspectFit(true);
+                    imageView.setImage(sticker.thumb.location, null, "webp", null);
+
+                    FrameLayout container = new FrameLayout(getContext());
+                    FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+                    params.setMargins(AndroidUtilities.dp(50), AndroidUtilities.dp(50), AndroidUtilities.dp(50), AndroidUtilities.dp(50));
+                    imageView.setLayoutParams(params);
+                    container.addView(imageView);
+
+                    AlertDialog.Builder builder = new AlertDialog.Builder(getContext());
+                    builder.setTitle(LocaleController.getString("AppName", R.string.AppName));
+                    builder.setView(container);
+                    builder.setPositiveButton(LocaleController.getString("OK", R.string.OK), new DialogInterface.OnClickListener() {
+                        @Override
+                        public void onClick(DialogInterface dialogInterface, int i) {
+                            SendMessagesHelper.getInstance().sendSticker(sticker, dialog_id, replyingMessageObject);
+                        }
+                    });
+                    builder.setNegativeButton(LocaleController.getString("Cancel", R.string.Cancel), null);
+
+                    Dialog visibleDialog = builder.create();
+                    visibleDialog.show();
+                    Button button1 = (Button) visibleDialog.findViewById(android.R.id.button1);
+                    Button button2 = (Button) visibleDialog.findViewById(android.R.id.button2);
+                    button1.setTypeface(AndroidUtilities.getTypeface("fonts/rmedium.ttf"));
+                    button2.setTypeface(AndroidUtilities.getTypeface("fonts/rmedium.ttf"));
+
+                    if (delegate != null) {
+                        delegate.onMessageSend(null);
+                    }
+                } else {
+                    SendMessagesHelper.getInstance().sendSticker(sticker, dialog_id, replyingMessageObject);
+                    if (delegate != null) {
+                        delegate.onMessageSend(null);
+                    }
+                }
             }
+            //End Of Teleh Code
 
             @Override
             public void onStickersSettingsClick() {
@@ -2183,15 +1962,60 @@ public class ChatActivityEnterView extends FrameLayout implements NotificationCe
             }
 
             @Override
-            public void onGifSelected(TLRPC.Document gif) {
-                SendMessagesHelper.getInstance().sendSticker(gif, dialog_id, replyingMessageObject);
-                if ((int) dialog_id == 0) {
-                    MessagesController.getInstance().saveGif(gif);
-                }
-                if (delegate != null) {
-                    delegate.onMessageSend(null);
+            //Teleh Code
+            public void onGifSelected(final TLRPC.Document gif) {
+                SharedPreferences preferences = ApplicationLoader.applicationContext.getSharedPreferences("mainconfig", Activity.MODE_PRIVATE);
+                boolean previewSticker = preferences.getBoolean("preview_sticker", false);
+                if (previewSticker) {
+                    BackupImageView imageView = new BackupImageView(getContext());
+                    imageView.setAspectFit(true);
+                    imageView.setImage(gif.thumb.location, null, "webp", null);
+
+                    FrameLayout container = new FrameLayout(getContext());
+                    FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+                    params.setMargins(AndroidUtilities.dp(50), AndroidUtilities.dp(50), AndroidUtilities.dp(50), AndroidUtilities.dp(50));
+                    imageView.setLayoutParams(params);
+
+                    container.addView(imageView);
+
+                    AlertDialog.Builder builder = new AlertDialog.Builder(getContext());
+                    builder.setTitle(LocaleController.getString("AppName", R.string.AppName));
+                    builder.setView(container);
+                    builder.setPositiveButton(LocaleController.getString("OK", R.string.OK), new DialogInterface.OnClickListener() {
+                        @Override
+                        public void onClick(DialogInterface dialogInterface, int i) {
+                            SendMessagesHelper.getInstance().sendSticker(gif, dialog_id, replyingMessageObject);
+                            if ((int) dialog_id == 0) {
+                                MessagesController.getInstance().saveGif(gif);
+                            }
+                            if (delegate != null) {
+                                delegate.onMessageSend(null);
+                            }
+                        }
+                    });
+                    builder.setNegativeButton(LocaleController.getString("Cancel", R.string.Cancel), null);
+
+                    Dialog visibleDialog = builder.create();
+                    visibleDialog.show();
+                    Button button1 = (Button) visibleDialog.findViewById(android.R.id.button1);
+                    Button button2 = (Button) visibleDialog.findViewById(android.R.id.button2);
+                    button1.setTypeface(AndroidUtilities.getTypeface("fonts/rmedium.ttf"));
+                    button2.setTypeface(AndroidUtilities.getTypeface("fonts/rmedium.ttf"));
+
+                    if (delegate != null) {
+                        delegate.onMessageSend(null);
+                    }
+                } else {
+                    SendMessagesHelper.getInstance().sendSticker(gif, dialog_id, replyingMessageObject);
+                    if ((int) dialog_id == 0) {
+                        MessagesController.getInstance().saveGif(gif);
+                    }
+                    if (delegate != null) {
+                        delegate.onMessageSend(null);
+                    }
                 }
             }
+            //End Of Teleh Code
 
             @Override
             public void onGifTab(boolean opened) {
@@ -2596,4 +2420,407 @@ public class ChatActivityEnterView extends FrameLayout implements NotificationCe
             }
         }
     }
+
+    public void hideSendButton() {
+        FrameLayout.LayoutParams layoutParams = (FrameLayout.LayoutParams) messageEditText.getLayoutParams();
+        layoutParams.rightMargin = AndroidUtilities.dp(4);
+        messageEditText.setLayoutParams(layoutParams);
+        sendButton.clearAnimation();
+        audioSendButton.clearAnimation();
+        attachButton.clearAnimation();
+        sendButtonContainer.clearAnimation();
+        sendButton.setVisibility(GONE);
+        audioSendButton.setVisibility(GONE);
+        attachButton.setVisibility(GONE);
+        sendButtonContainer.setVisibility(GONE);
+    }
+
+    public void showSendButton() {
+        FrameLayout.LayoutParams layoutParams = (FrameLayout.LayoutParams) messageEditText.getLayoutParams();
+        layoutParams.rightMargin = AndroidUtilities.dp(50);
+        messageEditText.setLayoutParams(layoutParams);
+        sendButton.clearAnimation();
+        audioSendButton.clearAnimation();
+        attachButton.clearAnimation();
+        sendButtonContainer.clearAnimation();
+        sendButton.setVisibility(VISIBLE);
+        audioSendButton.setVisibility(VISIBLE);
+        attachButton.setVisibility(VISIBLE);
+        sendButtonContainer.setVisibility(VISIBLE);
+    }
+
+    private void updateTheme() {
+        SharedPreferences themePrefs = ApplicationLoader.applicationContext.getSharedPreferences(AndroidUtilities.THEME_PREFS, AndroidUtilities.THEME_PREFS_MODE);
+        int def = themePrefs.getInt("themeColor", AndroidUtilities.defColor);
+        //Drawable send = getResources().getDrawable(R.drawable.ic_send);
+        //send.setColorFilter(themePrefs.getInt("chatSendIconColor", themePrefs.getInt("chatEditTextIconsColor", def)), PorterDuff.Mode.SRC_IN);
+        //sendButton.setImageDrawable(send);
+        sendButton.setColorFilter(themePrefs.getInt("chatSendIconColor", themePrefs.getInt("chatEditTextIconsColor", def)), PorterDuff.Mode.SRC_IN);
+        int editTextColor = themePrefs.getInt("chatEditTextColor", 0xff000000);
+        messageEditText.setTextColor(editTextColor);
+        //AndroidUtilities.setCursorDrawableColor(messageEditText, editTextColor);
+        messageEditText.setHintTextColor(AndroidUtilities.getIntAlphaColor("chatEditTextColor", 0xff000000, 0.35f));
+        messageEditText.setTextSize(themePrefs.getInt("chatEditTextSize", 18));
+
+        int color = themePrefs.getInt("chatEditTextBGColor", 0xffffffff);
+        setBackgroundColor(color);
+        textFieldContainer.setBackgroundColor(color);
+        int val = themePrefs.getInt("chatEditTextBGGradient", 0);
+        if (val > 0) {
+            GradientDrawable.Orientation go;
+            switch (val) {
+                case 2:
+                    go = GradientDrawable.Orientation.LEFT_RIGHT;
+                    break;
+                case 3:
+                    go = GradientDrawable.Orientation.TL_BR;
+                    break;
+                case 4:
+                    go = GradientDrawable.Orientation.BL_TR;
+                    break;
+                default:
+                    go = GradientDrawable.Orientation.TOP_BOTTOM;
+            }
+            int gradColor = themePrefs.getInt("chatEditTextBGGradientColor", 0xffffffff);
+            int[] colors = new int[]{color, gradColor};
+            GradientDrawable gd = new GradientDrawable(go, colors);
+            setBackgroundDrawable(gd);
+            textFieldContainer.setBackgroundDrawable(gd);
+        }
+        recordedAudioPanel.setBackgroundColor(Color.argb(0xff, Color.red(color), Color.green(color), Color.blue(color)));
+        //recordPanel.setBackgroundColor(color);
+    }
+
+    public interface ChatActivityEnterViewDelegate {
+        void onMessageSend(CharSequence message);
+
+        void needSendTyping();
+
+        void onTextChanged(CharSequence text, boolean bigChange);
+
+        void onAttachButtonHidden();
+
+        void onAttachButtonShow();
+
+        void onWindowSizeChanged(int size);
+
+        void onStickersTab(boolean opened);
+
+        void onMessageEditEnd(boolean loading);
+    }
+
+    private class SeekBarWaveformView extends View {
+
+        private SeekBarWaveform seekBarWaveform;
+
+        public SeekBarWaveformView(Context context) {
+            super(context);
+            seekBarWaveform = new SeekBarWaveform(context);
+            seekBarWaveform.setColors(0xffa2cef8, 0xffffffff, 0xffa2cef8);
+            seekBarWaveform.setDelegate(new SeekBar.SeekBarDelegate() {
+                @Override
+                public void onSeekBarDrag(float progress) {
+                    if (audioToSendMessageObject != null) {
+                        audioToSendMessageObject.audioProgress = progress;
+                        MediaController.getInstance().seekToProgress(audioToSendMessageObject, progress);
+                    }
+                }
+            });
+        }
+
+        public void setWaveform(byte[] waveform) {
+            seekBarWaveform.setWaveform(waveform);
+            invalidate();
+        }
+
+        public void setProgress(float progress) {
+            seekBarWaveform.setProgress(progress);
+            invalidate();
+        }
+
+        public boolean isDragging() {
+            return seekBarWaveform.isDragging();
+        }
+
+        @Override
+        public boolean onTouchEvent(MotionEvent event) {
+            boolean result = seekBarWaveform.onTouch(event.getAction(), event.getX(), event.getY());
+            if (result) {
+                if (event.getAction() == MotionEvent.ACTION_DOWN) {
+                    requestDisallowInterceptTouchEvent(true);
+                }
+                invalidate();
+            }
+            return result || super.onTouchEvent(event);
+        }
+
+        @Override
+        protected void onLayout(boolean changed, int left, int top, int right, int bottom) {
+            super.onLayout(changed, left, top, right, bottom);
+            seekBarWaveform.setSize(right - left, bottom - top);
+        }
+
+        @Override
+        protected void onDraw(Canvas canvas) {
+            super.onDraw(canvas);
+            seekBarWaveform.draw(canvas);
+        }
+    }
+
+    private class EditTextCaption extends EditText {
+
+        private String caption;
+        private StaticLayout captionLayout;
+        private int userNameLength;
+        private int xOffset;
+        private int yOffset;
+        private Object editor;
+        private Field editorField;
+        private Drawable[] mCursorDrawable;
+        private Field mCursorDrawableField;
+        private int triesCount = 0;
+
+        public EditTextCaption(Context context) {
+            super(context);
+
+            try {
+                Field field = TextView.class.getDeclaredField("mEditor");
+                field.setAccessible(true);
+                editor = field.get(this);
+                Class editorClass = Class.forName("android.widget.Editor");
+                editorField = editorClass.getDeclaredField("mShowCursor");
+                editorField.setAccessible(true);
+                mCursorDrawableField = editorClass.getDeclaredField("mCursorDrawable");
+                mCursorDrawableField.setAccessible(true);
+                mCursorDrawable = (Drawable[]) mCursorDrawableField.get(editor);
+            } catch (Throwable e) {
+                //
+            }
+        }
+
+        @Override
+        public void setTypeface(Typeface tf) {
+            super.setTypeface(AndroidUtilities.getTypeface("fonts/rmedium.ttf"));
+        }
+
+        public void setCaption(String value) {
+            if ((caption == null || caption.length() == 0) && (value == null || value.length() == 0) || caption != null && value != null && caption.equals(value)) {
+                return;
+            }
+            caption = value;
+            if (caption != null) {
+                caption = caption.replace('\n', ' ');
+            }
+            requestLayout();
+        }
+
+        @SuppressLint("DrawAllocation")
+        @Override
+        protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
+            try {
+                super.onMeasure(widthMeasureSpec, heightMeasureSpec);
+            } catch (Exception e) {
+                setMeasuredDimension(MeasureSpec.getSize(widthMeasureSpec), AndroidUtilities.dp(51));
+                FileLog.e("tmessages", e);
+            }
+
+
+            captionLayout = null;
+
+            if (caption != null && caption.length() > 0) {
+                CharSequence text = getText();
+                if (text.length() > 1 && text.charAt(0) == '@') {
+                    int index = TextUtils.indexOf(text, ' ');
+                    if (index != -1) {
+                        TextPaint paint = getPaint();
+                        CharSequence str = text.subSequence(0, index + 1);
+                        int size = (int) Math.ceil(paint.measureText(text, 0, index + 1));
+                        int width = getMeasuredWidth() - getPaddingLeft() - getPaddingRight();
+                        userNameLength = str.length();
+                        CharSequence captionFinal = TextUtils.ellipsize(caption, paint, width - size, TextUtils.TruncateAt.END);
+                        xOffset = size;
+                        try {
+                            captionLayout = new StaticLayout(captionFinal, getPaint(), width - size, Layout.Alignment.ALIGN_NORMAL, 1.0f, 0.0f, false);
+                            if (captionLayout.getLineCount() > 0) {
+                                xOffset += -captionLayout.getLineLeft(0);
+                            }
+                            yOffset = (getMeasuredHeight() - captionLayout.getLineBottom(0)) / 2 + AndroidUtilities.dp(0.5f);
+                        } catch (Exception e) {
+                            FileLog.e("tmessages", e);
+                        }
+                    }
+                }
+            }
+        }
+
+        @Override
+        protected void onDraw(Canvas canvas) {
+            try {
+                super.onDraw(canvas);
+                if (captionLayout != null && userNameLength == length()) {
+                    Paint paint = getPaint();
+                    int oldColor = getPaint().getColor();
+                    paint.setColor(0xffb2b2b2);
+                    canvas.save();
+                    canvas.translate(xOffset, yOffset);
+                    captionLayout.draw(canvas);
+                    canvas.restore();
+                    paint.setColor(oldColor);
+                }
+            } catch (Exception e) {
+                FileLog.e("tmessages", e);
+            }
+
+            try {
+                if (editorField != null && mCursorDrawable != null && mCursorDrawable[0] != null) {
+                    long mShowCursor = editorField.getLong(editor);
+                    boolean showCursor = (SystemClock.uptimeMillis() - mShowCursor) % (2 * 500) < 500;
+                    if (showCursor) {
+                        canvas.save();
+                        canvas.translate(0, getPaddingTop());
+                        mCursorDrawable[0].draw(canvas);
+                        canvas.restore();
+                    }
+                }
+            } catch (Throwable e) {
+                //ignore
+            }
+        }
+
+        @Override
+        public boolean onTouchEvent(MotionEvent event) {
+            if (isPopupShowing() && event.getAction() == MotionEvent.ACTION_DOWN) {
+                showPopup(AndroidUtilities.usingHardwareInput ? 0 : 2, 0);
+                openKeyboardInternal();
+            }
+            try {
+                return super.onTouchEvent(event);
+            } catch (Exception e) {
+                FileLog.e("tmessages", e);
+            }
+            return false;
+        }
+    }
+
+    private class RecordDot extends View {
+
+        private Drawable dotDrawable;
+        private float alpha;
+        private long lastUpdateTime;
+        private boolean isIncr;
+
+        public RecordDot(Context context) {
+            super(context);
+
+            dotDrawable = getResources().getDrawable(R.drawable.rec);
+        }
+
+        public void resetAlpha() {
+            alpha = 1.0f;
+            lastUpdateTime = System.currentTimeMillis();
+            isIncr = false;
+            invalidate();
+        }
+
+        @Override
+        protected void onDraw(Canvas canvas) {
+            dotDrawable.setBounds(0, 0, AndroidUtilities.dp(11), AndroidUtilities.dp(11));
+            dotDrawable.setAlpha((int) (255 * alpha));
+            long dt = (System.currentTimeMillis() - lastUpdateTime);
+            if (!isIncr) {
+                alpha -= dt / 400.0f;
+                if (alpha <= 0) {
+                    alpha = 0;
+                    isIncr = true;
+                }
+            } else {
+                alpha += dt / 400.0f;
+                if (alpha >= 1) {
+                    alpha = 1;
+                    isIncr = false;
+                }
+            }
+            lastUpdateTime = System.currentTimeMillis();
+            dotDrawable.draw(canvas);
+            invalidate();
+        }
+    }
+
+    private class RecordCircle extends View {
+
+        private Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private Paint paintRecord = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private Drawable micDrawable;
+        private float scale;
+        private float amplitude;
+        private float animateToAmplitude;
+        private float animateAmplitudeDiff;
+        private long lastUpdateTime;
+
+        public RecordCircle(Context context) {
+            super(context);
+            //paint.setColor(0xff5795cc);
+            SharedPreferences themePrefs = ApplicationLoader.applicationContext.getSharedPreferences(AndroidUtilities.THEME_PREFS, AndroidUtilities.THEME_PREFS_MODE);
+            paint.setColor(themePrefs.getInt("themeColor", AndroidUtilities.defColor));
+            paintRecord.setColor(0x0d000000);
+            micDrawable = getResources().getDrawable(R.drawable.mic_pressed);
+        }
+
+        public void setAmplitude(double value) {
+            animateToAmplitude = (float) Math.min(100, value) / 100.0f;
+            animateAmplitudeDiff = (animateToAmplitude - amplitude) / 150.0f;
+            lastUpdateTime = System.currentTimeMillis();
+            invalidate();
+        }
+
+        public float getScale() {
+            return scale;
+        }
+
+        public void setScale(float value) {
+            scale = value;
+            invalidate();
+        }
+
+        @Override
+        protected void onDraw(Canvas canvas) {
+            int cx = getMeasuredWidth() / 2;
+            int cy = getMeasuredHeight() / 2;
+            float sc;
+            float alpha;
+            if (scale <= 0.5f) {
+                alpha = sc = scale / 0.5f;
+            } else if (scale <= 0.75f) {
+                sc = 1.0f - (scale - 0.5f) / 0.25f * 0.1f;
+                alpha = 1;
+            } else {
+                sc = 0.9f + (scale - 0.75f) / 0.25f * 0.1f;
+                alpha = 1;
+            }
+            long dt = System.currentTimeMillis() - lastUpdateTime;
+            if (animateToAmplitude != amplitude) {
+                amplitude += animateAmplitudeDiff * dt;
+                if (animateAmplitudeDiff > 0) {
+                    if (amplitude > animateToAmplitude) {
+                        amplitude = animateToAmplitude;
+                    }
+                } else {
+                    if (amplitude < animateToAmplitude) {
+                        amplitude = animateToAmplitude;
+                    }
+                }
+                invalidate();
+            }
+            lastUpdateTime = System.currentTimeMillis();
+            if (amplitude != 0) {
+                canvas.drawCircle(getMeasuredWidth() / 2.0f, getMeasuredHeight() / 2.0f, (AndroidUtilities.dp(42) + AndroidUtilities.dp(20) * amplitude) * scale, paintRecord);
+            }
+            canvas.drawCircle(getMeasuredWidth() / 2.0f, getMeasuredHeight() / 2.0f, AndroidUtilities.dp(42) * sc, paint);
+            micDrawable.setBounds(cx - micDrawable.getIntrinsicWidth() / 2, cy - micDrawable.getIntrinsicHeight() / 2, cx + micDrawable.getIntrinsicWidth() / 2, cy + micDrawable.getIntrinsicHeight() / 2);
+            micDrawable.setAlpha((int) (255 * alpha));
+            micDrawable.draw(canvas);
+        }
+    }
+
+
 }

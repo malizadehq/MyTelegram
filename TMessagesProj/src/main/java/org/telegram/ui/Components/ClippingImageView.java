@@ -82,24 +82,54 @@ public class ClippingImageView extends View {
         return clipBottom;
     }
 
+    public void setClipBottom(int value) {
+        clipBottom = value;
+        invalidate();
+    }
+
     public int getClipHorizontal() {
         return clipRight;
+    }
+
+    public void setClipHorizontal(int value) {
+        clipRight = value;
+        clipLeft = value;
+        invalidate();
     }
 
     public int getClipLeft() {
         return clipLeft;
     }
 
+    public void setClipLeft(int value) {
+        clipLeft = value;
+        invalidate();
+    }
+
     public int getClipRight() {
         return clipRight;
+    }
+
+    public void setClipRight(int value) {
+        clipRight = value;
+        invalidate();
     }
 
     public int getClipTop() {
         return clipTop;
     }
 
+    public void setClipTop(int value) {
+        clipTop = value;
+        invalidate();
+    }
+
     public int getRadius() {
         return radius;
+    }
+
+    public void setRadius(int value) {
+        radius = value;
     }
 
     public void onDraw(Canvas canvas) {
@@ -165,32 +195,6 @@ public class ClippingImageView extends View {
         }
     }
 
-    public void setClipBottom(int value) {
-        clipBottom = value;
-        invalidate();
-    }
-
-    public void setClipHorizontal(int value) {
-        clipRight = value;
-        clipLeft = value;
-        invalidate();
-    }
-
-    public void setClipLeft(int value) {
-        clipLeft = value;
-        invalidate();
-    }
-
-    public void setClipRight(int value) {
-        clipRight = value;
-        invalidate();
-    }
-
-    public void setClipTop(int value) {
-        clipTop = value;
-        invalidate();
-    }
-
     public void setClipVertical(int value) {
         clipBottom = value;
         clipTop = value;
@@ -215,9 +219,5 @@ public class ClippingImageView extends View {
 
     public void setNeedRadius(boolean value) {
         needRadius = value;
-    }
-
-    public void setRadius(int value) {
-        radius = value;
     }
 }

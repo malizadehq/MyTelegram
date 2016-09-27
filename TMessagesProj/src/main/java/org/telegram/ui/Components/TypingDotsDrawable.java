@@ -8,6 +8,7 @@
 
 package org.telegram.ui.Components;
 
+import android.content.SharedPreferences;
 import android.graphics.Canvas;
 import android.graphics.ColorFilter;
 import android.graphics.Paint;
@@ -15,23 +16,26 @@ import android.graphics.drawable.Drawable;
 import android.view.animation.DecelerateInterpolator;
 
 import org.telegram.messenger.AndroidUtilities;
+import org.telegram.messenger.ApplicationLoader;
 import org.telegram.messenger.NotificationCenter;
-import org.telegram.ui.ActionBar.Theme;
 
 public class TypingDotsDrawable extends Drawable {
 
     private boolean isChat = false;
     private Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private float[] scales = new float[3];
-    private float[] startTimes = new float[] {0, 150, 300};
-    private float[] elapsedTimes = new float[] {0, 0, 0};
+    private float[] startTimes = new float[]{0, 150, 300};
+    private float[] elapsedTimes = new float[]{0, 0, 0};
     private long lastUpdateTime = 0;
     private boolean started = false;
     private DecelerateInterpolator decelerateInterpolator = new DecelerateInterpolator();
 
     public TypingDotsDrawable() {
         super();
-        paint.setColor(Theme.ACTION_BAR_SUBTITLE_COLOR);
+        //  paint.setColor(Theme.ACTION_BAR_SUBTITLE_COLOR);
+        SharedPreferences themePrefs = ApplicationLoader.applicationContext.getSharedPreferences(AndroidUtilities.THEME_PREFS, AndroidUtilities.THEME_PREFS_MODE);
+        paint.setColor(themePrefs.getInt("chatTypingColor", themePrefs.getInt("chatStatusColor", AndroidUtilities.getIntDarkerColor("themeColor", -0x40))));
+
     }
 
     public void setIsChat(boolean value) {

@@ -27,10 +27,6 @@ public class SizeNotifierFrameLayout extends FrameLayout {
     private int bottomClip;
     private SizeNotifierFrameLayoutDelegate delegate;
 
-    public interface SizeNotifierFrameLayoutDelegate {
-        void onSizeChanged(int keyboardHeight, boolean isWidthGreater);
-    }
-
     public SizeNotifierFrameLayout(Context context) {
         super(context);
         setWillNotDraw(false);
@@ -44,12 +40,12 @@ public class SizeNotifierFrameLayout extends FrameLayout {
         }
     }
 
-    public void setBackgroundImage(Drawable bitmap) {
-        backgroundDrawable = bitmap;
-    }
-
     public Drawable getBackgroundImage() {
         return backgroundDrawable;
+    }
+
+    public void setBackgroundImage(Drawable bitmap) {
+        backgroundDrawable = bitmap;
     }
 
     public void setDelegate(SizeNotifierFrameLayoutDelegate delegate) {
@@ -122,5 +118,9 @@ public class SizeNotifierFrameLayout extends FrameLayout {
         } else {
             super.onDraw(canvas);
         }
+    }
+
+    public interface SizeNotifierFrameLayoutDelegate {
+        void onSizeChanged(int keyboardHeight, boolean isWidthGreater);
     }
 }

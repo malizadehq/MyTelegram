@@ -21,24 +21,19 @@ import java.util.concurrent.CopyOnWriteArrayList;
 @SuppressLint("NewApi")
 public class ForegroundDetector implements Application.ActivityLifecycleCallbacks {
 
-    public interface Listener {
-        void onBecameForeground();
-        void onBecameBackground();
-    }
-
+    private static ForegroundDetector Instance = null;
     private int refs;
     private boolean wasInBackground = true;
     private long enterBackgroundTime = 0;
     private CopyOnWriteArrayList<Listener> listeners = new CopyOnWriteArrayList<>();
-    private static ForegroundDetector Instance = null;
-
-    public static ForegroundDetector getInstance() {
-        return Instance;
-    }
 
     public ForegroundDetector(Application application) {
         Instance = this;
         application.registerActivityLifecycleCallbacks(this);
+    }
+
+    public static ForegroundDetector getInstance() {
+        return Instance;
     }
 
     public boolean isForeground() {
@@ -119,5 +114,11 @@ public class ForegroundDetector implements Application.ActivityLifecycleCallback
 
     @Override
     public void onActivityDestroyed(Activity activity) {
+    }
+
+    public interface Listener {
+        void onBecameForeground();
+
+        void onBecameBackground();
     }
 }

@@ -77,7 +77,7 @@ public class TimerDrawable extends Drawable {
 
         timeWidth = timePaint.measureText(timeString);
         try {
-            timeLayout = new StaticLayout(timeString, timePaint, (int)Math.ceil(timeWidth), Layout.Alignment.ALIGN_NORMAL, 1.0f, 0.0f, false);
+            timeLayout = new StaticLayout(timeString, timePaint, (int) Math.ceil(timeWidth), Layout.Alignment.ALIGN_NORMAL, 1.0f, 0.0f, false);
             timeHeight = timeLayout.getHeight();
         } catch (Exception e) {
             timeLayout = null;
@@ -108,7 +108,7 @@ public class TimerDrawable extends Drawable {
             if (AndroidUtilities.density == 3) {
                 xOffxet = -1;
             }
-            canvas.translate((int)(width / 2 - Math.ceil(timeWidth / 2)) + xOffxet, (height - timeHeight) / 2);
+            canvas.translate((int) (width / 2 - Math.ceil(timeWidth / 2)) + xOffxet, (height - timeHeight) / 2);
             timeLayout.draw(canvas);
         }
     }

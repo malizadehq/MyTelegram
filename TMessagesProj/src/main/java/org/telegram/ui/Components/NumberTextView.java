@@ -38,16 +38,16 @@ public class NumberTextView extends View {
         super(context);
     }
 
+    public float getProgress() {
+        return progress;
+    }
+
     public void setProgress(float value) {
         if (progress == value) {
             return;
         }
         progress = value;
         invalidate();
-    }
-
-    public float getProgress() {
-        return progress;
     }
 
     public void setNumber(int number, boolean animated) {

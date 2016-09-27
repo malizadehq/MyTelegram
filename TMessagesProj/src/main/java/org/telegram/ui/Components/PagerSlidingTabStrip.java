@@ -26,36 +26,23 @@ import org.telegram.messenger.AndroidUtilities;
 
 public class PagerSlidingTabStrip extends HorizontalScrollView {
 
-    public interface IconTabProvider {
-        int getPageIconResId(int position);
-    }
-
-    private LinearLayout.LayoutParams defaultTabLayoutParams;
-
     private final PageListener pageListener = new PageListener();
     public OnPageChangeListener delegatePageListener;
-
+    private LinearLayout.LayoutParams defaultTabLayoutParams;
     private LinearLayout tabsContainer;
     private ViewPager pager;
-
     private int tabCount;
-
     private int currentPosition = 0;
     private float currentPositionOffset = 0f;
-
     private Paint rectPaint;
-
     private int indicatorColor = 0xff666666;
     private int underlineColor = 0x1a000000;
-
     private boolean shouldExpand = false;
-
     private int scrollOffset = AndroidUtilities.dp(52);
     private int indicatorHeight = AndroidUtilities.dp(8);
     private int underlineHeight = AndroidUtilities.dp(2);
     private int dividerPadding = AndroidUtilities.dp(12);
     private int tabPadding = AndroidUtilities.dp(24);
-
     private int lastScrollX = 0;
 
     public PagerSlidingTabStrip(Context context) {
@@ -199,6 +186,104 @@ public class PagerSlidingTabStrip extends HorizontalScrollView {
         canvas.drawRect(lineLeft, height - indicatorHeight, lineRight, height, rectPaint);
     }
 
+    public void onSizeChanged(int paramInt1, int paramInt2, int paramInt3, int paramInt4) {
+        if (!shouldExpand) {
+            post(new Runnable() {
+                public void run() {
+                    PagerSlidingTabStrip.this.notifyDataSetChanged();
+                }
+            });
+        }
+    }
+
+    public void setIndicatorColorResource(int resId) {
+        this.indicatorColor = getResources().getColor(resId);
+        invalidate();
+    }
+
+    public int getIndicatorColor() {
+        return this.indicatorColor;
+    }
+
+    public void setIndicatorColor(int indicatorColor) {
+        this.indicatorColor = indicatorColor;
+        invalidate();
+    }
+
+    public int getIndicatorHeight() {
+        return indicatorHeight;
+    }
+
+    public void setIndicatorHeight(int indicatorLineHeightPx) {
+        this.indicatorHeight = indicatorLineHeightPx;
+        invalidate();
+    }
+
+    public void setUnderlineColorResource(int resId) {
+        this.underlineColor = getResources().getColor(resId);
+        invalidate();
+    }
+
+    public int getUnderlineColor() {
+        return underlineColor;
+    }
+
+    public void setUnderlineColor(int underlineColor) {
+        this.underlineColor = underlineColor;
+        invalidate();
+    }
+
+    public int getUnderlineHeight() {
+        return underlineHeight;
+    }
+
+    public void setUnderlineHeight(int underlineHeightPx) {
+        this.underlineHeight = underlineHeightPx;
+        invalidate();
+    }
+
+    public int getDividerPadding() {
+        return dividerPadding;
+    }
+
+    public void setDividerPadding(int dividerPaddingPx) {
+        this.dividerPadding = dividerPaddingPx;
+        invalidate();
+    }
+
+    public int getScrollOffset() {
+        return scrollOffset;
+    }
+
+    public void setScrollOffset(int scrollOffsetPx) {
+        this.scrollOffset = scrollOffsetPx;
+        invalidate();
+    }
+
+    public boolean getShouldExpand() {
+        return shouldExpand;
+    }
+
+    public void setShouldExpand(boolean shouldExpand) {
+        this.shouldExpand = shouldExpand;
+        tabsContainer.setLayoutParams(new FrameLayout.LayoutParams(-1, -1));
+        updateTabStyles();
+        requestLayout();
+    }
+
+    public int getTabPaddingLeftRight() {
+        return tabPadding;
+    }
+
+    public void setTabPaddingLeftRight(int paddingPx) {
+        this.tabPadding = paddingPx;
+        updateTabStyles();
+    }
+
+    public interface IconTabProvider {
+        int getPageIconResId(int position);
+    }
+
     private class PageListener implements OnPageChangeListener {
 
         @Override
@@ -231,99 +316,5 @@ public class PagerSlidingTabStrip extends HorizontalScrollView {
                 tabsContainer.getChildAt(a).setSelected(a == position);
             }
         }
-    }
-
-    public void onSizeChanged(int paramInt1, int paramInt2, int paramInt3, int paramInt4) {
-        if (!shouldExpand) {
-            post(new Runnable() {
-                public void run() {
-                    PagerSlidingTabStrip.this.notifyDataSetChanged();
-                }
-            });
-        }
-    }
-
-    public void setIndicatorColor(int indicatorColor) {
-        this.indicatorColor = indicatorColor;
-        invalidate();
-    }
-
-    public void setIndicatorColorResource(int resId) {
-        this.indicatorColor = getResources().getColor(resId);
-        invalidate();
-    }
-
-    public int getIndicatorColor() {
-        return this.indicatorColor;
-    }
-
-    public void setIndicatorHeight(int indicatorLineHeightPx) {
-        this.indicatorHeight = indicatorLineHeightPx;
-        invalidate();
-    }
-
-    public int getIndicatorHeight() {
-        return indicatorHeight;
-    }
-
-    public void setUnderlineColor(int underlineColor) {
-        this.underlineColor = underlineColor;
-        invalidate();
-    }
-
-    public void setUnderlineColorResource(int resId) {
-        this.underlineColor = getResources().getColor(resId);
-        invalidate();
-    }
-
-    public int getUnderlineColor() {
-        return underlineColor;
-    }
-
-    public void setUnderlineHeight(int underlineHeightPx) {
-        this.underlineHeight = underlineHeightPx;
-        invalidate();
-    }
-
-    public int getUnderlineHeight() {
-        return underlineHeight;
-    }
-
-    public void setDividerPadding(int dividerPaddingPx) {
-        this.dividerPadding = dividerPaddingPx;
-        invalidate();
-    }
-
-    public int getDividerPadding() {
-        return dividerPadding;
-    }
-
-    public void setScrollOffset(int scrollOffsetPx) {
-        this.scrollOffset = scrollOffsetPx;
-        invalidate();
-    }
-
-    public int getScrollOffset() {
-        return scrollOffset;
-    }
-
-    public void setShouldExpand(boolean shouldExpand) {
-        this.shouldExpand = shouldExpand;
-        tabsContainer.setLayoutParams(new FrameLayout.LayoutParams(-1, -1));
-        updateTabStyles();
-        requestLayout();
-    }
-
-    public boolean getShouldExpand() {
-        return shouldExpand;
-    }
-
-    public void setTabPaddingLeftRight(int paddingPx) {
-        this.tabPadding = paddingPx;
-        updateTabStyles();
-    }
-
-    public int getTabPaddingLeftRight() {
-        return tabPadding;
     }
 }

@@ -20,6 +20,7 @@ import org.telegram.ui.ActionBar.Theme;
 
 public class SendingFileDrawable extends Drawable {
 
+    private static DecelerateInterpolator decelerateInterpolator = null;
     private float radOffset = 0;
     private float currentProgress = 0;
     private float animationProgressStart = 0;
@@ -30,7 +31,6 @@ public class SendingFileDrawable extends Drawable {
     private Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private long lastUpdateTime = 0;
     private boolean started = false;
-    private static DecelerateInterpolator decelerateInterpolator = null;
 
     public SendingFileDrawable() {
         super();

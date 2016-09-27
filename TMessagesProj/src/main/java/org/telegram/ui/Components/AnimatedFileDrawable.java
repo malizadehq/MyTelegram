@@ -32,14 +32,13 @@ import java.util.concurrent.ThreadPoolExecutor;
 
 public class AnimatedFileDrawable extends BitmapDrawable implements Animatable {
 
-    private static native int createDecoder(String src, int[] params);
-    private static native void destroyDecoder(int ptr);
-    private static native int getVideoFrame(int ptr, Bitmap bitmap, int[] params);
-
+    private static final Handler uiHandler = new Handler(Looper.getMainLooper());
+    private static ScheduledThreadPoolExecutor executor = new ScheduledThreadPoolExecutor(2, new ThreadPoolExecutor.DiscardPolicy());
+    private final int[] metaData = new int[3];
+    private final android.graphics.Rect dstRect = new android.graphics.Rect();
     private long lastFrameTime;
     private int lastTimeStamp;
     private int invalidateAfter = 50;
-    private final int[] metaData = new int[3];
     private Runnable loadFrameTask;
     private Bitmap renderingBitmap;
     private Bitmap nextRenderingBitmap;
@@ -61,16 +60,11 @@ public class AnimatedFileDrawable extends BitmapDrawable implements Animatable {
     private float scaleX = 1.0f;
     private float scaleY = 1.0f;
     private boolean applyTransformation;
-    private final android.graphics.Rect dstRect = new android.graphics.Rect();
-    private static final Handler uiHandler = new Handler(Looper.getMainLooper());
     private volatile boolean isRunning;
     private volatile boolean isRecycled;
     private volatile int nativePtr;
-    private static ScheduledThreadPoolExecutor executor = new ScheduledThreadPoolExecutor(2, new ThreadPoolExecutor.DiscardPolicy());
-
     private View parentView = null;
     private View secondParentView = null;
-
     protected final Runnable mInvalidateTask = new Runnable() {
         @Override
         public void run() {
@@ -81,7 +75,16 @@ public class AnimatedFileDrawable extends BitmapDrawable implements Animatable {
             }
         }
     };
-
+    private final Runnable mStartTask = new Runnable() {
+        @Override
+        public void run() {
+            if (secondParentView != null) {
+                secondParentView.invalidate();
+            } else if (parentView != null) {
+                parentView.invalidate();
+            }
+        }
+    };
     private Runnable uiRunnable = new Runnable() {
         @Override
         public void run() {
@@ -113,7 +116,6 @@ public class AnimatedFileDrawable extends BitmapDrawable implements Animatable {
             }
         }
     };
-
     private Runnable loadFrameRunnable = new Runnable() {
         @Override
         public void run() {
@@ -144,22 +146,25 @@ public class AnimatedFileDrawable extends BitmapDrawable implements Animatable {
         }
     };
 
-    private final Runnable mStartTask = new Runnable() {
-        @Override
-        public void run() {
-            if (secondParentView != null) {
-                secondParentView.invalidate();
-            } else if (parentView != null) {
-                parentView.invalidate();
-            }
-        }
-    };
-
     public AnimatedFileDrawable(File file, boolean createDecoder) {
         path = file;
         if (createDecoder) {
             nativePtr = createDecoder(file.getAbsolutePath(), metaData);
             decoderCreated = true;
+        }
+    }
+
+    private static native int createDecoder(String src, int[] params);
+
+    private static native void destroyDecoder(int ptr);
+
+    private static native int getVideoFrame(int ptr, Bitmap bitmap, int[] params);
+
+    protected static void runOnUiThread(Runnable task) {
+        if (Looper.myLooper() == uiHandler.getLooper()) {
+            task.run();
+        } else {
+            uiHandler.post(task);
         }
     }
 
@@ -200,14 +205,6 @@ public class AnimatedFileDrawable extends BitmapDrawable implements Animatable {
         if (renderingBitmap != null) {
             renderingBitmap.recycle();
             renderingBitmap = null;
-        }
-    }
-
-    protected static void runOnUiThread(Runnable task) {
-        if (Looper.myLooper() == uiHandler.getLooper()) {
-            task.run();
-        } else {
-            uiHandler.post(task);
         }
     }
 

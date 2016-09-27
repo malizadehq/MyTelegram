@@ -20,7 +20,8 @@ import android.content.Context;
 import android.content.DialogInterface;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
-import android.graphics.*;
+import android.graphics.Bitmap;
+import android.graphics.Canvas;
 import android.graphics.Rect;
 import android.graphics.drawable.Drawable;
 import android.os.Build;
@@ -42,16 +43,16 @@ import android.widget.TextView;
 import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.AnimatorListenerAdapterProxy;
 import org.telegram.messenger.ApplicationLoader;
-import org.telegram.messenger.MessagesController;
 import org.telegram.messenger.ContactsController;
 import org.telegram.messenger.FileLog;
 import org.telegram.messenger.LocaleController;
 import org.telegram.messenger.MediaController;
 import org.telegram.messenger.MessageObject;
+import org.telegram.messenger.MessagesController;
 import org.telegram.messenger.NotificationCenter;
+import org.telegram.messenger.R;
 import org.telegram.messenger.query.SearchQuery;
 import org.telegram.messenger.support.widget.LinearLayoutManager;
-import org.telegram.messenger.R;
 import org.telegram.messenger.support.widget.RecyclerView;
 import org.telegram.tgnet.TLRPC;
 import org.telegram.ui.ActionBar.BottomSheet;
@@ -67,17 +68,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 
 public class ChatAttachAlert extends BottomSheet implements NotificationCenter.NotificationCenterDelegate, PhotoViewer.PhotoViewerProvider, BottomSheet.BottomSheetDelegateInterface {
-
-    public interface ChatAttachViewDelegate {
-        void didPressedButton(int button);
-        View getRevealView();
-        void didSelectBot(TLRPC.User user);
-    }
-
-    private class InnerAnimator {
-        private AnimatorSet animatorSet;
-        private float startRadius;
-    }
 
     private LinearLayoutManager attachPhotoLayoutManager;
     private PhotoAttachAdapter photoAttachAdapter;
@@ -95,217 +85,20 @@ public class ChatAttachAlert extends BottomSheet implements NotificationCenter.N
     private ListAdapter adapter;
     private TextView hintTextView;
     private ArrayList<InnerAnimator> innerAnimators = new ArrayList<>();
-
     private AnimatorSet currentHintAnimation;
     private boolean hintShowed;
     private Runnable hideHintRunnable;
-
     private boolean deviceHasGoodCamera = false;//Build.VERSION.SDK_INT >= 16;
-
     private DecelerateInterpolator decelerateInterpolator = new DecelerateInterpolator();
-
     private boolean loading = true;
-
     private ChatAttachViewDelegate delegate;
-
     private int scrollOffsetY;
     private boolean ignoreLayout;
-
     private boolean useRevealAnimation;
     private float revealRadius;
     private int revealX;
     private int revealY;
     private boolean revealAnimationInProgress;
-
-    private class AttachButton extends FrameLayout {
-
-        private TextView textView;
-        private ImageView imageView;
-
-        public AttachButton(Context context) {
-            super(context);
-
-            imageView = new ImageView(context);
-            imageView.setScaleType(ImageView.ScaleType.CENTER);
-            addView(imageView, LayoutHelper.createFrame(64, 64, Gravity.CENTER_HORIZONTAL | Gravity.TOP));
-
-            textView = new TextView(context);
-            textView.setLines(1);
-            textView.setSingleLine(true);
-            textView.setGravity(Gravity.CENTER_HORIZONTAL);
-            textView.setEllipsize(TextUtils.TruncateAt.END);
-            textView.setTextColor(Theme.ATTACH_SHEET_TEXT_COLOR);
-            textView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 12);
-            addView(textView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.LEFT | Gravity.TOP, 0, 64, 0, 0));
-        }
-
-        @Override
-        protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
-            super.onMeasure(MeasureSpec.makeMeasureSpec(AndroidUtilities.dp(85), MeasureSpec.EXACTLY), MeasureSpec.makeMeasureSpec(AndroidUtilities.dp(90), MeasureSpec.EXACTLY));
-        }
-
-        public void setTextAndIcon(CharSequence text, Drawable drawable) {
-            textView.setText(text);
-            imageView.setBackgroundDrawable(drawable);
-        }
-
-        @Override
-        public boolean hasOverlappingRendering() {
-            return false;
-        }
-    }
-
-    private class AttachBotButton extends FrameLayout {
-
-        private BackupImageView imageView;
-        private TextView nameTextView;
-        private AvatarDrawable avatarDrawable = new AvatarDrawable();
-        private boolean pressed;
-
-        private boolean checkingForLongPress = false;
-        private CheckForLongPress pendingCheckForLongPress = null;
-        private int pressCount = 0;
-        private CheckForTap pendingCheckForTap = null;
-
-        private TLRPC.User currentUser;
-
-        private final class CheckForTap implements Runnable {
-            public void run() {
-                if (pendingCheckForLongPress == null) {
-                    pendingCheckForLongPress = new CheckForLongPress();
-                }
-                pendingCheckForLongPress.currentPressCount = ++pressCount;
-                postDelayed(pendingCheckForLongPress, ViewConfiguration.getLongPressTimeout() - ViewConfiguration.getTapTimeout());
-            }
-        }
-
-        class CheckForLongPress implements Runnable {
-            public int currentPressCount;
-
-            public void run() {
-                if (checkingForLongPress && getParent() != null && currentPressCount == pressCount) {
-                    checkingForLongPress = false;
-                    performHapticFeedback(HapticFeedbackConstants.LONG_PRESS);
-                    onLongPress();
-                    MotionEvent event = MotionEvent.obtain(0, 0, MotionEvent.ACTION_CANCEL, 0, 0, 0);
-                    onTouchEvent(event);
-                    event.recycle();
-                }
-            }
-        }
-
-        public AttachBotButton(Context context) {
-            super(context);
-
-            imageView = new BackupImageView(context);
-            imageView.setRoundRadius(AndroidUtilities.dp(27));
-            addView(imageView, LayoutHelper.createFrame(54, 54, Gravity.TOP | Gravity.CENTER_HORIZONTAL, 0, 7, 0, 0));
-
-            nameTextView = new TextView(context);
-            nameTextView.setTextColor(Theme.ATTACH_SHEET_TEXT_COLOR);
-            nameTextView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 12);
-            nameTextView.setMaxLines(2);
-            nameTextView.setGravity(Gravity.TOP | Gravity.CENTER_HORIZONTAL);
-            nameTextView.setLines(2);
-            nameTextView.setEllipsize(TextUtils.TruncateAt.END);
-            addView(nameTextView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.LEFT | Gravity.TOP, 6, 65, 6, 0));
-        }
-
-        @Override
-        protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
-            super.onMeasure(MeasureSpec.makeMeasureSpec(AndroidUtilities.dp(85), MeasureSpec.EXACTLY), MeasureSpec.makeMeasureSpec(AndroidUtilities.dp(100), MeasureSpec.EXACTLY));
-        }
-
-        private void onLongPress() {
-            if (baseFragment == null || currentUser == null) {
-                return;
-            }
-            AlertDialog.Builder builder = new AlertDialog.Builder(getContext());
-            builder.setTitle(LocaleController.getString("AppName", R.string.AppName));
-            builder.setMessage(LocaleController.formatString("ChatHintsDelete", R.string.ChatHintsDelete, ContactsController.formatName(currentUser.first_name, currentUser.last_name)));
-            builder.setPositiveButton(LocaleController.getString("OK", R.string.OK), new DialogInterface.OnClickListener() {
-                @Override
-                public void onClick(DialogInterface dialogInterface, int i) {
-                    SearchQuery.removeInline(currentUser.id);
-                }
-            });
-            builder.setNegativeButton(LocaleController.getString("Cancel", R.string.Cancel), null);
-            builder.show();
-        }
-
-        public void setUser(TLRPC.User user) {
-            if (user == null) {
-                return;
-            }
-            currentUser = user;
-            TLRPC.FileLocation photo = null;
-            nameTextView.setText(ContactsController.formatName(user.first_name, user.last_name));
-            avatarDrawable.setInfo(user);
-            if (user != null && user.photo != null) {
-                photo = user.photo.photo_small;
-            }
-            imageView.setImage(photo, "50_50", avatarDrawable);
-            requestLayout();
-        }
-
-        @Override
-        public boolean onTouchEvent(MotionEvent event) {
-            boolean result = false;
-
-            if (event.getAction() == MotionEvent.ACTION_DOWN) {
-                pressed = true;
-                invalidate();
-                result = true;
-            } else if (pressed) {
-                if (event.getAction() == MotionEvent.ACTION_UP) {
-                    getParent().requestDisallowInterceptTouchEvent(true);
-                    pressed = false;
-                    playSoundEffect(SoundEffectConstants.CLICK);
-                    delegate.didSelectBot(MessagesController.getInstance().getUser(SearchQuery.inlineBots.get((Integer) getTag()).peer.user_id));
-                    setUseRevealAnimation(false);
-                    dismiss();
-                    setUseRevealAnimation(true);
-                    invalidate();
-                } else if (event.getAction() == MotionEvent.ACTION_CANCEL) {
-                    pressed = false;
-                    invalidate();
-                }
-            }
-            if (!result) {
-                result = super.onTouchEvent(event);
-            } else {
-                if (event.getAction() == MotionEvent.ACTION_DOWN) {
-                    startCheckLongPress();
-                }
-            }
-            if (event.getAction() != MotionEvent.ACTION_DOWN && event.getAction() != MotionEvent.ACTION_MOVE) {
-                cancelCheckLongPress();
-            }
-
-            return result;
-        }
-
-        protected void startCheckLongPress() {
-            if (checkingForLongPress) {
-                return;
-            }
-            checkingForLongPress = true;
-            if (pendingCheckForTap == null) {
-                pendingCheckForTap = new CheckForTap();
-            }
-            postDelayed(pendingCheckForTap, ViewConfiguration.getTapTimeout());
-        }
-
-        protected void cancelCheckLongPress() {
-            checkingForLongPress = false;
-            if (pendingCheckForLongPress != null) {
-                removeCallbacks(pendingCheckForLongPress);
-            }
-            if (pendingCheckForTap != null) {
-                removeCallbacks(pendingCheckForTap);
-            }
-        }
-    }
 
     public ChatAttachAlert(Context context) {
         super(context, false);
@@ -949,6 +742,420 @@ public class ChatAttachAlert extends BottomSheet implements NotificationCenter.N
 
     }
 
+    private void setUseRevealAnimation(boolean value) {
+        if (!value || value && Build.VERSION.SDK_INT >= 18 && !AndroidUtilities.isTablet()) {
+            useRevealAnimation = value;
+        }
+    }
+
+    protected float getRevealRadius() {
+        return revealRadius;
+    }
+
+    @SuppressLint("NewApi")
+    protected void setRevealRadius(float radius) {
+        revealRadius = radius;
+        if (Build.VERSION.SDK_INT <= 19) {
+            containerView.invalidate();
+        }
+        if (!isDismissed()) {
+            for (int a = 0; a < innerAnimators.size(); a++) {
+                InnerAnimator innerAnimator = innerAnimators.get(a);
+                if (innerAnimator.startRadius > radius) {
+                    continue;
+                }
+                innerAnimator.animatorSet.start();
+                innerAnimators.remove(a);
+                a--;
+            }
+        }
+    }
+
+    @SuppressLint("NewApi")
+    private void startRevealAnimation(final boolean open) {
+        containerView.setTranslationY(0);
+
+        final AnimatorSet animatorSet = new AnimatorSet();
+
+        View view = delegate.getRevealView();
+        if (view.getVisibility() == View.VISIBLE && ((ViewGroup) view.getParent()).getVisibility() == View.VISIBLE) {
+            final int coords[] = new int[2];
+            view.getLocationInWindow(coords);
+            float top;
+            if (Build.VERSION.SDK_INT <= 19) {
+                top = AndroidUtilities.displaySize.y - containerView.getMeasuredHeight() - AndroidUtilities.statusBarHeight;
+            } else {
+                top = containerView.getY();
+            }
+            revealX = coords[0] + view.getMeasuredWidth() / 2;
+            revealY = (int) (coords[1] + view.getMeasuredHeight() / 2 - top);
+            if (Build.VERSION.SDK_INT <= 19) {
+                revealY -= AndroidUtilities.statusBarHeight;
+            }
+        } else {
+            revealX = AndroidUtilities.displaySize.x / 2 + backgroundPaddingLeft;
+            revealY = (int) (AndroidUtilities.displaySize.y - containerView.getY());
+        }
+
+        int corners[][] = new int[][]{
+                {0, 0},
+                {0, AndroidUtilities.dp(304)},
+                {containerView.getMeasuredWidth(), 0},
+                {containerView.getMeasuredWidth(), AndroidUtilities.dp(304)}
+        };
+        int finalRevealRadius = 0;
+        int y = revealY - scrollOffsetY + backgroundPaddingTop;
+        for (int a = 0; a < 4; a++) {
+            finalRevealRadius = Math.max(finalRevealRadius, (int) Math.ceil(Math.sqrt((revealX - corners[a][0]) * (revealX - corners[a][0]) + (y - corners[a][1]) * (y - corners[a][1]))));
+        }
+        int finalRevealX = revealX <= containerView.getMeasuredWidth() ? revealX : containerView.getMeasuredWidth();
+
+        ArrayList<Animator> animators = new ArrayList<>(3);
+        animators.add(ObjectAnimator.ofFloat(this, "revealRadius", open ? 0 : finalRevealRadius, open ? finalRevealRadius : 0));
+        animators.add(ObjectAnimator.ofInt(backDrawable, "alpha", open ? 51 : 0));
+        if (Build.VERSION.SDK_INT >= 21) {
+            containerView.setElevation(AndroidUtilities.dp(10));
+            try {
+                animators.add(ViewAnimationUtils.createCircularReveal(containerView, finalRevealX, revealY, open ? 0 : finalRevealRadius, open ? finalRevealRadius : 0));
+            } catch (Exception e) {
+                FileLog.e("tmessages", e);
+            }
+            animatorSet.setDuration(320);
+        } else {
+            if (!open) {
+                animatorSet.setDuration(200);
+                containerView.setPivotX(revealX <= containerView.getMeasuredWidth() ? revealX : containerView.getMeasuredWidth());
+                containerView.setPivotY(revealY);
+                animators.add(ObjectAnimator.ofFloat(containerView, "scaleX", 0.0f));
+                animators.add(ObjectAnimator.ofFloat(containerView, "scaleY", 0.0f));
+                animators.add(ObjectAnimator.ofFloat(containerView, "alpha", 0.0f));
+            } else {
+                animatorSet.setDuration(250);
+                containerView.setScaleX(1);
+                containerView.setScaleY(1);
+                containerView.setAlpha(1);
+                if (Build.VERSION.SDK_INT <= 19) {
+                    animatorSet.setStartDelay(20);
+                }
+            }
+        }
+        animatorSet.playTogether(animators);
+        animatorSet.addListener(new AnimatorListenerAdapter() {
+            public void onAnimationEnd(Animator animation) {
+                if (currentSheetAnimation != null && currentSheetAnimation.equals(animation)) {
+                    currentSheetAnimation = null;
+                    onRevealAnimationEnd(open);
+                    containerView.invalidate();
+                    containerView.setLayerType(View.LAYER_TYPE_NONE, null);
+                    if (!open) {
+                        containerView.setVisibility(View.INVISIBLE);
+                        try {
+                            dismissInternal();
+                        } catch (Exception e) {
+                            FileLog.e("tmessages", e);
+                        }
+                    }
+                }
+            }
+
+            @Override
+            public void onAnimationCancel(Animator animation) {
+                if (currentSheetAnimation != null && animatorSet.equals(animation)) {
+                    currentSheetAnimation = null;
+                }
+            }
+        });
+
+        if (open) {
+            innerAnimators.clear();
+            NotificationCenter.getInstance().setAllowedNotificationsDutingAnimation(new int[]{NotificationCenter.dialogsNeedReload});
+            NotificationCenter.getInstance().setAnimationInProgress(true);
+            revealAnimationInProgress = true;
+
+            int count = Build.VERSION.SDK_INT <= 19 ? 11 : 8;
+            for (int a = 0; a < count; a++) {
+                if (Build.VERSION.SDK_INT <= 19) {
+                    if (a < 8) {
+                        views[a].setScaleX(0.1f);
+                        views[a].setScaleY(0.1f);
+                    }
+                    views[a].setAlpha(0.0f);
+                } else {
+                    views[a].setScaleX(0.7f);
+                    views[a].setScaleY(0.7f);
+                }
+
+                InnerAnimator innerAnimator = new InnerAnimator();
+
+                int buttonX = views[a].getLeft() + views[a].getMeasuredWidth() / 2;
+                int buttonY = views[a].getTop() + attachView.getTop() + views[a].getMeasuredHeight() / 2;
+                float dist = (float) Math.sqrt((revealX - buttonX) * (revealX - buttonX) + (revealY - buttonY) * (revealY - buttonY));
+                float vecX = (revealX - buttonX) / dist;
+                float vecY = (revealY - buttonY) / dist;
+                views[a].setPivotX(views[a].getMeasuredWidth() / 2 + vecX * AndroidUtilities.dp(20));
+                views[a].setPivotY(views[a].getMeasuredHeight() / 2 + vecY * AndroidUtilities.dp(20));
+                innerAnimator.startRadius = dist - AndroidUtilities.dp(27 * 3);
+
+                views[a].setTag(R.string.AppName, 1);
+                animators = new ArrayList<>();
+                final AnimatorSet animatorSetInner;
+                if (a < 8) {
+                    animators.add(ObjectAnimator.ofFloat(views[a], "scaleX", 0.7f, 1.05f));
+                    animators.add(ObjectAnimator.ofFloat(views[a], "scaleY", 0.7f, 1.05f));
+
+                    animatorSetInner = new AnimatorSet();
+                    animatorSetInner.playTogether(
+                            ObjectAnimator.ofFloat(views[a], "scaleX", 1.0f),
+                            ObjectAnimator.ofFloat(views[a], "scaleY", 1.0f));
+                    animatorSetInner.setDuration(100);
+                    animatorSetInner.setInterpolator(decelerateInterpolator);
+                } else {
+                    animatorSetInner = null;
+                }
+                if (Build.VERSION.SDK_INT <= 19) {
+                    animators.add(ObjectAnimator.ofFloat(views[a], "alpha", 1.0f));
+                }
+                innerAnimator.animatorSet = new AnimatorSet();
+                innerAnimator.animatorSet.playTogether(animators);
+                innerAnimator.animatorSet.setDuration(150);
+                innerAnimator.animatorSet.setInterpolator(decelerateInterpolator);
+                innerAnimator.animatorSet.addListener(new AnimatorListenerAdapter() {
+                    @Override
+                    public void onAnimationEnd(Animator animation) {
+                        if (animatorSetInner != null) {
+                            animatorSetInner.start();
+                        }
+                    }
+                });
+                innerAnimators.add(innerAnimator);
+            }
+        }
+        currentSheetAnimation = animatorSet;
+        animatorSet.start();
+    }
+
+    @Override
+    protected boolean onCustomOpenAnimation() {
+        if (useRevealAnimation) {
+            startRevealAnimation(true);
+            return true;
+        }
+        return false;
+    }
+
+    @Override
+    protected boolean onCustomCloseAnimation() {
+        if (useRevealAnimation) {
+            backDrawable.setAlpha(51);
+            startRevealAnimation(false);
+            return true;
+        }
+        return false;
+    }
+
+    public interface ChatAttachViewDelegate {
+        void didPressedButton(int button);
+
+        View getRevealView();
+
+        void didSelectBot(TLRPC.User user);
+    }
+
+    private class InnerAnimator {
+        private AnimatorSet animatorSet;
+        private float startRadius;
+    }
+
+    private class AttachButton extends FrameLayout {
+
+        private TextView textView;
+        private ImageView imageView;
+
+        public AttachButton(Context context) {
+            super(context);
+
+            imageView = new ImageView(context);
+            imageView.setScaleType(ImageView.ScaleType.CENTER);
+            addView(imageView, LayoutHelper.createFrame(64, 64, Gravity.CENTER_HORIZONTAL | Gravity.TOP));
+
+            textView = new TextView(context);
+            textView.setLines(1);
+            textView.setSingleLine(true);
+            textView.setGravity(Gravity.CENTER_HORIZONTAL);
+            textView.setEllipsize(TextUtils.TruncateAt.END);
+            textView.setTextColor(Theme.ATTACH_SHEET_TEXT_COLOR);
+            textView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 12);
+            addView(textView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.LEFT | Gravity.TOP, 0, 64, 0, 0));
+        }
+
+        @Override
+        protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
+            super.onMeasure(MeasureSpec.makeMeasureSpec(AndroidUtilities.dp(85), MeasureSpec.EXACTLY), MeasureSpec.makeMeasureSpec(AndroidUtilities.dp(90), MeasureSpec.EXACTLY));
+        }
+
+        public void setTextAndIcon(CharSequence text, Drawable drawable) {
+            textView.setText(text);
+            imageView.setBackgroundDrawable(drawable);
+        }
+
+        @Override
+        public boolean hasOverlappingRendering() {
+            return false;
+        }
+    }
+
+    private class AttachBotButton extends FrameLayout {
+
+        private BackupImageView imageView;
+        private TextView nameTextView;
+        private AvatarDrawable avatarDrawable = new AvatarDrawable();
+        private boolean pressed;
+
+        private boolean checkingForLongPress = false;
+        private CheckForLongPress pendingCheckForLongPress = null;
+        private int pressCount = 0;
+        private CheckForTap pendingCheckForTap = null;
+
+        private TLRPC.User currentUser;
+
+        public AttachBotButton(Context context) {
+            super(context);
+
+            imageView = new BackupImageView(context);
+            imageView.setRoundRadius(AndroidUtilities.dp(27));
+            addView(imageView, LayoutHelper.createFrame(54, 54, Gravity.TOP | Gravity.CENTER_HORIZONTAL, 0, 7, 0, 0));
+
+            nameTextView = new TextView(context);
+            nameTextView.setTextColor(Theme.ATTACH_SHEET_TEXT_COLOR);
+            nameTextView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 12);
+            nameTextView.setMaxLines(2);
+            nameTextView.setGravity(Gravity.TOP | Gravity.CENTER_HORIZONTAL);
+            nameTextView.setLines(2);
+            nameTextView.setEllipsize(TextUtils.TruncateAt.END);
+            addView(nameTextView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.LEFT | Gravity.TOP, 6, 65, 6, 0));
+        }
+
+        @Override
+        protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
+            super.onMeasure(MeasureSpec.makeMeasureSpec(AndroidUtilities.dp(85), MeasureSpec.EXACTLY), MeasureSpec.makeMeasureSpec(AndroidUtilities.dp(100), MeasureSpec.EXACTLY));
+        }
+
+        private void onLongPress() {
+            if (baseFragment == null || currentUser == null) {
+                return;
+            }
+            AlertDialog.Builder builder = new AlertDialog.Builder(getContext());
+            builder.setTitle(LocaleController.getString("AppName", R.string.AppName));
+            builder.setMessage(LocaleController.formatString("ChatHintsDelete", R.string.ChatHintsDelete, ContactsController.formatName(currentUser.first_name, currentUser.last_name)));
+            builder.setPositiveButton(LocaleController.getString("OK", R.string.OK), new DialogInterface.OnClickListener() {
+                @Override
+                public void onClick(DialogInterface dialogInterface, int i) {
+                    SearchQuery.removeInline(currentUser.id);
+                }
+            });
+            builder.setNegativeButton(LocaleController.getString("Cancel", R.string.Cancel), null);
+            builder.show();
+        }
+
+        public void setUser(TLRPC.User user) {
+            if (user == null) {
+                return;
+            }
+            currentUser = user;
+            TLRPC.FileLocation photo = null;
+            nameTextView.setText(ContactsController.formatName(user.first_name, user.last_name));
+            avatarDrawable.setInfo(user);
+            if (user != null && user.photo != null) {
+                photo = user.photo.photo_small;
+            }
+            imageView.setImage(photo, "50_50", avatarDrawable);
+            requestLayout();
+        }
+
+        @Override
+        public boolean onTouchEvent(MotionEvent event) {
+            boolean result = false;
+
+            if (event.getAction() == MotionEvent.ACTION_DOWN) {
+                pressed = true;
+                invalidate();
+                result = true;
+            } else if (pressed) {
+                if (event.getAction() == MotionEvent.ACTION_UP) {
+                    getParent().requestDisallowInterceptTouchEvent(true);
+                    pressed = false;
+                    playSoundEffect(SoundEffectConstants.CLICK);
+                    delegate.didSelectBot(MessagesController.getInstance().getUser(SearchQuery.inlineBots.get((Integer) getTag()).peer.user_id));
+                    setUseRevealAnimation(false);
+                    dismiss();
+                    setUseRevealAnimation(true);
+                    invalidate();
+                } else if (event.getAction() == MotionEvent.ACTION_CANCEL) {
+                    pressed = false;
+                    invalidate();
+                }
+            }
+            if (!result) {
+                result = super.onTouchEvent(event);
+            } else {
+                if (event.getAction() == MotionEvent.ACTION_DOWN) {
+                    startCheckLongPress();
+                }
+            }
+            if (event.getAction() != MotionEvent.ACTION_DOWN && event.getAction() != MotionEvent.ACTION_MOVE) {
+                cancelCheckLongPress();
+            }
+
+            return result;
+        }
+
+        protected void startCheckLongPress() {
+            if (checkingForLongPress) {
+                return;
+            }
+            checkingForLongPress = true;
+            if (pendingCheckForTap == null) {
+                pendingCheckForTap = new CheckForTap();
+            }
+            postDelayed(pendingCheckForTap, ViewConfiguration.getTapTimeout());
+        }
+
+        protected void cancelCheckLongPress() {
+            checkingForLongPress = false;
+            if (pendingCheckForLongPress != null) {
+                removeCallbacks(pendingCheckForLongPress);
+            }
+            if (pendingCheckForTap != null) {
+                removeCallbacks(pendingCheckForTap);
+            }
+        }
+
+        private final class CheckForTap implements Runnable {
+            public void run() {
+                if (pendingCheckForLongPress == null) {
+                    pendingCheckForLongPress = new CheckForLongPress();
+                }
+                pendingCheckForLongPress.currentPressCount = ++pressCount;
+                postDelayed(pendingCheckForLongPress, ViewConfiguration.getLongPressTimeout() - ViewConfiguration.getTapTimeout());
+            }
+        }
+
+        class CheckForLongPress implements Runnable {
+            public int currentPressCount;
+
+            public void run() {
+                if (checkingForLongPress && getParent() != null && currentPressCount == pressCount) {
+                    checkingForLongPress = false;
+                    performHapticFeedback(HapticFeedbackConstants.LONG_PRESS);
+                    onLongPress();
+                    MotionEvent event = MotionEvent.obtain(0, 0, MotionEvent.ACTION_CANCEL, 0, 0, 0);
+                    onTouchEvent(event);
+                    event.recycle();
+                }
+            }
+        }
+    }
+
     private class Holder extends RecyclerView.ViewHolder {
 
         public Holder(View itemView) {
@@ -1136,216 +1343,5 @@ public class ChatAttachAlert extends BottomSheet implements NotificationCenter.N
             }
             return 0;
         }
-    }
-
-    private void setUseRevealAnimation(boolean value) {
-        if (!value || value && Build.VERSION.SDK_INT >= 18 && !AndroidUtilities.isTablet()) {
-            useRevealAnimation = value;
-        }
-    }
-
-    @SuppressLint("NewApi")
-    protected void setRevealRadius(float radius) {
-        revealRadius = radius;
-        if (Build.VERSION.SDK_INT <= 19) {
-            containerView.invalidate();
-        }
-        if (!isDismissed()) {
-            for (int a = 0; a < innerAnimators.size(); a++) {
-                InnerAnimator innerAnimator = innerAnimators.get(a);
-                if (innerAnimator.startRadius > radius) {
-                    continue;
-                }
-                innerAnimator.animatorSet.start();
-                innerAnimators.remove(a);
-                a--;
-            }
-        }
-    }
-
-    protected float getRevealRadius() {
-        return revealRadius;
-    }
-
-    @SuppressLint("NewApi")
-    private void startRevealAnimation(final boolean open) {
-        containerView.setTranslationY(0);
-
-        final AnimatorSet animatorSet = new AnimatorSet();
-
-        View view = delegate.getRevealView();
-        if (view.getVisibility() == View.VISIBLE && ((ViewGroup) view.getParent()).getVisibility() == View.VISIBLE) {
-            final int coords[] = new int[2];
-            view.getLocationInWindow(coords);
-            float top;
-            if (Build.VERSION.SDK_INT <= 19) {
-                top = AndroidUtilities.displaySize.y - containerView.getMeasuredHeight() - AndroidUtilities.statusBarHeight;
-            } else {
-                top = containerView.getY();
-            }
-            revealX = coords[0] + view.getMeasuredWidth() / 2;
-            revealY = (int) (coords[1] + view.getMeasuredHeight() / 2 - top);
-            if (Build.VERSION.SDK_INT <= 19) {
-                revealY -= AndroidUtilities.statusBarHeight;
-            }
-        } else {
-            revealX = AndroidUtilities.displaySize.x / 2 + backgroundPaddingLeft;
-            revealY = (int) (AndroidUtilities.displaySize.y - containerView.getY());
-        }
-
-        int corners[][] = new int[][]{
-                {0, 0},
-                {0, AndroidUtilities.dp(304)},
-                {containerView.getMeasuredWidth(), 0},
-                {containerView.getMeasuredWidth(), AndroidUtilities.dp(304)}
-        };
-        int finalRevealRadius = 0;
-        int y = revealY - scrollOffsetY + backgroundPaddingTop;
-        for (int a = 0; a < 4; a++) {
-            finalRevealRadius = Math.max(finalRevealRadius, (int) Math.ceil(Math.sqrt((revealX - corners[a][0]) * (revealX - corners[a][0]) + (y - corners[a][1]) * (y - corners[a][1]))));
-        }
-        int finalRevealX = revealX <= containerView.getMeasuredWidth() ? revealX : containerView.getMeasuredWidth();
-
-        ArrayList<Animator> animators = new ArrayList<>(3);
-        animators.add(ObjectAnimator.ofFloat(this, "revealRadius", open ? 0 : finalRevealRadius, open ? finalRevealRadius : 0));
-        animators.add(ObjectAnimator.ofInt(backDrawable, "alpha", open ? 51 : 0));
-        if (Build.VERSION.SDK_INT >= 21) {
-            containerView.setElevation(AndroidUtilities.dp(10));
-            try {
-                animators.add(ViewAnimationUtils.createCircularReveal(containerView, finalRevealX, revealY, open ? 0 : finalRevealRadius, open ? finalRevealRadius : 0));
-            } catch (Exception e) {
-                FileLog.e("tmessages", e);
-            }
-            animatorSet.setDuration(320);
-        } else {
-            if (!open) {
-                animatorSet.setDuration(200);
-                containerView.setPivotX(revealX <= containerView.getMeasuredWidth() ? revealX : containerView.getMeasuredWidth());
-                containerView.setPivotY(revealY);
-                animators.add(ObjectAnimator.ofFloat(containerView, "scaleX", 0.0f));
-                animators.add(ObjectAnimator.ofFloat(containerView, "scaleY", 0.0f));
-                animators.add(ObjectAnimator.ofFloat(containerView, "alpha", 0.0f));
-            } else {
-                animatorSet.setDuration(250);
-                containerView.setScaleX(1);
-                containerView.setScaleY(1);
-                containerView.setAlpha(1);
-                if (Build.VERSION.SDK_INT <= 19) {
-                    animatorSet.setStartDelay(20);
-                }
-            }
-        }
-        animatorSet.playTogether(animators);
-        animatorSet.addListener(new AnimatorListenerAdapter() {
-            public void onAnimationEnd(Animator animation) {
-                if (currentSheetAnimation != null && currentSheetAnimation.equals(animation)) {
-                    currentSheetAnimation = null;
-                    onRevealAnimationEnd(open);
-                    containerView.invalidate();
-                    containerView.setLayerType(View.LAYER_TYPE_NONE, null);
-                    if (!open) {
-                        containerView.setVisibility(View.INVISIBLE);
-                        try {
-                            dismissInternal();
-                        } catch (Exception e) {
-                            FileLog.e("tmessages", e);
-                        }
-                    }
-                }
-            }
-
-            @Override
-            public void onAnimationCancel(Animator animation) {
-                if (currentSheetAnimation != null && animatorSet.equals(animation)) {
-                    currentSheetAnimation = null;
-                }
-            }
-        });
-
-        if (open) {
-            innerAnimators.clear();
-            NotificationCenter.getInstance().setAllowedNotificationsDutingAnimation(new int[]{NotificationCenter.dialogsNeedReload});
-            NotificationCenter.getInstance().setAnimationInProgress(true);
-            revealAnimationInProgress = true;
-
-            int count = Build.VERSION.SDK_INT <= 19 ? 11 : 8;
-            for (int a = 0; a < count; a++) {
-                if (Build.VERSION.SDK_INT <= 19) {
-                    if (a < 8) {
-                        views[a].setScaleX(0.1f);
-                        views[a].setScaleY(0.1f);
-                    }
-                    views[a].setAlpha(0.0f);
-                } else {
-                    views[a].setScaleX(0.7f);
-                    views[a].setScaleY(0.7f);
-                }
-
-                InnerAnimator innerAnimator = new InnerAnimator();
-
-                int buttonX = views[a].getLeft() + views[a].getMeasuredWidth() / 2;
-                int buttonY = views[a].getTop() + attachView.getTop() + views[a].getMeasuredHeight() / 2;
-                float dist = (float) Math.sqrt((revealX - buttonX) * (revealX - buttonX) + (revealY - buttonY) * (revealY - buttonY));
-                float vecX = (revealX - buttonX) / dist;
-                float vecY = (revealY - buttonY) / dist;
-                views[a].setPivotX(views[a].getMeasuredWidth() / 2 + vecX * AndroidUtilities.dp(20));
-                views[a].setPivotY(views[a].getMeasuredHeight() / 2 + vecY * AndroidUtilities.dp(20));
-                innerAnimator.startRadius = dist - AndroidUtilities.dp(27 * 3);
-
-                views[a].setTag(R.string.AppName, 1);
-                animators = new ArrayList<>();
-                final AnimatorSet animatorSetInner;
-                if (a < 8) {
-                    animators.add(ObjectAnimator.ofFloat(views[a], "scaleX", 0.7f, 1.05f));
-                    animators.add(ObjectAnimator.ofFloat(views[a], "scaleY", 0.7f, 1.05f));
-
-                    animatorSetInner = new AnimatorSet();
-                    animatorSetInner.playTogether(
-                            ObjectAnimator.ofFloat(views[a], "scaleX", 1.0f),
-                            ObjectAnimator.ofFloat(views[a], "scaleY", 1.0f));
-                    animatorSetInner.setDuration(100);
-                    animatorSetInner.setInterpolator(decelerateInterpolator);
-                } else {
-                    animatorSetInner = null;
-                }
-                if (Build.VERSION.SDK_INT <= 19) {
-                    animators.add(ObjectAnimator.ofFloat(views[a], "alpha", 1.0f));
-                }
-                innerAnimator.animatorSet = new AnimatorSet();
-                innerAnimator.animatorSet.playTogether(animators);
-                innerAnimator.animatorSet.setDuration(150);
-                innerAnimator.animatorSet.setInterpolator(decelerateInterpolator);
-                innerAnimator.animatorSet.addListener(new AnimatorListenerAdapter() {
-                    @Override
-                    public void onAnimationEnd(Animator animation) {
-                        if (animatorSetInner != null) {
-                            animatorSetInner.start();
-                        }
-                    }
-                });
-                innerAnimators.add(innerAnimator);
-            }
-        }
-        currentSheetAnimation = animatorSet;
-        animatorSet.start();
-    }
-
-    @Override
-    protected boolean onCustomOpenAnimation() {
-        if (useRevealAnimation) {
-            startRevealAnimation(true);
-            return true;
-        }
-        return false;
-    }
-
-    @Override
-    protected boolean onCustomCloseAnimation() {
-        if (useRevealAnimation) {
-            backDrawable.setAlpha(51);
-            startRevealAnimation(false);
-            return true;
-        }
-        return false;
     }
 }

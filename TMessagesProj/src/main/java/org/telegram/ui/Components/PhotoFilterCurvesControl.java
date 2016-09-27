@@ -23,41 +23,29 @@ import java.util.Locale;
 
 public class PhotoFilterCurvesControl extends View {
 
-    public interface PhotoFilterCurvesControlDelegate {
-        void valueChanged();
-    }
-
     private final static int CurvesSegmentNone = 0;
     private final static int CurvesSegmentBlacks = 1;
     private final static int CurvesSegmentShadows = 2;
     private final static int CurvesSegmentMidtones = 3;
     private final static int CurvesSegmentHighlights = 4;
     private final static int CurvesSegmentWhites = 5;
-
     private final static int GestureStateBegan = 1;
     private final static int GestureStateChanged = 2;
     private final static int GestureStateEnded = 3;
     private final static int GestureStateCancelled = 4;
     private final static int GestureStateFailed = 5;
-
     private int activeSegment = CurvesSegmentNone;
-
     private boolean isMoving;
     private boolean checkForMoving = true;
-
     private float lastX;
     private float lastY;
-
     private Rect actualArea = new Rect();
-
     private Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private Paint paintDash = new Paint(Paint.ANTI_ALIAS_FLAG);
     private Paint paintCurve = new Paint(Paint.ANTI_ALIAS_FLAG);
     private TextPaint textPaint = new TextPaint(Paint.ANTI_ALIAS_FLAG);
     private Path path = new Path();
-
     private PhotoFilterCurvesControlDelegate delegate;
-
     private PhotoFilterView.CurvesToolValue curveValue;
 
     public PhotoFilterCurvesControl(Context context, PhotoFilterView.CurvesToolValue value) {
@@ -80,6 +68,7 @@ public class PhotoFilterCurvesControl extends View {
 
         textPaint.setColor(0xffbfbfbf);
         textPaint.setTextSize(AndroidUtilities.dp(13));
+        textPaint.setTypeface(AndroidUtilities.getTypeface("fonts/rmedium.ttf"));
     }
 
     public void setDelegate(PhotoFilterCurvesControlDelegate photoFilterCurvesControlDelegate) {
@@ -318,5 +307,9 @@ public class PhotoFilterCurvesControl extends View {
         }
 
         canvas.drawPath(path, paintCurve);
+    }
+
+    public interface PhotoFilterCurvesControlDelegate {
+        void valueChanged();
     }
 }

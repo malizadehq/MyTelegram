@@ -20,17 +20,17 @@ import android.os.Bundle;
 import android.provider.MediaStore;
 
 import org.telegram.messenger.AndroidUtilities;
-import org.telegram.messenger.ImageLoader;
-import org.telegram.messenger.MediaController;
-import org.telegram.tgnet.TLRPC;
 import org.telegram.messenger.FileLoader;
 import org.telegram.messenger.FileLog;
+import org.telegram.messenger.ImageLoader;
+import org.telegram.messenger.MediaController;
 import org.telegram.messenger.NotificationCenter;
 import org.telegram.messenger.UserConfig;
+import org.telegram.tgnet.TLRPC;
+import org.telegram.ui.ActionBar.BaseFragment;
 import org.telegram.ui.LaunchActivity;
 import org.telegram.ui.PhotoAlbumPickerActivity;
 import org.telegram.ui.PhotoCropActivity;
-import org.telegram.ui.ActionBar.BaseFragment;
 import org.telegram.ui.PhotoViewer;
 
 import java.io.File;
@@ -39,18 +39,14 @@ import java.util.ArrayList;
 public class AvatarUpdater implements NotificationCenter.NotificationCenterDelegate, PhotoCropActivity.PhotoEditActivityDelegate {
 
     public String currentPicturePath;
-    private TLRPC.PhotoSize smallPhoto;
-    private TLRPC.PhotoSize bigPhoto;
     public String uploadingAvatar = null;
-    File picturePath = null;
     public BaseFragment parentFragment = null;
     public AvatarUpdaterDelegate delegate;
-    private boolean clearAfterUpdate = false;
     public boolean returnOnly = false;
-
-    public interface AvatarUpdaterDelegate {
-        void didUploadedPhoto(TLRPC.InputFile file, TLRPC.PhotoSize small, TLRPC.PhotoSize big);
-    }
+    File picturePath = null;
+    private TLRPC.PhotoSize smallPhoto;
+    private TLRPC.PhotoSize bigPhoto;
+    private boolean clearAfterUpdate = false;
 
     public void clear() {
         if (uploadingAvatar != null) {
@@ -113,7 +109,7 @@ public class AvatarUpdater implements NotificationCenter.NotificationCenterDeleg
 
     private void startCrop(String path, Uri uri) {
         try {
-            LaunchActivity activity = (LaunchActivity)parentFragment.getParentActivity();
+            LaunchActivity activity = (LaunchActivity) parentFragment.getParentActivity();
             if (activity == null) {
                 return;
             }
@@ -141,7 +137,7 @@ public class AvatarUpdater implements NotificationCenter.NotificationCenterDeleg
                 try {
                     ExifInterface ei = new ExifInterface(currentPicturePath);
                     int exif = ei.getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL);
-                    switch(exif) {
+                    switch (exif) {
                         case ExifInterface.ORIENTATION_ROTATE_90:
                             orientation = 90;
                             break;
@@ -212,12 +208,12 @@ public class AvatarUpdater implements NotificationCenter.NotificationCenterDeleg
     @Override
     public void didReceivedNotification(int id, final Object... args) {
         if (id == NotificationCenter.FileDidUpload) {
-            String location = (String)args[0];
+            String location = (String) args[0];
             if (uploadingAvatar != null && location.equals(uploadingAvatar)) {
                 NotificationCenter.getInstance().removeObserver(AvatarUpdater.this, NotificationCenter.FileDidUpload);
                 NotificationCenter.getInstance().removeObserver(AvatarUpdater.this, NotificationCenter.FileDidFailUpload);
                 if (delegate != null) {
-                    delegate.didUploadedPhoto((TLRPC.InputFile)args[1], smallPhoto, bigPhoto);
+                    delegate.didUploadedPhoto((TLRPC.InputFile) args[1], smallPhoto, bigPhoto);
                 }
                 uploadingAvatar = null;
                 if (clearAfterUpdate) {
@@ -226,7 +222,7 @@ public class AvatarUpdater implements NotificationCenter.NotificationCenterDeleg
                 }
             }
         } else if (id == NotificationCenter.FileDidFailUpload) {
-            String location = (String)args[0];
+            String location = (String) args[0];
             if (uploadingAvatar != null && location.equals(uploadingAvatar)) {
                 NotificationCenter.getInstance().removeObserver(AvatarUpdater.this, NotificationCenter.FileDidUpload);
                 NotificationCenter.getInstance().removeObserver(AvatarUpdater.this, NotificationCenter.FileDidFailUpload);
@@ -237,5 +233,9 @@ public class AvatarUpdater implements NotificationCenter.NotificationCenterDeleg
                 }
             }
         }
+    }
+
+    public interface AvatarUpdaterDelegate {
+        void didUploadedPhoto(TLRPC.InputFile file, TLRPC.PhotoSize small, TLRPC.PhotoSize big);
     }
 }

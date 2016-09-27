@@ -48,353 +48,21 @@ import android.widget.RelativeLayout;
 import android.widget.TextView;
 
 import org.telegram.messenger.AndroidUtilities;
-import org.telegram.messenger.LocaleController;
-import org.telegram.messenger.NotificationCenter;
+import org.telegram.messenger.AnimatorListenerAdapterProxy;
 import org.telegram.messenger.ApplicationLoader;
 import org.telegram.messenger.FileLog;
+import org.telegram.messenger.LocaleController;
+import org.telegram.messenger.NotificationCenter;
 import org.telegram.messenger.R;
 import org.telegram.messenger.UserConfig;
-import org.telegram.messenger.AnimatorListenerAdapterProxy;
 
 import java.util.ArrayList;
 import java.util.Locale;
 
 public class PasscodeView extends FrameLayout {
 
-    public interface PasscodeViewDelegate {
-        void didAcceptedPassword();
-    }
-
-    private class AnimatingTextView extends FrameLayout {
-
-        private ArrayList<TextView> characterTextViews;
-        private ArrayList<TextView> dotTextViews;
-        private StringBuilder stringBuilder;
-        private String DOT = "\u2022";
-        private AnimatorSet currentAnimation;
-        private Runnable dotRunnable;
-
-        public AnimatingTextView(Context context) {
-            super(context);
-            characterTextViews = new ArrayList<>(4);
-            dotTextViews = new ArrayList<>(4);
-            stringBuilder = new StringBuilder(4);
-
-            for (int a = 0; a < 4; a++) {
-                TextView textView = new TextView(context);
-                textView.setTextColor(0xffffffff);
-                textView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 36);
-                textView.setGravity(Gravity.CENTER);
-                textView.setAlpha(0);
-                textView.setPivotX(AndroidUtilities.dp(25));
-                textView.setPivotY(AndroidUtilities.dp(25));
-                addView(textView);
-                LayoutParams layoutParams = (LayoutParams) textView.getLayoutParams();
-                layoutParams.width = AndroidUtilities.dp(50);
-                layoutParams.height = AndroidUtilities.dp(50);
-                layoutParams.gravity = Gravity.TOP | Gravity.LEFT;
-                textView.setLayoutParams(layoutParams);
-                characterTextViews.add(textView);
-
-                textView = new TextView(context);
-                textView.setTextColor(0xffffffff);
-                textView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 36);
-                textView.setGravity(Gravity.CENTER);
-                textView.setAlpha(0);
-                textView.setText(DOT);
-                textView.setPivotX(AndroidUtilities.dp(25));
-                textView.setPivotY(AndroidUtilities.dp(25));
-                addView(textView);
-                layoutParams = (LayoutParams) textView.getLayoutParams();
-                layoutParams.width = AndroidUtilities.dp(50);
-                layoutParams.height = AndroidUtilities.dp(50);
-                layoutParams.gravity = Gravity.TOP | Gravity.LEFT;
-                textView.setLayoutParams(layoutParams);
-                dotTextViews.add(textView);
-            }
-        }
-
-        private int getXForTextView(int pos) {
-            return (getMeasuredWidth() - stringBuilder.length() * AndroidUtilities.dp(30)) / 2 + pos * AndroidUtilities.dp(30) - AndroidUtilities.dp(10);
-        }
-
-        public void appendCharacter(String c) {
-            if (stringBuilder.length() == 4) {
-                return;
-            }
-            try {
-                performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);
-            } catch (Exception e) {
-                FileLog.e("tmessages", e);
-            }
-
-
-            ArrayList<Animator> animators = new ArrayList<>();
-            final int newPos = stringBuilder.length();
-            stringBuilder.append(c);
-
-            TextView textView = characterTextViews.get(newPos);
-            textView.setText(c);
-            textView.setTranslationX(getXForTextView(newPos));
-            animators.add(ObjectAnimator.ofFloat(textView, "scaleX", 0, 1));
-            animators.add(ObjectAnimator.ofFloat(textView, "scaleY", 0, 1));
-            animators.add(ObjectAnimator.ofFloat(textView, "alpha", 0, 1));
-            animators.add(ObjectAnimator.ofFloat(textView, "translationY", AndroidUtilities.dp(20), 0));
-            textView = dotTextViews.get(newPos);
-            textView.setTranslationX(getXForTextView(newPos));
-            textView.setAlpha(0);
-            animators.add(ObjectAnimator.ofFloat(textView, "scaleX", 0, 1));
-            animators.add(ObjectAnimator.ofFloat(textView, "scaleY", 0, 1));
-            animators.add(ObjectAnimator.ofFloat(textView, "translationY", AndroidUtilities.dp(20), 0));
-
-            for (int a = newPos + 1; a < 4; a++) {
-                textView = characterTextViews.get(a);
-                if (textView.getAlpha() != 0) {
-                    animators.add(ObjectAnimator.ofFloat(textView, "scaleX", 0));
-                    animators.add(ObjectAnimator.ofFloat(textView, "scaleY", 0));
-                    animators.add(ObjectAnimator.ofFloat(textView, "alpha", 0));
-                }
-
-                textView = dotTextViews.get(a);
-                if (textView.getAlpha() != 0) {
-                    animators.add(ObjectAnimator.ofFloat(textView, "scaleX", 0));
-                    animators.add(ObjectAnimator.ofFloat(textView, "scaleY", 0));
-                    animators.add(ObjectAnimator.ofFloat(textView, "alpha", 0));
-                }
-            }
-
-            if (dotRunnable != null) {
-                AndroidUtilities.cancelRunOnUIThread(dotRunnable);
-            }
-            dotRunnable = new Runnable() {
-                @Override
-                public void run() {
-                    if (dotRunnable != this) {
-                        return;
-                    }
-                    ArrayList<Animator> animators = new ArrayList<>();
-
-                    TextView textView = characterTextViews.get(newPos);
-                    animators.add(ObjectAnimator.ofFloat(textView, "scaleX", 0));
-                    animators.add(ObjectAnimator.ofFloat(textView, "scaleY", 0));
-                    animators.add(ObjectAnimator.ofFloat(textView, "alpha", 0));
-                    textView = dotTextViews.get(newPos);
-                    animators.add(ObjectAnimator.ofFloat(textView, "scaleX", 1));
-                    animators.add(ObjectAnimator.ofFloat(textView, "scaleY", 1));
-                    animators.add(ObjectAnimator.ofFloat(textView, "alpha", 1));
-
-                    currentAnimation = new AnimatorSet();
-                    currentAnimation.setDuration(150);
-                    currentAnimation.playTogether(animators);
-                    currentAnimation.addListener(new AnimatorListenerAdapterProxy() {
-                        @Override
-                        public void onAnimationEnd(Animator animation) {
-                            if (currentAnimation != null && currentAnimation.equals(animation)) {
-                                currentAnimation = null;
-                            }
-                        }
-                    });
-                    currentAnimation.start();
-                }
-            };
-            AndroidUtilities.runOnUIThread(dotRunnable, 1500);
-
-            for (int a = 0; a < newPos; a++) {
-                textView = characterTextViews.get(a);
-                animators.add(ObjectAnimator.ofFloat(textView, "translationX", getXForTextView(a)));
-                animators.add(ObjectAnimator.ofFloat(textView, "scaleX", 0));
-                animators.add(ObjectAnimator.ofFloat(textView, "scaleY", 0));
-                animators.add(ObjectAnimator.ofFloat(textView, "alpha", 0));
-                animators.add(ObjectAnimator.ofFloat(textView, "translationY", 0));
-                textView = dotTextViews.get(a);
-                animators.add(ObjectAnimator.ofFloat(textView, "translationX", getXForTextView(a)));
-                animators.add(ObjectAnimator.ofFloat(textView, "scaleX", 1));
-                animators.add(ObjectAnimator.ofFloat(textView, "scaleY", 1));
-                animators.add(ObjectAnimator.ofFloat(textView, "alpha", 1));
-                animators.add(ObjectAnimator.ofFloat(textView, "translationY", 0));
-            }
-
-            if (currentAnimation != null) {
-                currentAnimation.cancel();
-            }
-            currentAnimation = new AnimatorSet();
-            currentAnimation.setDuration(150);
-            currentAnimation.playTogether(animators);
-            currentAnimation.addListener(new AnimatorListenerAdapterProxy() {
-                @Override
-                public void onAnimationEnd(Animator animation) {
-                    if (currentAnimation != null && currentAnimation.equals(animation)) {
-                        currentAnimation = null;
-                    }
-                }
-            });
-            currentAnimation.start();
-        }
-
-        public String getString() {
-            return stringBuilder.toString();
-        }
-
-        public int lenght() {
-            return stringBuilder.length();
-        }
-
-        public void eraseLastCharacter() {
-            if (stringBuilder.length() == 0) {
-                return;
-            }
-            try {
-                performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);
-            } catch (Exception e) {
-                FileLog.e("tmessages", e);
-            }
-
-            ArrayList<Animator> animators = new ArrayList<>();
-            int deletingPos = stringBuilder.length() - 1;
-            if (deletingPos != 0) {
-                stringBuilder.deleteCharAt(deletingPos);
-            }
-
-            for (int a = deletingPos; a < 4; a++) {
-                TextView textView = characterTextViews.get(a);
-                if (textView.getAlpha() != 0) {
-                    animators.add(ObjectAnimator.ofFloat(textView, "scaleX", 0));
-                    animators.add(ObjectAnimator.ofFloat(textView, "scaleY", 0));
-                    animators.add(ObjectAnimator.ofFloat(textView, "alpha", 0));
-                    animators.add(ObjectAnimator.ofFloat(textView, "translationY", 0));
-                    animators.add(ObjectAnimator.ofFloat(textView, "translationX", getXForTextView(a)));
-                }
-
-                textView = dotTextViews.get(a);
-                if (textView.getAlpha() != 0) {
-                    animators.add(ObjectAnimator.ofFloat(textView, "scaleX", 0));
-                    animators.add(ObjectAnimator.ofFloat(textView, "scaleY", 0));
-                    animators.add(ObjectAnimator.ofFloat(textView, "alpha", 0));
-                    animators.add(ObjectAnimator.ofFloat(textView, "translationY", 0));
-                    animators.add(ObjectAnimator.ofFloat(textView, "translationX", getXForTextView(a)));
-                }
-            }
-
-            if (deletingPos == 0) {
-                stringBuilder.deleteCharAt(deletingPos);
-            }
-
-            for (int a = 0; a < deletingPos; a++) {
-                TextView textView = characterTextViews.get(a);
-                animators.add(ObjectAnimator.ofFloat(textView, "translationX", getXForTextView(a)));
-                textView = dotTextViews.get(a);
-                animators.add(ObjectAnimator.ofFloat(textView, "translationX", getXForTextView(a)));
-            }
-
-            if (dotRunnable != null) {
-                AndroidUtilities.cancelRunOnUIThread(dotRunnable);
-                dotRunnable = null;
-            }
-
-            if (currentAnimation != null) {
-                currentAnimation.cancel();
-            }
-            currentAnimation = new AnimatorSet();
-            currentAnimation.setDuration(150);
-            currentAnimation.playTogether(animators);
-            currentAnimation.addListener(new AnimatorListenerAdapterProxy() {
-                @Override
-                public void onAnimationEnd(Animator animation) {
-                    if (currentAnimation != null && currentAnimation.equals(animation)) {
-                        currentAnimation = null;
-                    }
-                }
-            });
-            currentAnimation.start();
-        }
-
-        private void eraseAllCharacters(final boolean animated) {
-            if (stringBuilder.length() == 0) {
-                return;
-            }
-            if (dotRunnable != null) {
-                AndroidUtilities.cancelRunOnUIThread(dotRunnable);
-                dotRunnable = null;
-            }
-            if (currentAnimation != null) {
-                currentAnimation.cancel();
-                currentAnimation = null;
-            }
-            stringBuilder.delete(0, stringBuilder.length());
-            if (animated) {
-                ArrayList<Animator> animators = new ArrayList<>();
-
-                for (int a = 0; a < 4; a++) {
-                    TextView textView = characterTextViews.get(a);
-                    if (textView.getAlpha() != 0) {
-                        animators.add(ObjectAnimator.ofFloat(textView, "scaleX", 0));
-                        animators.add(ObjectAnimator.ofFloat(textView, "scaleY", 0));
-                        animators.add(ObjectAnimator.ofFloat(textView, "alpha", 0));
-                    }
-
-                    textView = dotTextViews.get(a);
-                    if (textView.getAlpha() != 0) {
-                        animators.add(ObjectAnimator.ofFloat(textView, "scaleX", 0));
-                        animators.add(ObjectAnimator.ofFloat(textView, "scaleY", 0));
-                        animators.add(ObjectAnimator.ofFloat(textView, "alpha", 0));
-                    }
-                }
-
-                currentAnimation = new AnimatorSet();
-                currentAnimation.setDuration(150);
-                currentAnimation.playTogether(animators);
-                currentAnimation.addListener(new AnimatorListenerAdapterProxy() {
-                    @Override
-                    public void onAnimationEnd(Animator animation) {
-                        if (currentAnimation != null && currentAnimation.equals(animation)) {
-                            currentAnimation = null;
-                        }
-                    }
-                });
-                currentAnimation.start();
-            } else {
-                for (int a = 0; a < 4; a++) {
-                    characterTextViews.get(a).setAlpha(0);
-                    dotTextViews.get(a).setAlpha(0);
-                }
-            }
-        }
-
-        @Override
-        protected void onLayout(boolean changed, int left, int top, int right, int bottom) {
-            if (dotRunnable != null) {
-                AndroidUtilities.cancelRunOnUIThread(dotRunnable);
-                dotRunnable = null;
-            }
-            if (currentAnimation != null) {
-                currentAnimation.cancel();
-                currentAnimation = null;
-            }
-
-            for (int a = 0; a < 4; a++) {
-                if (a < stringBuilder.length()) {
-                    TextView textView = characterTextViews.get(a);
-                    textView.setAlpha(0);
-                    textView.setScaleX(1);
-                    textView.setScaleY(1);
-                    textView.setTranslationY(0);
-                    textView.setTranslationX(getXForTextView(a));
-
-                    textView = dotTextViews.get(a);
-                    textView.setAlpha(1);
-                    textView.setScaleX(1);
-                    textView.setScaleY(1);
-                    textView.setTranslationY(0);
-                    textView.setTranslationX(getXForTextView(a));
-                } else {
-                    characterTextViews.get(a).setAlpha(0);
-                    dotTextViews.get(a).setAlpha(0);
-                }
-            }
-            super.onLayout(changed, left, top, right, bottom);
-        }
-    }
-
+    private final static int id_fingerprint_textview = 1000;
+    private final static int id_fingerprint_imageview = 1001;
     private Drawable backgroundDrawable;
     private FrameLayout numbersFrameLayout;
     private ArrayList<TextView> numberTextViews;
@@ -418,9 +86,6 @@ public class PasscodeView extends FrameLayout {
     private Rect rect = new Rect();
 
     private PasscodeViewDelegate delegate;
-
-    private final static int id_fingerprint_textview = 1000;
-    private final static int id_fingerprint_imageview = 1001;
 
     public PasscodeView(final Context context) {
         super(context);
@@ -463,6 +128,7 @@ public class PasscodeView extends FrameLayout {
         passcodeTextView.setTextColor(0xffffffff);
         passcodeTextView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 14);
         passcodeTextView.setGravity(Gravity.CENTER_HORIZONTAL);
+        passcodeTextView.setTypeface(AndroidUtilities.getTypeface("fonts/rmedium.ttf"));
         passwordFrameLayout.addView(passcodeTextView);
         layoutParams = (LayoutParams) passcodeTextView.getLayoutParams();
         layoutParams.width = LayoutHelper.WRAP_CONTENT;
@@ -593,6 +259,7 @@ public class PasscodeView extends FrameLayout {
             textView.setTextColor(0xffffffff);
             textView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 36);
             textView.setGravity(Gravity.CENTER);
+            textView.setTypeface(AndroidUtilities.getTypeface("fonts/rmedium.ttf"));
             textView.setText(String.format(Locale.US, "%d", a));
             numbersFrameLayout.addView(textView);
             layoutParams = (LayoutParams) textView.getLayoutParams();
@@ -606,6 +273,7 @@ public class PasscodeView extends FrameLayout {
             textView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 12);
             textView.setTextColor(0x7fffffff);
             textView.setGravity(Gravity.CENTER);
+            textView.setTypeface(AndroidUtilities.getTypeface("fonts/rmedium.ttf"));
             numbersFrameLayout.addView(textView);
             layoutParams = (LayoutParams) textView.getLayoutParams();
             layoutParams.width = AndroidUtilities.dp(50);
@@ -1164,6 +832,350 @@ public class PasscodeView extends FrameLayout {
             }
         } else {
             super.onDraw(canvas);
+        }
+    }
+
+    public interface PasscodeViewDelegate {
+        void didAcceptedPassword();
+    }
+
+    private class AnimatingTextView extends FrameLayout {
+
+        private ArrayList<TextView> characterTextViews;
+        private ArrayList<TextView> dotTextViews;
+        private StringBuilder stringBuilder;
+        private String DOT = "\u2022";
+        private AnimatorSet currentAnimation;
+        private Runnable dotRunnable;
+
+        public AnimatingTextView(Context context) {
+            super(context);
+            characterTextViews = new ArrayList<>(4);
+            dotTextViews = new ArrayList<>(4);
+            stringBuilder = new StringBuilder(4);
+
+            for (int a = 0; a < 4; a++) {
+                TextView textView = new TextView(context);
+                textView.setTextColor(0xffffffff);
+                textView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 36);
+                textView.setGravity(Gravity.CENTER);
+                textView.setAlpha(0);
+                textView.setPivotX(AndroidUtilities.dp(25));
+                textView.setPivotY(AndroidUtilities.dp(25));
+                textView.setTypeface(AndroidUtilities.getTypeface("fonts/rmedium.ttf"));
+                textView.setAlpha(0);
+                textView.setPivotX(AndroidUtilities.dp(25));
+                textView.setPivotY(AndroidUtilities.dp(25));
+                textView.setAlpha(0);
+                textView.setPivotX(AndroidUtilities.dp(25));
+                textView.setPivotY(AndroidUtilities.dp(25));
+                addView(textView);
+                LayoutParams layoutParams = (LayoutParams) textView.getLayoutParams();
+                layoutParams.width = AndroidUtilities.dp(50);
+                layoutParams.height = AndroidUtilities.dp(50);
+                layoutParams.gravity = Gravity.TOP | Gravity.LEFT;
+                textView.setLayoutParams(layoutParams);
+                characterTextViews.add(textView);
+
+                textView = new TextView(context);
+                textView.setTextColor(0xffffffff);
+                textView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 36);
+                textView.setGravity(Gravity.CENTER);
+                textView.setAlpha(0);
+                textView.setTypeface(AndroidUtilities.getTypeface("fonts/rmedium.ttf"));
+                textView.setAlpha(0);
+                textView.setAlpha(0);
+                textView.setText(DOT);
+                textView.setPivotX(AndroidUtilities.dp(25));
+                textView.setPivotY(AndroidUtilities.dp(25));
+                addView(textView);
+                layoutParams = (LayoutParams) textView.getLayoutParams();
+                layoutParams.width = AndroidUtilities.dp(50);
+                layoutParams.height = AndroidUtilities.dp(50);
+                layoutParams.gravity = Gravity.TOP | Gravity.LEFT;
+                textView.setLayoutParams(layoutParams);
+                dotTextViews.add(textView);
+            }
+        }
+
+        private int getXForTextView(int pos) {
+            return (getMeasuredWidth() - stringBuilder.length() * AndroidUtilities.dp(30)) / 2 + pos * AndroidUtilities.dp(30) - AndroidUtilities.dp(10);
+        }
+
+        public void appendCharacter(String c) {
+            if (stringBuilder.length() == 4) {
+                return;
+            }
+            try {
+                performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);
+            } catch (Exception e) {
+                FileLog.e("tmessages", e);
+            }
+
+
+            ArrayList<Animator> animators = new ArrayList<>();
+            final int newPos = stringBuilder.length();
+            stringBuilder.append(c);
+
+            TextView textView = characterTextViews.get(newPos);
+            textView.setText(c);
+            textView.setTranslationX(getXForTextView(newPos));
+            animators.add(ObjectAnimator.ofFloat(textView, "scaleX", 0, 1));
+            animators.add(ObjectAnimator.ofFloat(textView, "scaleY", 0, 1));
+            animators.add(ObjectAnimator.ofFloat(textView, "alpha", 0, 1));
+            animators.add(ObjectAnimator.ofFloat(textView, "translationY", AndroidUtilities.dp(20), 0));
+            textView = dotTextViews.get(newPos);
+            textView.setTranslationX(getXForTextView(newPos));
+            textView.setAlpha(0);
+            animators.add(ObjectAnimator.ofFloat(textView, "scaleX", 0, 1));
+            animators.add(ObjectAnimator.ofFloat(textView, "scaleY", 0, 1));
+            animators.add(ObjectAnimator.ofFloat(textView, "translationY", AndroidUtilities.dp(20), 0));
+
+            for (int a = newPos + 1; a < 4; a++) {
+                textView = characterTextViews.get(a);
+                if (textView.getAlpha() != 0) {
+                    animators.add(ObjectAnimator.ofFloat(textView, "scaleX", 0));
+                    animators.add(ObjectAnimator.ofFloat(textView, "scaleY", 0));
+                    animators.add(ObjectAnimator.ofFloat(textView, "alpha", 0));
+                }
+
+                textView = dotTextViews.get(a);
+                if (textView.getAlpha() != 0) {
+                    animators.add(ObjectAnimator.ofFloat(textView, "scaleX", 0));
+                    animators.add(ObjectAnimator.ofFloat(textView, "scaleY", 0));
+                    animators.add(ObjectAnimator.ofFloat(textView, "alpha", 0));
+                }
+            }
+
+            if (dotRunnable != null) {
+                AndroidUtilities.cancelRunOnUIThread(dotRunnable);
+            }
+            dotRunnable = new Runnable() {
+                @Override
+                public void run() {
+                    if (dotRunnable != this) {
+                        return;
+                    }
+                    ArrayList<Animator> animators = new ArrayList<>();
+
+                    TextView textView = characterTextViews.get(newPos);
+                    animators.add(ObjectAnimator.ofFloat(textView, "scaleX", 0));
+                    animators.add(ObjectAnimator.ofFloat(textView, "scaleY", 0));
+                    animators.add(ObjectAnimator.ofFloat(textView, "alpha", 0));
+                    textView = dotTextViews.get(newPos);
+                    animators.add(ObjectAnimator.ofFloat(textView, "scaleX", 1));
+                    animators.add(ObjectAnimator.ofFloat(textView, "scaleY", 1));
+                    animators.add(ObjectAnimator.ofFloat(textView, "alpha", 1));
+
+                    currentAnimation = new AnimatorSet();
+                    currentAnimation.setDuration(150);
+                    currentAnimation.playTogether(animators);
+                    currentAnimation.addListener(new AnimatorListenerAdapterProxy() {
+                        @Override
+                        public void onAnimationEnd(Animator animation) {
+                            if (currentAnimation != null && currentAnimation.equals(animation)) {
+                                currentAnimation = null;
+                            }
+                        }
+                    });
+                    currentAnimation.start();
+                }
+            };
+            AndroidUtilities.runOnUIThread(dotRunnable, 1500);
+
+            for (int a = 0; a < newPos; a++) {
+                textView = characterTextViews.get(a);
+                animators.add(ObjectAnimator.ofFloat(textView, "translationX", getXForTextView(a)));
+                animators.add(ObjectAnimator.ofFloat(textView, "scaleX", 0));
+                animators.add(ObjectAnimator.ofFloat(textView, "scaleY", 0));
+                animators.add(ObjectAnimator.ofFloat(textView, "alpha", 0));
+                animators.add(ObjectAnimator.ofFloat(textView, "translationY", 0));
+                textView = dotTextViews.get(a);
+                animators.add(ObjectAnimator.ofFloat(textView, "translationX", getXForTextView(a)));
+                animators.add(ObjectAnimator.ofFloat(textView, "scaleX", 1));
+                animators.add(ObjectAnimator.ofFloat(textView, "scaleY", 1));
+                animators.add(ObjectAnimator.ofFloat(textView, "alpha", 1));
+                animators.add(ObjectAnimator.ofFloat(textView, "translationY", 0));
+            }
+
+            if (currentAnimation != null) {
+                currentAnimation.cancel();
+            }
+            currentAnimation = new AnimatorSet();
+            currentAnimation.setDuration(150);
+            currentAnimation.playTogether(animators);
+            currentAnimation.addListener(new AnimatorListenerAdapterProxy() {
+                @Override
+                public void onAnimationEnd(Animator animation) {
+                    if (currentAnimation != null && currentAnimation.equals(animation)) {
+                        currentAnimation = null;
+                    }
+                }
+            });
+            currentAnimation.start();
+        }
+
+        public String getString() {
+            return stringBuilder.toString();
+        }
+
+        public int lenght() {
+            return stringBuilder.length();
+        }
+
+        public void eraseLastCharacter() {
+            if (stringBuilder.length() == 0) {
+                return;
+            }
+            try {
+                performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);
+            } catch (Exception e) {
+                FileLog.e("tmessages", e);
+            }
+
+            ArrayList<Animator> animators = new ArrayList<>();
+            int deletingPos = stringBuilder.length() - 1;
+            if (deletingPos != 0) {
+                stringBuilder.deleteCharAt(deletingPos);
+            }
+
+            for (int a = deletingPos; a < 4; a++) {
+                TextView textView = characterTextViews.get(a);
+                if (textView.getAlpha() != 0) {
+                    animators.add(ObjectAnimator.ofFloat(textView, "scaleX", 0));
+                    animators.add(ObjectAnimator.ofFloat(textView, "scaleY", 0));
+                    animators.add(ObjectAnimator.ofFloat(textView, "alpha", 0));
+                    animators.add(ObjectAnimator.ofFloat(textView, "translationY", 0));
+                    animators.add(ObjectAnimator.ofFloat(textView, "translationX", getXForTextView(a)));
+                }
+
+                textView = dotTextViews.get(a);
+                if (textView.getAlpha() != 0) {
+                    animators.add(ObjectAnimator.ofFloat(textView, "scaleX", 0));
+                    animators.add(ObjectAnimator.ofFloat(textView, "scaleY", 0));
+                    animators.add(ObjectAnimator.ofFloat(textView, "alpha", 0));
+                    animators.add(ObjectAnimator.ofFloat(textView, "translationY", 0));
+                    animators.add(ObjectAnimator.ofFloat(textView, "translationX", getXForTextView(a)));
+                }
+            }
+
+            if (deletingPos == 0) {
+                stringBuilder.deleteCharAt(deletingPos);
+            }
+
+            for (int a = 0; a < deletingPos; a++) {
+                TextView textView = characterTextViews.get(a);
+                animators.add(ObjectAnimator.ofFloat(textView, "translationX", getXForTextView(a)));
+                textView = dotTextViews.get(a);
+                animators.add(ObjectAnimator.ofFloat(textView, "translationX", getXForTextView(a)));
+            }
+
+            if (dotRunnable != null) {
+                AndroidUtilities.cancelRunOnUIThread(dotRunnable);
+                dotRunnable = null;
+            }
+
+            if (currentAnimation != null) {
+                currentAnimation.cancel();
+            }
+            currentAnimation = new AnimatorSet();
+            currentAnimation.setDuration(150);
+            currentAnimation.playTogether(animators);
+            currentAnimation.addListener(new AnimatorListenerAdapterProxy() {
+                @Override
+                public void onAnimationEnd(Animator animation) {
+                    if (currentAnimation != null && currentAnimation.equals(animation)) {
+                        currentAnimation = null;
+                    }
+                }
+            });
+            currentAnimation.start();
+        }
+
+        private void eraseAllCharacters(final boolean animated) {
+            if (stringBuilder.length() == 0) {
+                return;
+            }
+            if (dotRunnable != null) {
+                AndroidUtilities.cancelRunOnUIThread(dotRunnable);
+                dotRunnable = null;
+            }
+            if (currentAnimation != null) {
+                currentAnimation.cancel();
+                currentAnimation = null;
+            }
+            stringBuilder.delete(0, stringBuilder.length());
+            if (animated) {
+                ArrayList<Animator> animators = new ArrayList<>();
+
+                for (int a = 0; a < 4; a++) {
+                    TextView textView = characterTextViews.get(a);
+                    if (textView.getAlpha() != 0) {
+                        animators.add(ObjectAnimator.ofFloat(textView, "scaleX", 0));
+                        animators.add(ObjectAnimator.ofFloat(textView, "scaleY", 0));
+                        animators.add(ObjectAnimator.ofFloat(textView, "alpha", 0));
+                    }
+
+                    textView = dotTextViews.get(a);
+                    if (textView.getAlpha() != 0) {
+                        animators.add(ObjectAnimator.ofFloat(textView, "scaleX", 0));
+                        animators.add(ObjectAnimator.ofFloat(textView, "scaleY", 0));
+                        animators.add(ObjectAnimator.ofFloat(textView, "alpha", 0));
+                    }
+                }
+
+                currentAnimation = new AnimatorSet();
+                currentAnimation.setDuration(150);
+                currentAnimation.playTogether(animators);
+                currentAnimation.addListener(new AnimatorListenerAdapterProxy() {
+                    @Override
+                    public void onAnimationEnd(Animator animation) {
+                        if (currentAnimation != null && currentAnimation.equals(animation)) {
+                            currentAnimation = null;
+                        }
+                    }
+                });
+                currentAnimation.start();
+            } else {
+                for (int a = 0; a < 4; a++) {
+                    characterTextViews.get(a).setAlpha(0);
+                    dotTextViews.get(a).setAlpha(0);
+                }
+            }
+        }
+
+        @Override
+        protected void onLayout(boolean changed, int left, int top, int right, int bottom) {
+            if (dotRunnable != null) {
+                AndroidUtilities.cancelRunOnUIThread(dotRunnable);
+                dotRunnable = null;
+            }
+            if (currentAnimation != null) {
+                currentAnimation.cancel();
+                currentAnimation = null;
+            }
+
+            for (int a = 0; a < 4; a++) {
+                if (a < stringBuilder.length()) {
+                    TextView textView = characterTextViews.get(a);
+                    textView.setAlpha(0);
+                    textView.setScaleX(1);
+                    textView.setScaleY(1);
+                    textView.setTranslationY(0);
+                    textView.setTranslationX(getXForTextView(a));
+
+                    textView = dotTextViews.get(a);
+                    textView.setAlpha(1);
+                    textView.setScaleX(1);
+                    textView.setScaleY(1);
+                    textView.setTranslationY(0);
+                    textView.setTranslationX(getXForTextView(a));
+                } else {
+                    characterTextViews.get(a).setAlpha(0);
+                    dotTextViews.get(a).setAlpha(0);
+                }
+            }
+            super.onLayout(changed, left, top, right, bottom);
         }
     }
 }

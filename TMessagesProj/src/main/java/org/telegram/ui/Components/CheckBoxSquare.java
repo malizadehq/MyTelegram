@@ -23,24 +23,19 @@ import org.telegram.messenger.AndroidUtilities;
 
 public class CheckBoxSquare extends View {
 
+    private final static float progressBounceDiff = 0.2f;
     private static Paint eraser;
     private static Paint checkPaint;
     private static Paint backgroundPaint;
     private static RectF rectF;
-
     private Bitmap drawBitmap;
     private Canvas drawCanvas;
-
     private float progress;
     private ObjectAnimator checkAnimator;
-
     private boolean attachedToWindow;
     private boolean isChecked;
     private boolean isDisabled;
-
     private int color = 0xff43a0df;
-
-    private final static float progressBounceDiff = 0.2f;
 
     public CheckBoxSquare(Context context) {
         super(context);
@@ -68,16 +63,16 @@ public class CheckBoxSquare extends View {
         }
     }
 
+    public float getProgress() {
+        return progress;
+    }
+
     public void setProgress(float value) {
         if (progress == value) {
             return;
         }
         progress = value;
         invalidate();
-    }
-
-    public float getProgress() {
-        return progress;
     }
 
     public void setColor(int value) {

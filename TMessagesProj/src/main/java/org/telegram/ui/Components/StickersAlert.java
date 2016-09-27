@@ -13,7 +13,7 @@ import android.animation.AnimatorSet;
 import android.animation.ObjectAnimator;
 import android.annotation.SuppressLint;
 import android.content.Context;
-import android.graphics.*;
+import android.graphics.Canvas;
 import android.graphics.Rect;
 import android.graphics.drawable.Drawable;
 import android.os.Build;
@@ -50,10 +50,6 @@ import org.telegram.ui.StickerPreviewViewer;
 
 public class StickersAlert extends BottomSheet implements NotificationCenter.NotificationCenterDelegate {
 
-    public interface StickersAlertDelegate {
-        void onStickerSelected(TLRPC.Document sticker);
-    }
-
     private RecyclerListView gridView;
     private GridLayoutManager layoutManager;
     private GridAdapter adapter;
@@ -69,13 +65,10 @@ public class StickersAlert extends BottomSheet implements NotificationCenter.Not
     private AnimatorSet shadowAnimation[] = new AnimatorSet[2];
     private View shadow[] = new View[2];
     private FrameLayout emptyView;
-
     private TLRPC.TL_messages_stickerSet stickerSet;
     private TLRPC.Document selectedSticker;
     private TLRPC.InputStickerSet inputStickerSet;
-
     private StickersAlertDelegate delegate;
-
     private int scrollOffsetY;
     private int reqId;
     private boolean ignoreLayout;
@@ -571,6 +564,10 @@ public class StickersAlert extends BottomSheet implements NotificationCenter.Not
         }
     }
 
+    public interface StickersAlertDelegate {
+        void onStickerSelected(TLRPC.Document sticker);
+    }
+
     private class GridAdapter extends RecyclerView.Adapter {
 
         Context context;
@@ -584,13 +581,6 @@ public class StickersAlert extends BottomSheet implements NotificationCenter.Not
             return stickerSet != null ? stickerSet.documents.size() : 0;
         }
 
-        private class Holder extends RecyclerView.ViewHolder {
-
-            public Holder(View itemView) {
-                super(itemView);
-            }
-        }
-
         @Override
         public RecyclerView.ViewHolder onCreateViewHolder(ViewGroup parent, int viewType) {
             View view = new StickerEmojiCell(context);
@@ -601,6 +591,13 @@ public class StickersAlert extends BottomSheet implements NotificationCenter.Not
         @Override
         public void onBindViewHolder(RecyclerView.ViewHolder holder, int position) {
             ((StickerEmojiCell) holder.itemView).setSticker(stickerSet.documents.get(position), true);
+        }
+
+        private class Holder extends RecyclerView.ViewHolder {
+
+            public Holder(View itemView) {
+                super(itemView);
+            }
         }
     }
 }

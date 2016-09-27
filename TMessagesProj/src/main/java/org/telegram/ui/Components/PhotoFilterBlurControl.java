@@ -19,31 +19,16 @@ import org.telegram.messenger.AndroidUtilities;
 
 public class PhotoFilterBlurControl extends FrameLayout {
 
-    public interface PhotoFilterLinearBlurControlDelegate {
-        void valueChanged(Point centerPoint, float falloff, float size, float angle);
-    }
-
     private final static float BlurInsetProximity = AndroidUtilities.dp(20);
     private final static float BlurMinimumFalloff = 0.1f;
     private final static float BlurMinimumDifference = 0.02f;
     private final static float BlurViewCenterInset = AndroidUtilities.dp(30.0f);
     private final static float BlurViewRadiusInset = AndroidUtilities.dp(30.0f);
-
-    private enum BlurViewActiveControl {
-        BlurViewActiveControlNone,
-        BlurViewActiveControlCenter,
-        BlurViewActiveControlInnerRadius,
-        BlurViewActiveControlOuterRadius,
-        BlurViewActiveControlWholeArea,
-        BlurViewActiveControlRotation
-    }
-
     private final int GestureStateBegan = 1;
     private final int GestureStateChanged = 2;
     private final int GestureStateEnded = 3;
     private final int GestureStateCancelled = 4;
     private final int GestureStateFailed = 5;
-
     private BlurViewActiveControl activeControl;
     private Point startCenterPoint = new Point();
     private float startDistance;
@@ -54,7 +39,6 @@ public class PhotoFilterBlurControl extends FrameLayout {
     private float size = 0.35f;
     private float angle;
     private RectF arcRect = new RectF();
-
     private float pointerStartX;
     private float pointerStartY;
     private float startPointerDistance;
@@ -63,12 +47,9 @@ public class PhotoFilterBlurControl extends FrameLayout {
     private boolean isZooming;
     private boolean checkForMoving = true;
     private boolean checkForZooming;
-
     private int type;
-
     private Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private Paint arcPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-
     private PhotoFilterLinearBlurControlDelegate delegate;
 
     public PhotoFilterBlurControl(Context context) {
@@ -495,5 +476,18 @@ public class PhotoFilterBlurControl extends FrameLayout {
 
     private float getActualOuterRadius() {
         return (actualAreaSize.width > actualAreaSize.height ? actualAreaSize.height : actualAreaSize.width) * size;
+    }
+
+    private enum BlurViewActiveControl {
+        BlurViewActiveControlNone,
+        BlurViewActiveControlCenter,
+        BlurViewActiveControlInnerRadius,
+        BlurViewActiveControlOuterRadius,
+        BlurViewActiveControlWholeArea,
+        BlurViewActiveControlRotation
+    }
+
+    public interface PhotoFilterLinearBlurControlDelegate {
+        void valueChanged(Point centerPoint, float falloff, float size, float angle);
     }
 }

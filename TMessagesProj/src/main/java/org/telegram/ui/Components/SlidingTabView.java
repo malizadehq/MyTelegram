@@ -24,10 +24,6 @@ import org.telegram.ui.ActionBar.Theme;
 
 public class SlidingTabView extends LinearLayout {
 
-    public interface SlidingTabViewDelegate {
-        void didSelectTab(int tab);
-    }
-
     private SlidingTabViewDelegate delegate;
     private int selectedTab = 0;
     private int tabCount = 0;
@@ -67,7 +63,7 @@ public class SlidingTabView extends LinearLayout {
             }
         });
         addView(tab);
-        LayoutParams layoutParams = (LayoutParams)tab.getLayoutParams();
+        LayoutParams layoutParams = (LayoutParams) tab.getLayoutParams();
         layoutParams.height = LayoutHelper.MATCH_PARENT;
         layoutParams.width = 0;
         layoutParams.weight = 50;
@@ -106,7 +102,7 @@ public class SlidingTabView extends LinearLayout {
     @Override
     protected void onLayout(boolean changed, int l, int t, int r, int b) {
         super.onLayout(changed, l, t, r, b);
-        tabWidth = (r - l) / (float)tabCount;
+        tabWidth = (r - l) / (float) tabCount;
         animateTabXTo = tabX = tabWidth * selectedTab;
     }
 
@@ -126,5 +122,9 @@ public class SlidingTabView extends LinearLayout {
         }
 
         canvas.drawRect(tabX, getHeight() - AndroidUtilities.dp(2), (tabX + tabWidth), getHeight(), paint);
+    }
+
+    public interface SlidingTabViewDelegate {
+        void didSelectTab(int tab);
     }
 }

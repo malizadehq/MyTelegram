@@ -23,10 +23,6 @@ public class SizeNotifierFrameLayoutPhoto extends FrameLayout {
     private SizeNotifierFrameLayoutPhotoDelegate delegate;
     private WindowManager windowManager;
 
-    public interface SizeNotifierFrameLayoutPhotoDelegate {
-        void onSizeChanged(int keyboardHeight, boolean isWidthGreater);
-    }
-
     public SizeNotifierFrameLayoutPhoto(Context context) {
         super(context);
     }
@@ -66,5 +62,9 @@ public class SizeNotifierFrameLayoutPhoto extends FrameLayout {
                 }
             });
         }
+    }
+
+    public interface SizeNotifierFrameLayoutPhotoDelegate {
+        void onSizeChanged(int keyboardHeight, boolean isWidthGreater);
     }
 }

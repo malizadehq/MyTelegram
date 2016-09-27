@@ -17,8 +17,8 @@ import android.widget.ListAdapter;
 import android.widget.ListView;
 
 import org.telegram.messenger.AndroidUtilities;
-import org.telegram.messenger.LocaleController;
 import org.telegram.messenger.FileLog;
+import org.telegram.messenger.LocaleController;
 import org.telegram.ui.Adapters.BaseSectionsAdapter;
 
 public class SectionsListView extends ListView implements AbsListView.OnScrollListener {
@@ -148,7 +148,7 @@ public class SectionsListView extends ListView implements AbsListView.OnScrollLi
             return;
         }
         int saveCount = canvas.save();
-        int top = (Integer)pinnedHeader.getTag();
+        int top = (Integer) pinnedHeader.getTag();
         canvas.translate(LocaleController.isRTL ? getWidth() - pinnedHeader.getWidth() : 0, top);
         canvas.clipRect(0, 0, getWidth(), pinnedHeader.getMeasuredHeight());
         pinnedHeader.draw(canvas);

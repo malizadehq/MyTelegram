@@ -24,12 +24,11 @@ import org.telegram.ui.ActionBar.Theme;
 
 public class RadioButton extends View {
 
-    private Bitmap bitmap;
-    private Canvas bitmapCanvas;
     private static Paint paint;
     private static Paint eraser;
     private static Paint checkedPaint;
-
+    private Bitmap bitmap;
+    private Canvas bitmapCanvas;
     private int checkedColor = Theme.ACTION_BAR_SUBTITLE_COLOR;
     private int color = Theme.ACTION_BAR_SUBTITLE_COLOR;
 
@@ -60,16 +59,16 @@ public class RadioButton extends View {
         }
     }
 
+    public float getProgress() {
+        return progress;
+    }
+
     public void setProgress(float value) {
         if (progress == value) {
             return;
         }
         progress = value;
         invalidate();
-    }
-
-    public float getProgress() {
-        return progress;
     }
 
     public void setSize(int value) {

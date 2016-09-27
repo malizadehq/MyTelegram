@@ -38,22 +38,6 @@ public class SpannableStringLight extends SpannableString {
         }
     }
 
-    public void setSpansCount(int count) {
-        count += mSpanCountOverride;
-        mSpansOverride = new Object[count];
-        mSpanDataOverride = new int[count * 3];
-        num = mSpanCountOverride;
-        mSpanCountOverride = count;
-
-        try {
-            mSpansField.set(this, mSpansOverride);
-            mSpanDataField.set(this, mSpanDataOverride);
-            mSpanCountField.set(this, mSpanCountOverride);
-        } catch (Throwable e) {
-            FileLog.e("tmessages", e);
-        }
-    }
-
     public static boolean isFieldsAvailable() {
         if (!fieldsAvailable && mSpansField == null) {
             try {
@@ -71,6 +55,22 @@ public class SpannableStringLight extends SpannableString {
             fieldsAvailable = true;
         }
         return mSpansField != null;
+    }
+
+    public void setSpansCount(int count) {
+        count += mSpanCountOverride;
+        mSpansOverride = new Object[count];
+        mSpanDataOverride = new int[count * 3];
+        num = mSpanCountOverride;
+        mSpanCountOverride = count;
+
+        try {
+            mSpansField.set(this, mSpansOverride);
+            mSpanDataField.set(this, mSpanDataOverride);
+            mSpanCountField.set(this, mSpanCountOverride);
+        } catch (Throwable e) {
+            FileLog.e("tmessages", e);
+        }
     }
 
     public void setSpanLight(Object what, int start, int end, int flags) {

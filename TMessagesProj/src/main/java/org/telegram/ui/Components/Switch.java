@@ -19,7 +19,9 @@ package org.telegram.ui.Components;
 import android.animation.ObjectAnimator;
 import android.annotation.SuppressLint;
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.graphics.Canvas;
+import android.graphics.Color;
 import android.graphics.PorterDuff;
 import android.graphics.PorterDuffColorFilter;
 import android.graphics.Rect;
@@ -33,54 +35,31 @@ import android.view.ViewConfiguration;
 import android.widget.CompoundButton;
 
 import org.telegram.messenger.AndroidUtilities;
+import org.telegram.messenger.ApplicationLoader;
 import org.telegram.messenger.LocaleController;
 import org.telegram.messenger.R;
 
 public class Switch extends CompoundButton {
 
-    public static class Insets {
-        public static final Insets NONE = new Insets(AndroidUtilities.dp(4), 0, AndroidUtilities.dp(4), 0);
-
-        public final int left;
-        public final int top;
-        public final int right;
-        public final int bottom;
-
-        private Insets(int left, int top, int right, int bottom) {
-            this.left = left;
-            this.top = top;
-            this.right = right;
-            this.bottom = bottom;
-        }
-    }
-
-    public static float constrain(float amount, float low, float high) {
-        return amount < low ? low : (amount > high ? high : amount);
-    }
-
     private static final int THUMB_ANIMATION_DURATION = 250;
-
     private static final int TOUCH_MODE_IDLE = 0;
     private static final int TOUCH_MODE_DOWN = 1;
     private static final int TOUCH_MODE_DRAGGING = 2;
-
+    private final Rect mTempRect = new Rect();
     private Drawable mThumbDrawable;
     private Drawable mTrackDrawable;
     private int mThumbTextPadding;
     private int mSwitchMinWidth;
     private int mSwitchPadding;
     private boolean mSplitTrack;
-
     private boolean attachedToWindow;
     private boolean wasLayout;
-
     private int mTouchMode;
     private int mTouchSlop;
     private float mTouchX;
     private float mTouchY;
     private VelocityTracker mVelocityTracker = VelocityTracker.obtain();
     private int mMinFlingVelocity;
-
     private float thumbPosition;
     private int mSwitchWidth;
     private int mSwitchHeight;
@@ -89,10 +68,7 @@ public class Switch extends CompoundButton {
     private int mSwitchTop;
     private int mSwitchRight;
     private int mSwitchBottom;
-
     private ObjectAnimator mPositionAnimator;
-
-    private final Rect mTempRect = new Rect();
 
     public Switch(Context context) {
         super(context);
@@ -123,17 +99,16 @@ public class Switch extends CompoundButton {
         setChecked(isChecked());
     }
 
-    public void setSwitchPadding(int pixels) {
-        mSwitchPadding = pixels;
-        requestLayout();
+    public static float constrain(float amount, float low, float high) {
+        return amount < low ? low : (amount > high ? high : amount);
     }
 
     public int getSwitchPadding() {
         return mSwitchPadding;
     }
 
-    public void setSwitchMinWidth(int pixels) {
-        mSwitchMinWidth = pixels;
+    public void setSwitchPadding(int pixels) {
+        mSwitchPadding = pixels;
         requestLayout();
     }
 
@@ -141,13 +116,22 @@ public class Switch extends CompoundButton {
         return mSwitchMinWidth;
     }
 
-    public void setThumbTextPadding(int pixels) {
-        mThumbTextPadding = pixels;
+    public void setSwitchMinWidth(int pixels) {
+        mSwitchMinWidth = pixels;
         requestLayout();
     }
 
     public int getThumbTextPadding() {
         return mThumbTextPadding;
+    }
+
+    public void setThumbTextPadding(int pixels) {
+        mThumbTextPadding = pixels;
+        requestLayout();
+    }
+
+    public Drawable getTrackDrawable() {
+        return mTrackDrawable;
     }
 
     public void setTrackDrawable(Drawable track) {
@@ -161,8 +145,8 @@ public class Switch extends CompoundButton {
         requestLayout();
     }
 
-    public Drawable getTrackDrawable() {
-        return mTrackDrawable;
+    public Drawable getThumbDrawable() {
+        return mThumbDrawable;
     }
 
     public void setThumbDrawable(Drawable thumb) {
@@ -176,17 +160,13 @@ public class Switch extends CompoundButton {
         requestLayout();
     }
 
-    public Drawable getThumbDrawable() {
-        return mThumbDrawable;
+    public boolean getSplitTrack() {
+        return mSplitTrack;
     }
 
     public void setSplitTrack(boolean splitTrack) {
         mSplitTrack = splitTrack;
         invalidate();
-    }
-
-    public boolean getSplitTrack() {
-        return mSplitTrack;
     }
 
     @Override
@@ -366,13 +346,13 @@ public class Switch extends CompoundButton {
         return thumbPosition > 0.5f;
     }
 
+    public float getThumbPosition() {
+        return thumbPosition;
+    }
+
     private void setThumbPosition(float position) {
         thumbPosition = position;
         invalidate();
-    }
-
-    public float getThumbPosition() {
-        return thumbPosition;
     }
 
     @Override
@@ -398,6 +378,10 @@ public class Switch extends CompoundButton {
         wasLayout = false;
     }
 
+    public int adjustAlpha(int color, float factor) {
+        return Color.argb(Math.round(((float) Color.alpha(color)) * factor), Color.red(color), Color.green(color), Color.blue(color));
+    }
+
     @Override
     public void setChecked(boolean checked) {
         super.setChecked(checked);
@@ -410,12 +394,21 @@ public class Switch extends CompoundButton {
             cancelPositionAnimator();
             setThumbPosition(checked ? 1 : 0);
         }
-
-        if (mTrackDrawable != null) {
-            mTrackDrawable.setColorFilter(new PorterDuffColorFilter(checked ? 0xffa0d6fa : 0xffc7c7c7, PorterDuff.Mode.MULTIPLY));
-        }
-        if (mThumbDrawable != null) {
-            mThumbDrawable.setColorFilter(new PorterDuffColorFilter(checked ? 0xff45abef : 0xffededed, PorterDuff.Mode.MULTIPLY));
+        if (getTag() == null) {
+            SharedPreferences preferences = ApplicationLoader.applicationContext.getSharedPreferences(AndroidUtilities.THEME_PREFS, AndroidUtilities.THEME_PREFS_MODE);
+            int defColor = preferences.getInt("themeColor", AndroidUtilities.defColor);
+            int sColor = preferences.getInt("prefSectionColor", defColor);
+            int sDarkColor = AndroidUtilities.getIntAlphaColor("prefSectionColor", sColor, 0.5f);
+            int darkColor = AndroidUtilities.getIntAlphaColor("themeColor", AndroidUtilities.defColor, 0.5f);
+            int checkColor = sColor == defColor ? darkColor : sDarkColor;
+            if (mTrackDrawable != null) {
+                //mTrackDrawable.setColorFilter(new PorterDuffColorFilter(checked ? 0xffa0d6fa : 0xffc7c7c7, PorterDuff.Mode.MULTIPLY));
+                mTrackDrawable.setColorFilter(new PorterDuffColorFilter(checked ? checkColor : 0xffc7c7c7, PorterDuff.Mode.MULTIPLY));
+            }
+            if (mThumbDrawable != null) {
+                //mThumbDrawable.setColorFilter(new PorterDuffColorFilter(checked ? 0xff45abef : 0xffededed, PorterDuff.Mode.MULTIPLY));
+                mThumbDrawable.setColorFilter(new PorterDuffColorFilter(checked ? sColor : 0xffededed, PorterDuff.Mode.MULTIPLY));
+            }
         }
     }
 
@@ -620,15 +613,6 @@ public class Switch extends CompoundButton {
         }
     }
 
-    /*@Override
-    protected int[] onCreateDrawableState(int extraSpace) {
-        final int[] drawableState = super.onCreateDrawableState(extraSpace + 1);
-        if (isChecked()) {
-            mergeDrawableStates(drawableState, CHECKED_STATE_SET);
-        }
-        return drawableState;
-    }*/
-
     @Override
     protected void drawableStateChanged() {
         super.drawableStateChanged();
@@ -645,6 +629,15 @@ public class Switch extends CompoundButton {
 
         invalidate();
     }
+
+    /*@Override
+    protected int[] onCreateDrawableState(int extraSpace) {
+        final int[] drawableState = super.onCreateDrawableState(extraSpace + 1);
+        if (isChecked()) {
+            mergeDrawableStates(drawableState, CHECKED_STATE_SET);
+        }
+        return drawableState;
+    }*/
 
     @SuppressLint("NewApi")
     @Override
@@ -680,6 +673,38 @@ public class Switch extends CompoundButton {
         if (mPositionAnimator != null && mPositionAnimator.isRunning()) {
             mPositionAnimator.end();
             mPositionAnimator = null;
+        }
+    }
+
+    //Teleh
+    public void setColor(int color) {
+        boolean checked = isChecked();
+        SharedPreferences preferences = ApplicationLoader.applicationContext.getSharedPreferences(AndroidUtilities.THEME_PREFS, AndroidUtilities.THEME_PREFS_MODE);
+        int defColor = preferences.getInt("themeColor", AndroidUtilities.defColor);
+        int darkColor = AndroidUtilities.getIntAlphaColor("themeColor", AndroidUtilities.defColor, 0.5f);
+        int sDarkColor = AndroidUtilities.setDarkColor(color, 0x7f);
+        int checkColor = color == defColor ? darkColor : sDarkColor;
+        if (mTrackDrawable != null) {
+            mTrackDrawable.setColorFilter(new PorterDuffColorFilter(checked ? color : 0xffc7c7c7, PorterDuff.Mode.MULTIPLY));
+        }
+        if (mThumbDrawable != null) {
+            mThumbDrawable.setColorFilter(new PorterDuffColorFilter(checked ? checkColor : 0xffededed, PorterDuff.Mode.MULTIPLY));
+        }
+    }
+
+    public static class Insets {
+        public static final Insets NONE = new Insets(AndroidUtilities.dp(4), 0, AndroidUtilities.dp(4), 0);
+
+        public final int left;
+        public final int top;
+        public final int right;
+        public final int bottom;
+
+        private Insets(int left, int top, int right, int bottom) {
+            this.left = left;
+            this.top = top;
+            this.right = right;
+            this.bottom = bottom;
         }
     }
 }

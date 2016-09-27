@@ -30,11 +30,11 @@ import android.widget.ImageView;
 import android.widget.LinearLayout;
 
 import org.telegram.messenger.AndroidUtilities;
+import org.telegram.messenger.ApplicationLoader;
 import org.telegram.messenger.Emoji;
+import org.telegram.messenger.FileLog;
 import org.telegram.messenger.LocaleController;
 import org.telegram.messenger.NotificationCenter;
-import org.telegram.messenger.ApplicationLoader;
-import org.telegram.messenger.FileLog;
 import org.telegram.messenger.R;
 import org.telegram.tgnet.TLRPC;
 
@@ -43,37 +43,24 @@ import java.lang.reflect.Method;
 
 public class PhotoViewerCaptionEnterView extends FrameLayout implements NotificationCenter.NotificationCenterDelegate, SizeNotifierFrameLayoutPhoto.SizeNotifierFrameLayoutPhotoDelegate {
 
-    public interface PhotoViewerCaptionEnterViewDelegate {
-        void onCaptionEnter();
-        void onTextChanged(CharSequence text);
-        void onWindowSizeChanged(int size);
-    }
-
     private EditText messageEditText;
     private ImageView emojiButton;
     private EmojiView emojiView;
     private SizeNotifierFrameLayoutPhoto sizeNotifierLayout;
-
     private ActionMode currentActionMode;
-
     private AnimatorSet runningAnimation;
     private AnimatorSet runningAnimation2;
     private ObjectAnimator runningAnimationAudio;
     private int runningAnimationType;
     private int audioInterfaceState;
-
     private int lastSizeChangeValue1;
     private boolean lastSizeChangeValue2;
-
     private int keyboardHeight;
     private int keyboardHeightLand;
     private boolean keyboardVisible;
     private int emojiPadding;
-
     private boolean innerTextChange;
-
     private PhotoViewerCaptionEnterViewDelegate delegate;
-
     private View windowView;
 
     public PhotoViewerCaptionEnterView(Context context, SizeNotifierFrameLayoutPhoto parent, final View window) {
@@ -601,5 +588,13 @@ public class PhotoViewerCaptionEnterView extends FrameLayout implements Notifica
                 emojiView.invalidateViews();
             }
         }
+    }
+
+    public interface PhotoViewerCaptionEnterViewDelegate {
+        void onCaptionEnter();
+
+        void onTextChanged(CharSequence text);
+
+        void onWindowSizeChanged(int size);
     }
 }

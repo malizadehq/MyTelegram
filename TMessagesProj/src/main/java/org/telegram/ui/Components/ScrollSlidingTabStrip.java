@@ -9,9 +9,12 @@
 package org.telegram.ui.Components;
 
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.graphics.Paint.Style;
+import android.graphics.PorterDuff;
+import android.graphics.drawable.Drawable;
 import android.os.Build;
 import android.view.Gravity;
 import android.view.View;
@@ -21,32 +24,23 @@ import android.widget.ImageView;
 import android.widget.LinearLayout;
 
 import org.telegram.messenger.AndroidUtilities;
+import org.telegram.messenger.ApplicationLoader;
 import org.telegram.tgnet.TLRPC;
 
 public class ScrollSlidingTabStrip extends HorizontalScrollView {
 
-    public interface ScrollSlidingTabStripDelegate {
-        void onPageSelected(int page);
-    }
-
     private LinearLayout.LayoutParams defaultTabLayoutParams;
     private LinearLayout tabsContainer;
     private ScrollSlidingTabStripDelegate delegate;
-
     private int tabCount;
-
     private int currentPosition = 0;
-
     private Paint rectPaint;
-
     private int indicatorColor = 0xff666666;
     private int underlineColor = 0x1a000000;
-
     private int scrollOffset = AndroidUtilities.dp(52);
     private int underlineHeight = AndroidUtilities.dp(2);
     private int dividerPadding = AndroidUtilities.dp(12);
     private int tabPadding = AndroidUtilities.dp(24);
-
     private int lastScrollX = 0;
 
     public ScrollSlidingTabStrip(Context context) {
@@ -94,7 +88,9 @@ public class ScrollSlidingTabStrip extends HorizontalScrollView {
         final int position = tabCount++;
         ImageView tab = new ImageView(getContext());
         tab.setFocusable(true);
-        tab.setImageResource(resId);
+        paintTabIcons(resId);
+        //  tab.setImageResource(resId);
+        tab.setImageDrawable(getResources().getDrawable(resId));
         tab.setScaleType(ImageView.ScaleType.CENTER);
         tab.setOnClickListener(new OnClickListener() {
             @Override
@@ -224,5 +220,16 @@ public class ScrollSlidingTabStrip extends HorizontalScrollView {
     public void setUnderlineHeight(int underlineHeightPx) {
         this.underlineHeight = underlineHeightPx;
         invalidate();
+    }
+
+    private void paintTabIcons(int i) {
+        SharedPreferences themePrefs = ApplicationLoader.applicationContext.getSharedPreferences(AndroidUtilities.THEME_PREFS, AndroidUtilities.THEME_PREFS_MODE);
+        Drawable icon = getResources().getDrawable(i);
+        int iconColor = themePrefs.getInt("chatEmojiViewTabIconColor", 0xffa8a8a8);
+        icon.setColorFilter(iconColor, PorterDuff.Mode.SRC_IN);
+    }
+
+    public interface ScrollSlidingTabStripDelegate {
+        void onPageSelected(int page);
     }
 }

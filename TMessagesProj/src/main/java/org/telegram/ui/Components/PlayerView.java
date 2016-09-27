@@ -12,7 +12,9 @@ import android.animation.Animator;
 import android.animation.AnimatorSet;
 import android.animation.ObjectAnimator;
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.graphics.Canvas;
+import android.graphics.PorterDuff;
 import android.text.SpannableStringBuilder;
 import android.text.Spanned;
 import android.text.TextUtils;
@@ -26,6 +28,7 @@ import android.widget.TextView;
 
 import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.AnimatorListenerAdapterProxy;
+import org.telegram.messenger.ApplicationLoader;
 import org.telegram.messenger.MediaController;
 import org.telegram.messenger.MessageObject;
 import org.telegram.messenger.NotificationCenter;
@@ -33,6 +36,8 @@ import org.telegram.messenger.R;
 import org.telegram.ui.ActionBar.BaseFragment;
 import org.telegram.ui.ActionBar.Theme;
 import org.telegram.ui.AudioPlayerActivity;
+import org.telegram.ui.ChatActivity;
+import org.telegram.ui.DialogsActivity;
 
 public class PlayerView extends FrameLayout implements NotificationCenter.NotificationCenterDelegate {
 
@@ -44,6 +49,7 @@ public class PlayerView extends FrameLayout implements NotificationCenter.Notifi
     private BaseFragment fragment;
     private float topPadding;
     private boolean visible;
+    private int titleColor = Theme.INAPP_PLAYER_TITLE_TEXT_COLOR;
 
     public PlayerView(Context context, BaseFragment parentFragment) {
         super(context);
@@ -75,13 +81,16 @@ public class PlayerView extends FrameLayout implements NotificationCenter.Notifi
             }
         });
 
+        paintPlayer();
+
         titleTextView = new TextView(context);
-        titleTextView.setTextColor(Theme.INAPP_PLAYER_TITLE_TEXT_COLOR);
+        titleTextView.setTextColor(titleColor);
         titleTextView.setMaxLines(1);
         titleTextView.setLines(1);
         titleTextView.setSingleLine(true);
         titleTextView.setEllipsize(TextUtils.TruncateAt.END);
         titleTextView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 15);
+        titleTextView.setTypeface(AndroidUtilities.getTypeface("fonts/rmedium.ttf"));
         titleTextView.setGravity(Gravity.CENTER_VERTICAL | Gravity.LEFT);
         addView(titleTextView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, 36, Gravity.LEFT | Gravity.TOP, 35, 0, 36, 0));
 
@@ -233,10 +242,42 @@ public class PlayerView extends FrameLayout implements NotificationCenter.Notifi
                     stringBuilder = new SpannableStringBuilder(String.format("%s - %s", messageObject.getMusicAuthor(), messageObject.getMusicTitle()));
                     titleTextView.setEllipsize(TextUtils.TruncateAt.END);
                 }
-                TypefaceSpan span = new TypefaceSpan(AndroidUtilities.getTypeface("fonts/rmedium.ttf"), 0, Theme.INAPP_PLAYER_PERFORMER_TEXT_COLOR);
+                TypefaceSpan span = new TypefaceSpan(AndroidUtilities.getTypeface("fonts/rmedium.ttf"), 0, titleColor);
                 stringBuilder.setSpan(span, 0, messageObject.getMusicAuthor().length(), Spanned.SPAN_INCLUSIVE_INCLUSIVE);
                 titleTextView.setText(stringBuilder);
             }
+        }
+    }
+
+    private void paintPlayer() {
+        SharedPreferences themePrefs = ApplicationLoader.applicationContext.getSharedPreferences(AndroidUtilities.THEME_PREFS, AndroidUtilities.THEME_PREFS_MODE);
+        int hColor = themePrefs.getInt("themeColor", AndroidUtilities.defColor);
+        int iconColor = 0xffffffff;
+        int tColor = 0xffffffff;
+        if (fragment instanceof DialogsActivity) {
+            hColor = themePrefs.getInt("chatsHeaderColor", hColor);
+            iconColor = themePrefs.getInt("chatsHeaderIconsColor", iconColor);
+            tColor = themePrefs.getInt("chatsHeaderTitleColor", tColor);
+        } else if (fragment instanceof ChatActivity) {
+            hColor = themePrefs.getInt("chatHeaderColor", hColor);
+            iconColor = themePrefs.getInt("chatHeaderIconsColor", iconColor);
+            tColor = themePrefs.getInt("chatNameColor", tColor);
+        }
+        setBackgroundColor(0x00000000);
+        if (getChildAt(0) != null) {
+            getChildAt(0).setBackgroundColor(hColor);
+        }
+
+        if (titleColor != tColor) {
+            titleColor = tColor;
+            if (titleTextView != null) {
+                titleTextView.setTextColor(tColor);
+            }
+        }
+
+        playButton.setColorFilter(iconColor, PorterDuff.Mode.SRC_IN);
+        if (getChildAt(4) != null) {
+            ((ImageView) getChildAt(4)).setColorFilter(iconColor, PorterDuff.Mode.SRC_IN);
         }
     }
 
@@ -255,6 +296,7 @@ public class PlayerView extends FrameLayout implements NotificationCenter.Notifi
         }
         final boolean result = super.drawChild(canvas, child, drawingTime);
         canvas.restoreToCount(restoreToCount);
+        paintPlayer();
         return result;
     }
 }

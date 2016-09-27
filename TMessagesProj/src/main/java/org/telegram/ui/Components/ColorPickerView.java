@@ -38,7 +38,7 @@ public class ColorPickerView extends View {
     private static final String STATE_OLD_COLOR = "color";
     private static final String STATE_SHOW_OLD_COLOR = "showColor";
 
-    private static final int[] COLORS = new int[] { 0xFFFF0000, 0xFFFF00FF, 0xFF0000FF, 0xFF00FFFF, 0xFF00FF00, 0xFFFFFFFF, 0xFFFFFF00, 0xFFFF0000 };
+    private static final int[] COLORS = new int[]{0xFFFF0000, 0xFFFF00FF, 0xFF0000FF, 0xFF00FFFF, 0xFF00FF00, 0xFFFFFFFF, 0xFFFFFF00, 0xFFFF0000};
 
     private Paint mColorWheelPaint;
     private Paint mPointerHaloPaint;
@@ -86,14 +86,6 @@ public class ColorPickerView extends View {
     public ColorPickerView(Context context, AttributeSet attrs, int defStyle) {
         super(context, attrs, defStyle);
         init(attrs, defStyle);
-    }
-
-    public interface OnColorChangedListener {
-        void onColorChanged(int color);
-    }
-
-    public interface OnColorSelectedListener {
-        void onColorSelected(int color);
     }
 
     public void setOnColorChangedListener(OnColorChangedListener listener) {
@@ -317,7 +309,7 @@ public class ColorPickerView extends View {
         float x = (float) (mColorWheelRadius * Math.cos(angle));
         float y = (float) (mColorWheelRadius * Math.sin(angle));
 
-        return new float[] { x, y };
+        return new float[]{x, y};
     }
 
     public void setNewCenterColor(int color) {
@@ -327,11 +319,15 @@ public class ColorPickerView extends View {
             mCenterOldColor = color;
             mCenterOldPaint.setColor(color);
         }
-        if (onColorChangedListener != null && color != oldChangedListenerColor ) {
+        if (onColorChangedListener != null && color != oldChangedListenerColor) {
             onColorChangedListener.onColorChanged(color);
-            oldChangedListenerColor  = color;
+            oldChangedListenerColor = color;
         }
         invalidate();
+    }
+
+    public int getOldCenterColor() {
+        return mCenterOldColor;
     }
 
     public void setOldCenterColor(int color) {
@@ -340,17 +336,13 @@ public class ColorPickerView extends View {
         invalidate();
     }
 
-    public int getOldCenterColor() {
-        return mCenterOldColor;
+    public boolean getShowOldCenterColor() {
+        return mShowCenterOldColor;
     }
 
     public void setShowOldCenterColor(boolean show) {
         mShowCenterOldColor = show;
         invalidate();
-    }
-
-    public boolean getShowOldCenterColor() {
-        return mShowCenterOldColor;
     }
 
     @Override
@@ -379,5 +371,13 @@ public class ColorPickerView extends View {
         int currentColor = calculateColor(mAngle);
         mPointerColor.setColor(currentColor);
         setNewCenterColor(currentColor);
+    }
+
+    public interface OnColorChangedListener {
+        void onColorChanged(int color);
+    }
+
+    public interface OnColorSelectedListener {
+        void onColorSelected(int color);
     }
 }

@@ -40,6 +40,7 @@ public class LetterDrawable extends Drawable {
             namePaint = new TextPaint(Paint.ANTI_ALIAS_FLAG);
             namePaint.setColor(0xffffffff);
             namePaint.setTextSize(AndroidUtilities.dp(28));
+            namePaint.setTypeface(AndroidUtilities.getTypeface("fonts/rmedium.ttf"));
         }
     }
 

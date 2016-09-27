@@ -22,11 +22,6 @@ import org.telegram.messenger.FileLog;
 
 public class PhotoCropView extends FrameLayout {
 
-    public interface PhotoCropViewDelegate {
-        void needMoveImageTo(float x, float y, float s, boolean animated);
-        Bitmap getBitmap();
-    }
-
     private boolean freeformCrop = true;
     private Paint rectPaint;
     private Paint circlePaint;
@@ -44,7 +39,6 @@ public class PhotoCropView extends FrameLayout {
     private float bitmapGlobalY = 0;
     private PhotoCropViewDelegate delegate;
     private Bitmap bitmapToEdit;
-
     private RectF animationStartValues;
     private RectF animationEndValues;
     private Runnable animationRunnable;
@@ -735,5 +729,11 @@ public class PhotoCropView extends FrameLayout {
             rectSizeX = percSizeX * bitmapWidth;
             rectSizeY = percSizeY * bitmapHeight;
         }
+    }
+
+    public interface PhotoCropViewDelegate {
+        void needMoveImageTo(float x, float y, float s, boolean animated);
+
+        Bitmap getBitmap();
     }
 }
