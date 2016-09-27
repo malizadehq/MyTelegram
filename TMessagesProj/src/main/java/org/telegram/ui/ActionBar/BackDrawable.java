@@ -21,6 +21,7 @@ import org.telegram.messenger.AndroidUtilities;
 public class BackDrawable extends Drawable {
 
     private Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private Paint paintB = new Paint(Paint.ANTI_ALIAS_FLAG);
     private boolean reverseAngle = false;
     private long lastFrameTime;
     private boolean animationInProgress;
@@ -83,7 +84,7 @@ public class BackDrawable extends Drawable {
         int rD = (int) ((117 - 255) * currentRotation);
         int c = Color.rgb(255 + rD, 255 + rD, 255 + rD);
         paint.setColor(c);
-
+        if (currentRotation < 1) paint.setColor(paintB.getColor());
         canvas.save();
         canvas.translate(getIntrinsicWidth() / 2, getIntrinsicHeight() / 2);
         float rotation = currentRotation;
@@ -111,6 +112,12 @@ public class BackDrawable extends Drawable {
     @Override
     public void setColorFilter(ColorFilter cf) {
 
+    }
+
+    //Teleh
+    public void setColor(int color) {
+        paint.setColor(color);
+        paintB.setColor(color);
     }
 
     @Override

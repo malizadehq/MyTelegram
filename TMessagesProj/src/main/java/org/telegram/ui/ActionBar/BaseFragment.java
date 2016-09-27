@@ -14,18 +14,21 @@ import android.app.Dialog;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.Button;
+import android.widget.TextView;
 
+import org.telegram.messenger.AndroidUtilities;
+import org.telegram.messenger.ApplicationLoader;
 import org.telegram.messenger.FileLog;
 import org.telegram.tgnet.ConnectionsManager;
 
 public class BaseFragment {
 
-    private boolean isFinished = false;
     protected Dialog visibleDialog = null;
-
     protected View fragmentView;
     protected ActionBarLayout parentLayout;
     protected ActionBar actionBar;
@@ -33,6 +36,7 @@ public class BaseFragment {
     protected Bundle arguments;
     protected boolean swipeBackEnabled = true;
     protected boolean hasOwnBackground = false;
+    private boolean isFinished = false;
 
     public BaseFragment() {
         classGuid = ConnectionsManager.getInstance().generateClassGuid();
@@ -125,6 +129,7 @@ public class BaseFragment {
         ActionBar actionBar = new ActionBar(context);
         actionBar.setBackgroundColor(Theme.ACTION_BAR_COLOR);
         actionBar.setItemsBackgroundColor(Theme.ACTION_BAR_SELECTOR_COLOR);
+        //actionBar.setItemsBackground(R.drawable.bar_selector);
         return actionBar;
     }
 
@@ -294,6 +299,22 @@ public class BaseFragment {
                 }
             });
             visibleDialog.show();
+            SharedPreferences preferences = ApplicationLoader.applicationContext.getSharedPreferences(AndroidUtilities.THEME_PREFS, AndroidUtilities.THEME_PREFS_MODE);
+            int color = preferences.getInt("dialogColor", preferences.getInt("themeColor", AndroidUtilities.defColor));
+            int id = visibleDialog.getContext().getResources().getIdentifier("android:id/alertTitle", null, null);
+            TextView tv = (TextView) visibleDialog.findViewById(id);
+            if (tv != null) tv.setTextColor(color);
+            id = visibleDialog.getContext().getResources().getIdentifier("android:id/titleDivider", null, null);
+            View divider = visibleDialog.findViewById(id);
+            if (divider != null) divider.setBackgroundColor(color);
+
+            Button btn = (Button) visibleDialog.findViewById(android.R.id.button1);
+            if (btn != null) btn.setTextColor(color);
+            btn = (Button) visibleDialog.findViewById(android.R.id.button2);
+            if (btn != null) btn.setTextColor(color);
+            btn = (Button) visibleDialog.findViewById(android.R.id.button3);
+            if (btn != null) btn.setTextColor(color);
+            int bgColor = preferences.getInt("prefBGColor", 0xffffffff);
             return visibleDialog;
         } catch (Exception e) {
             FileLog.e("tmessages", e);

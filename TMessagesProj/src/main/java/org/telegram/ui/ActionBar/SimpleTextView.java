@@ -208,14 +208,6 @@ public class SimpleTextView extends View implements Drawable.Callback {
         }
     }
 
-    public void setText(CharSequence value) {
-        if (text == null && value == null || text != null && value != null && text.equals(value)) {
-            return;
-        }
-        text = value;
-        recreateLayoutMaybe();
-    }
-
     public void setDrawablePadding(int value) {
         if (drawablePadding == value) {
             return;
@@ -240,6 +232,14 @@ public class SimpleTextView extends View implements Drawable.Callback {
             return "";
         }
         return text;
+    }
+
+    public void setText(CharSequence value) {
+        if (text == null && value == null || text != null && value != null && text.equals(value)) {
+            return;
+        }
+        text = value;
+        recreateLayoutMaybe();
     }
 
     @Override

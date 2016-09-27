@@ -12,6 +12,7 @@ import android.animation.Animator;
 import android.animation.AnimatorSet;
 import android.animation.ObjectAnimator;
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.content.res.Configuration;
 import android.graphics.drawable.Drawable;
 import android.os.Build;
@@ -24,22 +25,17 @@ import android.widget.ImageView;
 import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.AnimatorListenerAdapterProxy;
 import org.telegram.messenger.ApplicationLoader;
+import org.telegram.messenger.R;
 import org.telegram.ui.Components.LayoutHelper;
 
 import java.util.ArrayList;
-// Theme added
+
 public class ActionBar extends FrameLayout {
 
-    public static class ActionBarMenuOnItemClick {
-        public void onItemClick(int id) {
-
-        }
-
-        public boolean canOpenMenu() {
-            return true;
-        }
-    }
-
+    public ActionBarMenuOnItemClick actionBarMenuOnItemClick;
+    protected boolean isSearchFieldVisible;
+    protected int itemsBackgroundColor;
+    protected BaseFragment parentFragment;
     private ImageView backButtonImageView;
     private SimpleTextView titleTextView;
     private SimpleTextView subtitleTextView;
@@ -52,19 +48,46 @@ public class ActionBar extends FrameLayout {
     private boolean interceptTouches = true;
     private int extraHeight;
     private AnimatorSet actionModeAnimation;
-
     private boolean allowOverlayTitle;
     private CharSequence lastTitle;
     private boolean castShadows = true;
-
-    protected boolean isSearchFieldVisible;
-    protected int itemsBackgroundColor;
     private boolean isBackOverlayVisible;
-    protected BaseFragment parentFragment;
-    public ActionBarMenuOnItemClick actionBarMenuOnItemClick;
+    private ImageView ghostView;
 
     public ActionBar(Context context) {
         super(context);
+        createGhostModeImage();
+        changeGhostModeVisibility();
+    }
+
+    public static int getCurrentActionBarHeight() {
+        if (AndroidUtilities.isTablet()) {
+            return AndroidUtilities.dp(64);
+        } else if (ApplicationLoader.applicationContext.getResources().getConfiguration().orientation == Configuration.ORIENTATION_LANDSCAPE) {
+            return AndroidUtilities.dp(48);
+        } else {
+           return AndroidUtilities.dp(56);
+         //   return AndroidUtilities.dp(30);
+        }
+    }
+
+    public void changeGhostModeVisibility() {
+        ImageView img = this.ghostView;
+        SharedPreferences var5 = ApplicationLoader.applicationContext.getSharedPreferences("mainconfig", 0);
+
+        if (var5.getBoolean("ghost_mode", false) == true && var5.getBoolean("show_ghost_state_icon", true) == true) {
+            img.setVisibility(VISIBLE);
+        } else {
+            img.setVisibility(GONE);
+        }
+
+    }
+
+    public void createGhostModeImage() {
+        this.ghostView = new ImageView(this.getContext());
+        this.ghostView.setImageResource(R.drawable.ic_teleh_seen);
+        this.ghostView.setPadding(20, 20, 20, 20);
+        this.addView(this.ghostView, 0, LayoutHelper.createFrame(-2, -2, 17));
     }
 
     private void createBackButtonImage() {
@@ -90,7 +113,7 @@ public class ActionBar extends FrameLayout {
             }
         });
     }
-// theme issue fixed
+
     public void setBackButtonDrawable(Drawable drawable) {
         if (backButtonImageView == null) {
             createBackButtonImage();
@@ -120,12 +143,12 @@ public class ActionBar extends FrameLayout {
         addView(subtitleTextView, 0, LayoutHelper.createFrame(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.LEFT | Gravity.TOP));
     }
 
-    public void setAddToContainer(boolean value) {
-        addToContainer = value;
-    }
-
     public boolean getAddToContainer() {
         return addToContainer;
+    }
+
+    public void setAddToContainer(boolean value) {
+        addToContainer = value;
     }
 
     public void setSubtitle(CharSequence value) {
@@ -149,14 +172,15 @@ public class ActionBar extends FrameLayout {
         addView(titleTextView, 0, LayoutHelper.createFrame(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.LEFT | Gravity.TOP));
     }
 
-    public void setTitle(CharSequence value) {
-        if (value != null && titleTextView == null) {
-            createTitleTextView();
+    public void setTitleColor(int color) {
+        if (this.titleTextView != null) {
+            this.titleTextView.setTextColor(color);
         }
-        if (titleTextView != null) {
-            lastTitle = value;
-            titleTextView.setVisibility(value != null && !isSearchFieldVisible ? VISIBLE : INVISIBLE);
-            titleTextView.setText(value);
+    }
+
+    public void setSubTitleColor(int color) {
+        if (this.subtitleTextView != null) {
+            this.subtitleTextView.setTextColor(color);
         }
     }
 
@@ -173,6 +197,17 @@ public class ActionBar extends FrameLayout {
             return null;
         }
         return titleTextView.getText().toString();
+    }
+
+    public void setTitle(CharSequence value) {
+        if (value != null && titleTextView == null) {
+            createTitleTextView();
+        }
+        if (titleTextView != null) {
+            lastTitle = value;
+            titleTextView.setVisibility(value != null && !isSearchFieldVisible ? VISIBLE : INVISIBLE);
+            titleTextView.setText(value);
+        }
     }
 
     public ActionBarMenu createMenu() {
@@ -196,7 +231,7 @@ public class ActionBar extends FrameLayout {
         actionMode.setBackgroundColor(0xffffffff);
         addView(actionMode, indexOfChild(backButtonImageView));
         actionMode.setPadding(0, occupyStatusBar ? AndroidUtilities.statusBarHeight : 0, 0, 0);
-        FrameLayout.LayoutParams layoutParams = (FrameLayout.LayoutParams)actionMode.getLayoutParams();
+        FrameLayout.LayoutParams layoutParams = (FrameLayout.LayoutParams) actionMode.getLayoutParams();
         layoutParams.height = LayoutHelper.MATCH_PARENT;
         layoutParams.width = LayoutHelper.MATCH_PARENT;
         layoutParams.gravity = Gravity.RIGHT;
@@ -207,7 +242,7 @@ public class ActionBar extends FrameLayout {
             actionModeTop = new View(getContext());
             actionModeTop.setBackgroundColor(0x99000000);
             addView(actionModeTop);
-            layoutParams = (FrameLayout.LayoutParams)actionModeTop.getLayoutParams();
+            layoutParams = (FrameLayout.LayoutParams) actionModeTop.getLayoutParams();
             layoutParams.height = AndroidUtilities.statusBarHeight;
             layoutParams.width = LayoutHelper.MATCH_PARENT;
             layoutParams.gravity = Gravity.TOP | Gravity.LEFT;
@@ -451,6 +486,7 @@ public class ActionBar extends FrameLayout {
             menu.layout(menuLeft, additionalTop, menuLeft + menu.getMeasuredWidth(), additionalTop + menu.getMeasuredHeight());
         }
 
+        int offset = AndroidUtilities.dp(!AndroidUtilities.isTablet() && getResources().getConfiguration().orientation == Configuration.ORIENTATION_LANDSCAPE ? 1 : 2);
         if (titleTextView != null && titleTextView.getVisibility() != GONE) {
             int textTop;
             if (subtitleTextView != null && subtitleTextView.getVisibility() != GONE) {
@@ -550,6 +586,10 @@ public class ActionBar extends FrameLayout {
         return isSearchFieldVisible;
     }
 
+    public boolean getOccupyStatusBar() {
+        return occupyStatusBar;
+    }
+
     public void setOccupyStatusBar(boolean value) {
         occupyStatusBar = value;
         if (actionMode != null) {
@@ -557,23 +597,20 @@ public class ActionBar extends FrameLayout {
         }
     }
 
-    public boolean getOccupyStatusBar() {
-        return occupyStatusBar;
-    }
-
     public void setItemsBackgroundColor(int color) {
         itemsBackgroundColor = color;
         if (backButtonImageView != null) {
             backButtonImageView.setBackgroundDrawable(Theme.createBarSelectorDrawable(itemsBackgroundColor));
         }
-    }
-
-    public void setCastShadows(boolean value) {
-        castShadows = value;
+        setBackgroundColor(AndroidUtilities.getIntColor("themeColor")); //Teleh
     }
 
     public boolean getCastShadows() {
         return castShadows;
+    }
+
+    public void setCastShadows(boolean value) {
+        castShadows = value;
     }
 
     @Override
@@ -581,18 +618,18 @@ public class ActionBar extends FrameLayout {
         return super.onTouchEvent(event) || interceptTouches;
     }
 
-    public static int getCurrentActionBarHeight() {
-        if (AndroidUtilities.isTablet()) {
-            return AndroidUtilities.dp(64);
-        } else if (ApplicationLoader.applicationContext.getResources().getConfiguration().orientation == Configuration.ORIENTATION_LANDSCAPE) {
-            return AndroidUtilities.dp(48);
-        } else {
-            return AndroidUtilities.dp(56);
-        }
-    }
-
     @Override
     public boolean hasOverlappingRendering() {
         return false;
+    }
+
+    public static class ActionBarMenuOnItemClick {
+        public void onItemClick(int id) {
+
+        }
+
+        public boolean canOpenMenu() {
+            return true;
+        }
     }
 }

@@ -14,9 +14,11 @@ import android.animation.ObjectAnimator;
 import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.graphics.drawable.Drawable;
+import android.graphics.drawable.GradientDrawable;
 import android.os.Build;
 import android.view.Gravity;
 import android.view.MotionEvent;
@@ -29,9 +31,10 @@ import android.widget.FrameLayout;
 import android.widget.ListView;
 
 import org.telegram.messenger.AndroidUtilities;
+import org.telegram.messenger.AnimatorListenerAdapterProxy;
+import org.telegram.messenger.ApplicationLoader;
 import org.telegram.messenger.FileLog;
 import org.telegram.messenger.R;
-import org.telegram.messenger.AnimatorListenerAdapterProxy;
 
 public class DrawerLayoutContainer extends FrameLayout {
 
@@ -120,16 +123,18 @@ public class DrawerLayoutContainer extends FrameLayout {
         return 0;
     }
 
-    public void setDrawerLayout(ViewGroup layout) {
-        drawerLayout = layout;
-        addView(drawerLayout);
-        if (Build.VERSION.SDK_INT >= 21) {
-            drawerLayout.setFitsSystemWindows(true);
-        }
+    private void setChildInsets(Object insets, boolean draw) {
+        lastInsets = insets;
+        setWillNotDraw(!draw && getBackground() == null);
+        requestLayout();
     }
 
     public void moveDrawerByX(float dx) {
         setDrawerPosition(drawerPosition + dx);
+    }
+
+    public float getDrawerPosition() {
+        return drawerPosition;
     }
 
     public void setDrawerPosition(float value) {
@@ -146,10 +151,6 @@ public class DrawerLayoutContainer extends FrameLayout {
             drawerLayout.setVisibility(newVisibility);
         }
         setScrimOpacity(drawerPosition / (float) drawerLayout.getMeasuredWidth());
-    }
-
-    public float getDrawerPosition() {
-        return drawerPosition;
     }
 
     public void cancelCurrentAnimation() {
@@ -217,17 +218,25 @@ public class DrawerLayoutContainer extends FrameLayout {
         }
     }
 
+    private float getScrimOpacity() {
+        return scrimOpacity;
+    }
+
     private void setScrimOpacity(float value) {
         scrimOpacity = value;
         invalidate();
     }
 
-    private float getScrimOpacity() {
-        return scrimOpacity;
-    }
-
     public View getDrawerLayout() {
         return drawerLayout;
+    }
+
+    public void setDrawerLayout(ViewGroup layout) {
+        drawerLayout = layout;
+        addView(drawerLayout);
+        if (Build.VERSION.SDK_INT >= 21) {
+            drawerLayout.setFitsSystemWindows(true);
+        }
     }
 
     public void setParentActionBarLayout(ActionBarLayout layout) {
@@ -437,6 +446,8 @@ public class DrawerLayoutContainer extends FrameLayout {
                 child.measure(drawerWidthSpec, drawerHeightSpec);
             }
         }
+        //Teleh
+        updateListBG();
     }
 
     @Override
@@ -492,5 +503,38 @@ public class DrawerLayoutContainer extends FrameLayout {
     @Override
     public boolean hasOverlappingRendering() {
         return false;
+    }
+
+    //Teleh
+    private void updateListBG() {
+        if (getDrawerLayout() != null) {
+            SharedPreferences themePrefs = ApplicationLoader.applicationContext.getSharedPreferences(AndroidUtilities.THEME_PREFS, AndroidUtilities.THEME_PREFS_MODE);
+            int mainColor = themePrefs.getInt("drawerListColor", 0xffffffff);
+            int value = themePrefs.getInt("drawerRowGradient", 0);
+            boolean b = true;//themePrefs.getBoolean("drawerRowGradientListCheck", false);
+            if (value > 0 && b) {
+                GradientDrawable.Orientation go;
+                switch (value) {
+                    case 2:
+                        go = GradientDrawable.Orientation.LEFT_RIGHT;
+                        break;
+                    case 3:
+                        go = GradientDrawable.Orientation.TL_BR;
+                        break;
+                    case 4:
+                        go = GradientDrawable.Orientation.BL_TR;
+                        break;
+                    default:
+                        go = GradientDrawable.Orientation.TOP_BOTTOM;
+                }
+
+                int gradColor = themePrefs.getInt("drawerRowGradientColor", 0xffffffff);
+                int[] colors = new int[]{mainColor, gradColor};
+                GradientDrawable gd = new GradientDrawable(go, colors);
+                getDrawerLayout().setBackgroundDrawable(gd);
+            } else {
+                getDrawerLayout().setBackgroundColor(mainColor);
+            }
+        }
     }
 }

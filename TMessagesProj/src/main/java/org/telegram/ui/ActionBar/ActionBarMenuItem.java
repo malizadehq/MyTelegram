@@ -9,7 +9,9 @@
 package org.telegram.ui.ActionBar;
 
 import android.content.Context;
+import android.graphics.PorterDuff;
 import android.graphics.Rect;
+import android.graphics.drawable.Drawable;
 import android.os.Build;
 import android.text.Editable;
 import android.text.TextWatcher;
@@ -38,35 +40,13 @@ import java.lang.reflect.Field;
 
 public class ActionBarMenuItem extends FrameLayout {
 
-    public static class ActionBarMenuItemSearchListener {
-        public void onSearchExpand() {
-        }
-
-        public boolean canCollapseSearch() {
-            return true;
-        }
-
-        public void onSearchCollapse() {
-
-        }
-
-        public void onTextChanged(EditText editText) {
-        }
-
-        public void onSearchPressed(EditText editText) {
-        }
-    }
-
-    public interface ActionBarMenuItemDelegate {
-        void onItemClick(int id);
-    }
-
+    protected ImageView iconView;
+    protected boolean overrideMenuClick;
     private ActionBarPopupWindow.ActionBarPopupWindowLayout popupLayout;
     private ActionBarMenu parentMenu;
     private ActionBarPopupWindow popupWindow;
     private EditText searchField;
     private ImageView clearButton;
-    protected ImageView iconView;
     private FrameLayout searchContainer;
     private boolean isSearchField = false;
     private ActionBarMenuItemSearchListener listener;
@@ -79,7 +59,6 @@ public class ActionBarMenuItem extends FrameLayout {
     private int subMenuOpenSide = 0;
     private ActionBarMenuItemDelegate delegate;
     private boolean allowCloseAnimation = true;
-    protected boolean overrideMenuClick;
     private boolean processedPopupClick;
 
     public ActionBarMenuItem(Context context, ActionBarMenu menu, int backgroundColor) {
@@ -366,6 +345,16 @@ public class ActionBarMenuItem extends FrameLayout {
         iconView.setImageResource(resId);
     }
 
+    //Teleh
+    public void setIcon(Drawable drawable) {
+        iconView.setImageDrawable(drawable);
+    }
+
+    public void setIconColor(int color) {
+        iconView.setColorFilter(color, PorterDuff.Mode.SRC_IN);
+    }
+
+    //End Teleh
     public ImageView getImageView() {
         return iconView;
     }
@@ -584,6 +573,29 @@ public class ActionBarMenuItem extends FrameLayout {
         View view = popupLayout.findViewWithTag(id);
         if (view != null) {
             view.setVisibility(VISIBLE);
+        }
+    }
+
+    public interface ActionBarMenuItemDelegate {
+        void onItemClick(int id);
+    }
+
+    public static class ActionBarMenuItemSearchListener {
+        public void onSearchExpand() {
+        }
+
+        public boolean canCollapseSearch() {
+            return true;
+        }
+
+        public void onSearchCollapse() {
+
+        }
+
+        public void onTextChanged(EditText editText) {
+        }
+
+        public void onSearchPressed(EditText editText) {
         }
     }
 }

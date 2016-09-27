@@ -39,8 +39,14 @@ public class ActionBarPopupWindow extends PopupWindow {
 
     private static final Field superListenerField;
     private static final boolean animationEnabled = Build.VERSION.SDK_INT >= 18;
+    private static final ViewTreeObserver.OnScrollChangedListener NOP = new ViewTreeObserver.OnScrollChangedListener() {
+        @Override
+        public void onScrollChanged() {
+            /* do nothing */
+        }
+    };
     private static DecelerateInterpolator decelerateInterpolator = new DecelerateInterpolator();
-    private AnimatorSet windowAnimatorSet;
+
     static {
         Field f = null;
         try {
@@ -52,183 +58,9 @@ public class ActionBarPopupWindow extends PopupWindow {
         superListenerField = f;
     }
 
-    private static final ViewTreeObserver.OnScrollChangedListener NOP = new ViewTreeObserver.OnScrollChangedListener() {
-        @Override
-        public void onScrollChanged() {
-            /* do nothing */
-        }
-    };
-
+    private AnimatorSet windowAnimatorSet;
     private ViewTreeObserver.OnScrollChangedListener mSuperScrollListener;
     private ViewTreeObserver mViewTreeObserver;
-
-    public interface OnDispatchKeyEventListener {
-        void onDispatchKeyEvent(KeyEvent keyEvent);
-    }
-
-    public static class ActionBarPopupWindowLayout extends FrameLayout {
-
-        private OnDispatchKeyEventListener mOnDispatchKeyEventListener;
-        protected static Drawable backgroundDrawable;
-        private float backScaleX = 1;
-        private float backScaleY = 1;
-        private int backAlpha = 255;
-        private int lastStartedChild = 0;
-        private boolean showedFromBotton;
-        private HashMap<View, Integer> positions = new HashMap<>();
-
-        private ScrollView scrollView;
-        private LinearLayout linearLayout;
-
-        public ActionBarPopupWindowLayout(Context context) {
-            super(context);
-
-            if (backgroundDrawable == null) {
-                backgroundDrawable = getResources().getDrawable(R.drawable.popup_fixed);
-            }
-
-            setPadding(AndroidUtilities.dp(8), AndroidUtilities.dp(8), AndroidUtilities.dp(8), AndroidUtilities.dp(8));
-            setWillNotDraw(false);
-
-            try {
-                scrollView = new ScrollView(context);
-                scrollView.setVerticalScrollBarEnabled(false);
-                addView(scrollView, LayoutHelper.createFrame(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT));
-            } catch (Throwable e) {
-                FileLog.e("tmessages", e);
-            }
-
-
-            linearLayout = new LinearLayout(context);
-            linearLayout.setOrientation(LinearLayout.VERTICAL);
-            if (scrollView != null) {
-                scrollView.addView(linearLayout, new ScrollView.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-            } else {
-                addView(linearLayout, LayoutHelper.createFrame(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT));
-            }
-        }
-
-        public void setShowedFromBotton(boolean value) {
-            showedFromBotton = value;
-        }
-
-        public void setDispatchKeyEventListener(OnDispatchKeyEventListener listener) {
-            mOnDispatchKeyEventListener = listener;
-        }
-
-        public void setBackAlpha(int value) {
-            backAlpha = value;
-        }
-
-        public int getBackAlpha() {
-            return backAlpha;
-        }
-
-        public void setBackScaleX(float value) {
-            backScaleX = value;
-            invalidate();
-        }
-
-        public void setBackScaleY(float value) {
-            backScaleY = value;
-            if (animationEnabled) {
-                int count = getItemsCount();
-                int visibleCount = 0;
-                for (int a = 0; a < count; a++) {
-                    visibleCount += getItemAt(a).getVisibility() == VISIBLE ? 1 : 0;
-                }
-                int height = getMeasuredHeight() - AndroidUtilities.dp(16);
-                if (showedFromBotton) {
-                    for (int a = lastStartedChild; a >= 0; a--) {
-                        View child = getItemAt(a);
-                        if (child.getVisibility() != VISIBLE) {
-                            continue;
-                        }
-                        Integer position = positions.get(child);
-                        if (position != null && height - (position * AndroidUtilities.dp(48) + AndroidUtilities.dp(32)) > value * height) {
-                            break;
-                        }
-                        lastStartedChild = a - 1;
-                        startChildAnimation(child);
-                    }
-                } else {
-                    for (int a = lastStartedChild; a < count; a++) {
-                        View child = getItemAt(a);
-                        if (child.getVisibility() != VISIBLE) {
-                            continue;
-                        }
-                        Integer position = positions.get(child);
-                        if (position != null && (position + 1) * AndroidUtilities.dp(48) - AndroidUtilities.dp(24) > value * height) {
-                            break;
-                        }
-                        lastStartedChild = a + 1;
-                        startChildAnimation(child);
-                    }
-                }
-            }
-            invalidate();
-        }
-
-        private void startChildAnimation(View child) {
-            if (animationEnabled) {
-                AnimatorSet animatorSet = new AnimatorSet();
-                animatorSet.playTogether(
-                        ObjectAnimator.ofFloat(child, "alpha", 0.0f, 1.0f),
-                        ObjectAnimator.ofFloat(child, "translationY", AndroidUtilities.dp(showedFromBotton ? 6 : -6), 0));
-                animatorSet.setDuration(180);
-                animatorSet.setInterpolator(decelerateInterpolator);
-                animatorSet.start();
-            }
-        }
-
-        @Override
-        public void addView(View child) {
-            linearLayout.addView(child);
-        }
-
-        public float getBackScaleX() {
-            return backScaleX;
-        }
-
-        public float getBackScaleY() {
-            return backScaleY;
-        }
-
-        @Override
-        public boolean dispatchKeyEvent(KeyEvent event) {
-            if (mOnDispatchKeyEventListener != null) {
-                mOnDispatchKeyEventListener.onDispatchKeyEvent(event);
-            }
-            return super.dispatchKeyEvent(event);
-        }
-
-        @Override
-        protected void onDraw(Canvas canvas) {
-            if (backgroundDrawable != null) {
-                backgroundDrawable.setAlpha(backAlpha);
-                if (showedFromBotton) {
-                    backgroundDrawable.setBounds(0, (int) (getMeasuredHeight() * (1.0f - backScaleY)), (int) (getMeasuredWidth() * backScaleX), getMeasuredHeight());
-                } else {
-                    backgroundDrawable.setBounds(0, 0, (int) (getMeasuredWidth() * backScaleX), (int) (getMeasuredHeight() * backScaleY));
-                }
-                backgroundDrawable.draw(canvas);
-            }
-        }
-
-        public int getItemsCount() {
-            return linearLayout.getChildCount();
-        }
-
-        public View getItemAt(int index) {
-            return linearLayout.getChildAt(index);
-        }
-
-        public void scrollToTop() {
-            if (scrollView != null) {
-                scrollView.scrollTo(0, 0);
-            }
-        }
-    }
 
     public ActionBarPopupWindow() {
         super();
@@ -432,6 +264,174 @@ public class ActionBarPopupWindow extends PopupWindow {
                 //don't promt
             }
             unregisterListener();
+        }
+    }
+
+    public interface OnDispatchKeyEventListener {
+        void onDispatchKeyEvent(KeyEvent keyEvent);
+    }
+
+    public static class ActionBarPopupWindowLayout extends FrameLayout {
+
+        protected static Drawable backgroundDrawable;
+        private OnDispatchKeyEventListener mOnDispatchKeyEventListener;
+        private float backScaleX = 1;
+        private float backScaleY = 1;
+        private int backAlpha = 255;
+        private int lastStartedChild = 0;
+        private boolean showedFromBotton;
+        private HashMap<View, Integer> positions = new HashMap<>();
+
+        private ScrollView scrollView;
+        private LinearLayout linearLayout;
+
+        public ActionBarPopupWindowLayout(Context context) {
+            super(context);
+
+            if (backgroundDrawable == null) {
+                backgroundDrawable = getResources().getDrawable(R.drawable.popup_fixed);
+            }
+
+            setPadding(AndroidUtilities.dp(8), AndroidUtilities.dp(8), AndroidUtilities.dp(8), AndroidUtilities.dp(8));
+            setWillNotDraw(false);
+
+            try {
+                scrollView = new ScrollView(context);
+                scrollView.setVerticalScrollBarEnabled(false);
+                addView(scrollView, LayoutHelper.createFrame(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT));
+            } catch (Throwable e) {
+                FileLog.e("tmessages", e);
+            }
+
+
+            linearLayout = new LinearLayout(context);
+            linearLayout.setOrientation(LinearLayout.VERTICAL);
+            if (scrollView != null) {
+                scrollView.addView(linearLayout, new ScrollView.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+            } else {
+                addView(linearLayout, LayoutHelper.createFrame(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT));
+            }
+        }
+
+        public void setShowedFromBotton(boolean value) {
+            showedFromBotton = value;
+        }
+
+        public void setDispatchKeyEventListener(OnDispatchKeyEventListener listener) {
+            mOnDispatchKeyEventListener = listener;
+        }
+
+        public int getBackAlpha() {
+            return backAlpha;
+        }
+
+        public void setBackAlpha(int value) {
+            backAlpha = value;
+        }
+
+        private void startChildAnimation(View child) {
+            if (animationEnabled) {
+                AnimatorSet animatorSet = new AnimatorSet();
+                animatorSet.playTogether(
+                        ObjectAnimator.ofFloat(child, "alpha", 0.0f, 1.0f),
+                        ObjectAnimator.ofFloat(child, "translationY", AndroidUtilities.dp(showedFromBotton ? 6 : -6), 0));
+                animatorSet.setDuration(180);
+                animatorSet.setInterpolator(decelerateInterpolator);
+                animatorSet.start();
+            }
+        }
+
+        @Override
+        public void addView(View child) {
+            linearLayout.addView(child);
+        }
+
+        public float getBackScaleX() {
+            return backScaleX;
+        }
+
+        public void setBackScaleX(float value) {
+            backScaleX = value;
+            invalidate();
+        }
+
+        public float getBackScaleY() {
+            return backScaleY;
+        }
+
+        public void setBackScaleY(float value) {
+            backScaleY = value;
+            if (animationEnabled) {
+                int count = getItemsCount();
+                int visibleCount = 0;
+                for (int a = 0; a < count; a++) {
+                    visibleCount += getItemAt(a).getVisibility() == VISIBLE ? 1 : 0;
+                }
+                int height = getMeasuredHeight() - AndroidUtilities.dp(16);
+                if (showedFromBotton) {
+                    for (int a = lastStartedChild; a >= 0; a--) {
+                        View child = getItemAt(a);
+                        if (child.getVisibility() != VISIBLE) {
+                            continue;
+                        }
+                        Integer position = positions.get(child);
+                        if (position != null && height - (position * AndroidUtilities.dp(48) + AndroidUtilities.dp(32)) > value * height) {
+                            break;
+                        }
+                        lastStartedChild = a - 1;
+                        startChildAnimation(child);
+                    }
+                } else {
+                    for (int a = lastStartedChild; a < count; a++) {
+                        View child = getItemAt(a);
+                        if (child.getVisibility() != VISIBLE) {
+                            continue;
+                        }
+                        Integer position = positions.get(child);
+                        if (position != null && (position + 1) * AndroidUtilities.dp(48) - AndroidUtilities.dp(24) > value * height) {
+                            break;
+                        }
+                        lastStartedChild = a + 1;
+                        startChildAnimation(child);
+                    }
+                }
+            }
+            invalidate();
+        }
+
+        @Override
+        public boolean dispatchKeyEvent(KeyEvent event) {
+            if (mOnDispatchKeyEventListener != null) {
+                mOnDispatchKeyEventListener.onDispatchKeyEvent(event);
+            }
+            return super.dispatchKeyEvent(event);
+        }
+
+        @Override
+        protected void onDraw(Canvas canvas) {
+            if (backgroundDrawable != null) {
+                backgroundDrawable.setAlpha(backAlpha);
+                if (showedFromBotton) {
+                    backgroundDrawable.setBounds(0, (int) (getMeasuredHeight() * (1.0f - backScaleY)), (int) (getMeasuredWidth() * backScaleX), getMeasuredHeight());
+                } else {
+                    backgroundDrawable.setBounds(0, 0, (int) (getMeasuredWidth() * backScaleX), (int) (getMeasuredHeight() * backScaleY));
+                }
+                backgroundDrawable.draw(canvas);
+            }
+        }
+
+        public int getItemsCount() {
+            return linearLayout.getChildCount();
+        }
+
+        public View getItemAt(int index) {
+            return linearLayout.getChildAt(index);
+        }
+
+        public void scrollToTop() {
+            if (scrollView != null) {
+                scrollView.scrollTo(0, 0);
+            }
         }
     }
 }

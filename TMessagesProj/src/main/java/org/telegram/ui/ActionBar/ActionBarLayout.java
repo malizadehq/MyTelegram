@@ -32,104 +32,34 @@ import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 
 import org.telegram.messenger.AndroidUtilities;
-import org.telegram.messenger.R;
 import org.telegram.messenger.AnimatorListenerAdapterProxy;
+import org.telegram.messenger.R;
 import org.telegram.ui.Components.LayoutHelper;
 
 import java.util.ArrayList;
 
 public class ActionBarLayout extends FrameLayout {
 
-    public interface ActionBarLayoutDelegate {
-        boolean onPreIme();
-        boolean needPresentFragment(BaseFragment fragment, boolean removeLast, boolean forceWithoutAnimation, ActionBarLayout layout);
-        boolean needAddFragmentToStack(BaseFragment fragment, ActionBarLayout layout);
-        boolean needCloseLastFragment(ActionBarLayout layout);
-        void onRebuildAllFragments(ActionBarLayout layout);
-    }
-
-    public class LinearLayoutContainer extends LinearLayout {
-
-        private Rect rect = new Rect();
-        private boolean isKeyboardVisible;
-
-        public LinearLayoutContainer(Context context) {
-            super(context);
-            setOrientation(VERTICAL);
-        }
-
-        @Override
-        protected boolean drawChild(Canvas canvas, View child, long drawingTime) {
-            if (child instanceof ActionBar) {
-                return super.drawChild(canvas, child, drawingTime);
-            } else {
-                int actionBarHeight = 0;
-                int childCount = getChildCount();
-                for (int a = 0; a < childCount; a++) {
-                    View view = getChildAt(a);
-                    if (view == child) {
-                        continue;
-                    }
-                    if (view instanceof ActionBar && view.getVisibility() == VISIBLE) {
-                        if (((ActionBar) view).getCastShadows()) {
-                            actionBarHeight = view.getMeasuredHeight();
-                        }
-                        break;
-                    }
-                }
-                boolean result = super.drawChild(canvas, child, drawingTime);
-                if (actionBarHeight != 0 && headerShadowDrawable != null) {
-                    headerShadowDrawable.setBounds(0, actionBarHeight, getMeasuredWidth(), actionBarHeight + headerShadowDrawable.getIntrinsicHeight());
-                    headerShadowDrawable.draw(canvas);
-                }
-                return result;
-            }
-        }
-
-        @Override
-        public boolean hasOverlappingRendering() {
-            return false;
-        }
-
-        @Override
-        protected void onLayout(boolean changed, int l, int t, int r, int b) {
-            super.onLayout(changed, l, t, r, b);
-
-            View rootView = getRootView();
-            getWindowVisibleDisplayFrame(rect);
-            int usableViewHeight = rootView.getHeight() - (rect.top != 0 ? AndroidUtilities.statusBarHeight : 0) - AndroidUtilities.getViewInset(rootView);
-            isKeyboardVisible = usableViewHeight - (rect.bottom - rect.top) > 0;
-            if (waitingForKeyboardCloseRunnable != null && !containerView.isKeyboardVisible && !containerViewBack.isKeyboardVisible) {
-                AndroidUtilities.cancelRunOnUIThread(waitingForKeyboardCloseRunnable);
-                waitingForKeyboardCloseRunnable.run();
-                waitingForKeyboardCloseRunnable = null;
-            }
-        }
-    }
-
     private static Drawable headerShadowDrawable;
     private static Drawable layerShadowDrawable;
     private static Paint scrimPaint;
-
+    public float innerTranslationX;
+    public ArrayList<BaseFragment> fragmentsStack = null;
+    protected boolean startedTracking;
+    protected boolean animationInProgress;
+    protected Activity parentActivity = null;
     private Runnable waitingForKeyboardCloseRunnable;
     private Runnable delayedOpenAnimationRunnable;
-
     private LinearLayoutContainer containerView;
     private LinearLayoutContainer containerViewBack;
     private DrawerLayoutContainer drawerLayoutContainer;
     private ActionBar currentActionBar;
-
     private AnimatorSet currentAnimation;
     private DecelerateInterpolator decelerateInterpolator = new DecelerateInterpolator(1.5f);
     private AccelerateDecelerateInterpolator accelerateDecelerateInterpolator = new AccelerateDecelerateInterpolator();
-
-    public float innerTranslationX;
-
     private boolean maybeStartTracking;
-    protected boolean startedTracking;
     private int startedTrackingX;
     private int startedTrackingY;
-    protected boolean animationInProgress;
     private VelocityTracker velocityTracker;
     private boolean beginTrackingSent;
     private boolean transitionAnimationInProgress;
@@ -149,9 +79,6 @@ public class ActionBarLayout extends FrameLayout {
     private String titleOverlayText;
 
     private ActionBarLayoutDelegate delegate = null;
-    protected Activity parentActivity = null;
-
-    public ArrayList<BaseFragment> fragmentsStack = null;
 
     public ActionBarLayout(Context context) {
         super(context);
@@ -203,13 +130,13 @@ public class ActionBarLayout extends FrameLayout {
         }
     }
 
+    public float getInnerTranslationX() {
+        return innerTranslationX;
+    }
+
     public void setInnerTranslationX(float value) {
         innerTranslationX = value;
         invalidate();
-    }
-
-    public float getInnerTranslationX() {
-        return innerTranslationX;
     }
 
     public void onResume() {
@@ -283,7 +210,7 @@ public class ActionBarLayout extends FrameLayout {
                 layerShadowDrawable.setAlpha((int) (0xff * alpha));
                 layerShadowDrawable.draw(canvas);
             } else if (child == containerViewBack) {
-                float opacity = Math.min(0.8f, (width - translationX) / (float)width);
+                float opacity = Math.min(0.8f, (width - translationX) / (float) width);
                 if (opacity < 0) {
                     opacity = 0;
                 }
@@ -1177,12 +1104,12 @@ public class ActionBarLayout extends FrameLayout {
         backgroundView = view;
     }
 
-    public void setDrawerLayoutContainer(DrawerLayoutContainer layout) {
-        drawerLayoutContainer = layout;
-    }
-
     public DrawerLayoutContainer getDrawerLayoutContainer() {
         return drawerLayoutContainer;
+    }
+
+    public void setDrawerLayoutContainer(DrawerLayoutContainer layout) {
+        drawerLayoutContainer = layout;
     }
 
     public void setRemoveActionBarExtraHeight(boolean value) {
@@ -1201,5 +1128,76 @@ public class ActionBarLayout extends FrameLayout {
     @Override
     public boolean hasOverlappingRendering() {
         return false;
+    }
+
+    public interface ActionBarLayoutDelegate {
+        boolean onPreIme();
+
+        boolean needPresentFragment(BaseFragment fragment, boolean removeLast, boolean forceWithoutAnimation, ActionBarLayout layout);
+
+        boolean needAddFragmentToStack(BaseFragment fragment, ActionBarLayout layout);
+
+        boolean needCloseLastFragment(ActionBarLayout layout);
+
+        void onRebuildAllFragments(ActionBarLayout layout);
+    }
+
+    public class LinearLayoutContainer extends LinearLayout {
+
+        private Rect rect = new Rect();
+        private boolean isKeyboardVisible;
+
+        public LinearLayoutContainer(Context context) {
+            super(context);
+            setOrientation(VERTICAL);
+        }
+
+        @Override
+        protected boolean drawChild(Canvas canvas, View child, long drawingTime) {
+            if (child instanceof ActionBar) {
+                return super.drawChild(canvas, child, drawingTime);
+            } else {
+                int actionBarHeight = 0;
+                int childCount = getChildCount();
+                for (int a = 0; a < childCount; a++) {
+                    View view = getChildAt(a);
+                    if (view == child) {
+                        continue;
+                    }
+                    if (view instanceof ActionBar && view.getVisibility() == VISIBLE) {
+                        if (((ActionBar) view).getCastShadows()) {
+                            actionBarHeight = view.getMeasuredHeight();
+                        }
+                        break;
+                    }
+                }
+                boolean result = super.drawChild(canvas, child, drawingTime);
+                if (actionBarHeight != 0 && headerShadowDrawable != null) {
+                    headerShadowDrawable.setBounds(0, actionBarHeight, getMeasuredWidth(), actionBarHeight + headerShadowDrawable.getIntrinsicHeight());
+                    headerShadowDrawable.draw(canvas);
+                }
+                return result;
+            }
+        }
+
+        @Override
+        public boolean hasOverlappingRendering() {
+            return false;
+        }
+
+        @Override
+        protected void onLayout(boolean changed, int l, int t, int r, int b) {
+            super.onLayout(changed, l, t, r, b);
+
+            View rootView = getRootView();
+            getWindowVisibleDisplayFrame(rect);
+            int usableViewHeight = rootView.getHeight() - (rect.top != 0 ? AndroidUtilities.statusBarHeight : 0) - AndroidUtilities.getViewInset(rootView);
+            isKeyboardVisible = usableViewHeight - (rect.bottom - rect.top) > 0;
+            if (waitingForKeyboardCloseRunnable != null && !containerView.isKeyboardVisible && !containerViewBack.isKeyboardVisible) {
+                AndroidUtilities.cancelRunOnUIThread(waitingForKeyboardCloseRunnable);
+                waitingForKeyboardCloseRunnable.run();
+                waitingForKeyboardCloseRunnable = null;
+            }
+        }
     }
 }

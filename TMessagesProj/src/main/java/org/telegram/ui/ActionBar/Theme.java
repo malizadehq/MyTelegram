@@ -8,7 +8,9 @@
 
 package org.telegram.ui.ActionBar;
 
+import android.app.Activity;
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.content.res.ColorStateList;
 import android.graphics.Canvas;
 import android.graphics.ColorFilter;
@@ -24,21 +26,21 @@ import android.os.Build;
 import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.ApplicationLoader;
 import org.telegram.messenger.R;
+import org.telegram.ui.ImageListActivity;
 
 public class Theme {
-
-    public static final int ACTION_BAR_COLOR = 0xff527da3;
+    public static final int ACTION_BAR_COLOR = ApplicationLoader.applicationContext.getSharedPreferences("telehtheme", 0).getInt("theme_color", 0xff527da3);
     public static final int ACTION_BAR_PHOTO_VIEWER_COLOR = 0x7f000000;
     public static final int ACTION_BAR_MEDIA_PICKER_COLOR = 0xff333333;
     public static final int ACTION_BAR_CHANNEL_INTRO_COLOR = 0xffffffff;
     public static final int ACTION_BAR_PLAYER_COLOR = 0xffffffff;
     public static final int ACTION_BAR_TITLE_COLOR = 0xffffffff;
     public static final int ACTION_BAR_SUBTITLE_COLOR = 0xffd5e8f7;
-    public static final int ACTION_BAR_PROFILE_COLOR = 0xff598fba;
+    public static final int ACTION_BAR_PROFILE_COLOR = ApplicationLoader.applicationContext.getSharedPreferences("mainconfig", 0).getInt("theme_color", 0xff598fba);
     public static final int ACTION_BAR_PROFILE_SUBTITLE_COLOR = 0xffd7eafa;
     public static final int ACTION_BAR_MAIN_AVATAR_COLOR = 0xff5085b1;
     public static final int ACTION_BAR_ACTION_MODE_TEXT_COLOR = 0xff737373;
-    public static final int ACTION_BAR_SELECTOR_COLOR = 0xff406d94;
+    public static final int ACTION_BAR_SELECTOR_COLOR = 0x66626262;
 
     public static final int INPUT_FIELD_SELECTOR_COLOR = 0xffd6d6d6;
     public static final int ACTION_BAR_PICKER_SELECTOR_COLOR = 0xff3d3d3d;
@@ -240,27 +242,27 @@ public class Theme {
 
     public static PorterDuffColorFilter colorFilter;
     public static PorterDuffColorFilter colorPressedFilter;
-    private static int currentColor;
-
     public static Drawable attachButtonDrawables[] = new Drawable[8];
-
+    private static int currentColor;
     private static Paint maskPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
 
     public static void loadRecources(Context context) {
         if (backgroundDrawableIn == null) {
-            backgroundDrawableIn = context.getResources().getDrawable(R.drawable.msg_in);
-            backgroundDrawableInSelected = context.getResources().getDrawable(R.drawable.msg_in_selected);
-            backgroundDrawableOut = context.getResources().getDrawable(R.drawable.msg_out);
-            backgroundDrawableOutSelected = context.getResources().getDrawable(R.drawable.msg_out_selected);
-            backgroundMediaDrawableIn = context.getResources().getDrawable(R.drawable.msg_in_photo);
-            backgroundMediaDrawableInSelected = context.getResources().getDrawable(R.drawable.msg_in_photo_selected);
-            backgroundMediaDrawableOut = context.getResources().getDrawable(R.drawable.msg_out_photo);
-            backgroundMediaDrawableOutSelected = context.getResources().getDrawable(R.drawable.msg_out_photo_selected);
-            checkDrawable = context.getResources().getDrawable(R.drawable.msg_check);
-            halfCheckDrawable = context.getResources().getDrawable(R.drawable.msg_halfcheck);
+            //backgroundDrawableIn = context.getResources().getDrawable(R.drawable.msg_in);
+            //backgroundDrawableInSelected = context.getResources().getDrawable(R.drawable.msg_in_selected);
+            //backgroundDrawableOut = context.getResources().getDrawable(R.drawable.msg_out);
+            //backgroundDrawableOutSelected = context.getResources().getDrawable(R.drawable.msg_out_selected);
+            //backgroundMediaDrawableIn = context.getResources().getDrawable(R.drawable.msg_in_photo);
+            //backgroundMediaDrawableInSelected = context.getResources().getDrawable(R.drawable.msg_in_photo_selected);
+            //backgroundMediaDrawableOut = context.getResources().getDrawable(R.drawable.msg_out_photo);
+            //backgroundMediaDrawableOutSelected = context.getResources().getDrawable(R.drawable.msg_out_photo_selected);
+            setBubbles(context);
+            setChecks(context);
+            //  checkDrawable = context.getResources().getDrawable(R.drawable.msg_check);
+            //  halfCheckDrawable = context.getResources().getDrawable(R.drawable.msg_halfcheck);
             clockDrawable = context.getResources().getDrawable(R.drawable.msg_clock);
-            checkMediaDrawable = context.getResources().getDrawable(R.drawable.msg_check_w);
-            halfCheckMediaDrawable = context.getResources().getDrawable(R.drawable.msg_halfcheck_w);
+            //   checkMediaDrawable = context.getResources().getDrawable(R.drawable.msg_check_w);
+            //   halfCheckMediaDrawable = context.getResources().getDrawable(R.drawable.msg_halfcheck_w);
             clockMediaDrawable = context.getResources().getDrawable(R.drawable.msg_clock_photo);
             clockChannelDrawable[0] = context.getResources().getDrawable(R.drawable.msg_clock2);
             clockChannelDrawable[1] = context.getResources().getDrawable(R.drawable.msg_clock2_s);
@@ -427,6 +429,159 @@ public class Theme {
             stateListDrawable.addState(new int[]{android.R.attr.state_activated}, new ColorDrawable(color));
             stateListDrawable.addState(new int[]{}, new ColorDrawable(0x00000000));
             return stateListDrawable;
+        }
+    }
+
+    public static void setBubbles(Context context) {
+        SharedPreferences themePrefs = ApplicationLoader.applicationContext.getSharedPreferences(AndroidUtilities.THEME_PREFS, Activity.MODE_PRIVATE);
+        String bubble = themePrefs.getString("chatBubbleStyle", ImageListActivity.getBubbleName(0));
+        if (bubble.equals(ImageListActivity.getBubbleName(0))) {
+            backgroundDrawableIn = context.getResources().getDrawable(R.drawable.msg_in);
+            backgroundDrawableInSelected = context.getResources().getDrawable(R.drawable.msg_in_selected);
+            backgroundDrawableOut = context.getResources().getDrawable(R.drawable.msg_out);
+            backgroundDrawableOutSelected = context.getResources().getDrawable(R.drawable.msg_out_selected);
+            backgroundMediaDrawableIn = context.getResources().getDrawable(R.drawable.msg_in_photo);
+            backgroundMediaDrawableInSelected = context.getResources().getDrawable(R.drawable.msg_in_photo_selected);
+            backgroundMediaDrawableOut = context.getResources().getDrawable(R.drawable.msg_out_photo);
+            backgroundMediaDrawableOutSelected = context.getResources().getDrawable(R.drawable.msg_out_photo_selected);
+        } else if (bubble.equals(ImageListActivity.getBubbleName(1))) {
+            backgroundDrawableIn = context.getResources().getDrawable(R.drawable.msg_in_2);
+            backgroundDrawableInSelected = context.getResources().getDrawable(R.drawable.msg_in_2_selected);
+            backgroundDrawableOut = context.getResources().getDrawable(R.drawable.msg_out_2);
+            backgroundDrawableOutSelected = context.getResources().getDrawable(R.drawable.msg_out_2_selected);
+            backgroundMediaDrawableIn = context.getResources().getDrawable(R.drawable.msg_in_2_photo);
+            backgroundMediaDrawableInSelected = context.getResources().getDrawable(R.drawable.msg_in_2_photo_selected);
+            backgroundMediaDrawableOut = context.getResources().getDrawable(R.drawable.msg_out_2_photo);
+            backgroundMediaDrawableOutSelected = context.getResources().getDrawable(R.drawable.msg_out_2_photo_selected);
+        } else if (bubble.equals(ImageListActivity.getBubbleName(2))) {
+            backgroundDrawableIn = context.getResources().getDrawable(R.drawable.msg_in_3);
+            backgroundDrawableInSelected = context.getResources().getDrawable(R.drawable.msg_in_3_selected);
+            backgroundDrawableOut = context.getResources().getDrawable(R.drawable.msg_out_3);
+            backgroundDrawableOutSelected = context.getResources().getDrawable(R.drawable.msg_out_3_selected);
+            backgroundMediaDrawableIn = context.getResources().getDrawable(R.drawable.msg_in_3_photo);
+            backgroundMediaDrawableInSelected = context.getResources().getDrawable(R.drawable.msg_in_3_photo_selected);
+            backgroundMediaDrawableOut = context.getResources().getDrawable(R.drawable.msg_out_3_photo);
+            backgroundMediaDrawableOutSelected = context.getResources().getDrawable(R.drawable.msg_out_3_photo_selected);
+        } else if (bubble.equals(ImageListActivity.getBubbleName(3))) {
+            backgroundDrawableIn = context.getResources().getDrawable(R.drawable.msg_in_4);
+            backgroundDrawableInSelected = context.getResources().getDrawable(R.drawable.msg_in_4_selected);
+            backgroundDrawableOut = context.getResources().getDrawable(R.drawable.msg_out_4);
+            backgroundDrawableOutSelected = context.getResources().getDrawable(R.drawable.msg_out_4_selected);
+            backgroundMediaDrawableIn = context.getResources().getDrawable(R.drawable.msg_in_4_photo);
+            backgroundMediaDrawableInSelected = context.getResources().getDrawable(R.drawable.msg_in_4_photo_selected);
+            backgroundMediaDrawableOut = context.getResources().getDrawable(R.drawable.msg_out_4_photo);
+            backgroundMediaDrawableOutSelected = context.getResources().getDrawable(R.drawable.msg_out_4_photo_selected);
+        } else if (bubble.equals(ImageListActivity.getBubbleName(4))) {
+            backgroundDrawableIn = context.getResources().getDrawable(R.drawable.msg_in_5);
+            backgroundDrawableInSelected = context.getResources().getDrawable(R.drawable.msg_in_5_selected);
+            backgroundDrawableOut = context.getResources().getDrawable(R.drawable.msg_out_5);
+            backgroundDrawableOutSelected = context.getResources().getDrawable(R.drawable.msg_out_5_selected);
+            backgroundMediaDrawableIn = context.getResources().getDrawable(R.drawable.msg_in_5_photo);
+            backgroundMediaDrawableInSelected = context.getResources().getDrawable(R.drawable.msg_in_5_photo_selected);
+            backgroundMediaDrawableOut = context.getResources().getDrawable(R.drawable.msg_out_5_photo);
+            backgroundMediaDrawableOutSelected = context.getResources().getDrawable(R.drawable.msg_out_5_photo_selected);
+        } else if (bubble.equals(ImageListActivity.getBubbleName(5))) {
+            backgroundDrawableIn = context.getResources().getDrawable(R.drawable.msg_in_6);
+            backgroundDrawableInSelected = context.getResources().getDrawable(R.drawable.msg_in_6_selected);
+            backgroundDrawableOut = context.getResources().getDrawable(R.drawable.msg_out_6);
+            backgroundDrawableOutSelected = context.getResources().getDrawable(R.drawable.msg_out_6_selected);
+            backgroundMediaDrawableIn = context.getResources().getDrawable(R.drawable.msg_in_6_photo);
+            backgroundMediaDrawableInSelected = context.getResources().getDrawable(R.drawable.msg_in_6_photo_selected);
+            backgroundMediaDrawableOut = context.getResources().getDrawable(R.drawable.msg_out_6_photo);
+            backgroundMediaDrawableOutSelected = context.getResources().getDrawable(R.drawable.msg_out_6_photo_selected);
+        } else if (bubble.equals(ImageListActivity.getBubbleName(6))) {
+            backgroundDrawableIn = context.getResources().getDrawable(R.drawable.msg_in_7);
+            backgroundDrawableInSelected = context.getResources().getDrawable(R.drawable.msg_in_7_selected);
+            backgroundDrawableOut = context.getResources().getDrawable(R.drawable.msg_out_7);
+            backgroundDrawableOutSelected = context.getResources().getDrawable(R.drawable.msg_out_7_selected);
+            backgroundMediaDrawableIn = context.getResources().getDrawable(R.drawable.msg_in_7_photo);
+            backgroundMediaDrawableInSelected = context.getResources().getDrawable(R.drawable.msg_in_7_photo_selected);
+            backgroundMediaDrawableOut = context.getResources().getDrawable(R.drawable.msg_out_7_photo);
+            backgroundMediaDrawableOutSelected = context.getResources().getDrawable(R.drawable.msg_out_7_photo_selected);
+        } else if (bubble.equals(ImageListActivity.getBubbleName(7))) {
+            backgroundDrawableIn = context.getResources().getDrawable(R.drawable.msg_in_8);
+            backgroundDrawableInSelected = context.getResources().getDrawable(R.drawable.msg_in_8_selected);
+            backgroundDrawableOut = context.getResources().getDrawable(R.drawable.msg_out_8);
+            backgroundDrawableOutSelected = context.getResources().getDrawable(R.drawable.msg_out_8_selected);
+            backgroundMediaDrawableIn = context.getResources().getDrawable(R.drawable.msg_in_8_photo);
+            backgroundMediaDrawableInSelected = context.getResources().getDrawable(R.drawable.msg_in_8_photo_selected);
+            backgroundMediaDrawableOut = context.getResources().getDrawable(R.drawable.msg_out_8_photo);
+            backgroundMediaDrawableOutSelected = context.getResources().getDrawable(R.drawable.msg_out_8_photo_selected);
+        } else {
+            backgroundDrawableIn = context.getResources().getDrawable(R.drawable.msg_in);
+            backgroundDrawableInSelected = context.getResources().getDrawable(R.drawable.msg_in_selected);
+            backgroundDrawableOut = context.getResources().getDrawable(R.drawable.msg_out);
+            backgroundDrawableOutSelected = context.getResources().getDrawable(R.drawable.msg_out_selected);
+            backgroundMediaDrawableIn = context.getResources().getDrawable(R.drawable.msg_in_photo);
+            backgroundMediaDrawableInSelected = context.getResources().getDrawable(R.drawable.msg_in_photo_selected);
+            backgroundMediaDrawableOut = context.getResources().getDrawable(R.drawable.msg_out_photo);
+            backgroundMediaDrawableOutSelected = context.getResources().getDrawable(R.drawable.msg_out_photo_selected);
+        }
+    }
+
+    public static void setChecks(Context context) {
+        SharedPreferences themePrefs = ApplicationLoader.applicationContext.getSharedPreferences(AndroidUtilities.THEME_PREFS, Activity.MODE_PRIVATE);
+        String check = themePrefs.getString("chatCheckStyle", ImageListActivity.getCheckName(0));
+        if (check.equals(ImageListActivity.getCheckName(1))) {
+            checkDrawable = context.getResources().getDrawable(R.drawable.msg_check_2);
+            halfCheckDrawable = context.getResources().getDrawable(R.drawable.msg_halfcheck_2);
+            checkMediaDrawable = context.getResources().getDrawable(R.drawable.msg_check_w_2);
+            halfCheckMediaDrawable = context.getResources().getDrawable(R.drawable.msg_halfcheck_w_2);
+        } else if (check.equals(ImageListActivity.getCheckName(2))) {
+            checkDrawable = context.getResources().getDrawable(R.drawable.msg_check_3);
+            halfCheckDrawable = context.getResources().getDrawable(R.drawable.msg_halfcheck_3);
+            checkMediaDrawable = context.getResources().getDrawable(R.drawable.msg_check_w_3);
+            halfCheckMediaDrawable = context.getResources().getDrawable(R.drawable.msg_halfcheck_w_3);
+        } else if (check.equals(ImageListActivity.getCheckName(3))) {
+            checkDrawable = context.getResources().getDrawable(R.drawable.msg_check_4);
+            halfCheckDrawable = context.getResources().getDrawable(R.drawable.msg_halfcheck_4);
+            checkMediaDrawable = context.getResources().getDrawable(R.drawable.msg_check_w_4);
+            halfCheckMediaDrawable = context.getResources().getDrawable(R.drawable.msg_halfcheck_w_4);
+        } else if (check.equals(ImageListActivity.getCheckName(4))) {
+            checkDrawable = context.getResources().getDrawable(R.drawable.msg_check_5);
+            halfCheckDrawable = context.getResources().getDrawable(R.drawable.msg_halfcheck_5);
+            checkMediaDrawable = context.getResources().getDrawable(R.drawable.msg_check_w_5);
+            halfCheckMediaDrawable = context.getResources().getDrawable(R.drawable.msg_halfcheck_w_5);
+        } else if (check.equals(ImageListActivity.getCheckName(5))) {
+            checkDrawable = context.getResources().getDrawable(R.drawable.msg_check_6);
+            halfCheckDrawable = context.getResources().getDrawable(R.drawable.msg_halfcheck_6);
+            checkMediaDrawable = context.getResources().getDrawable(R.drawable.msg_check_w_6);
+            halfCheckMediaDrawable = context.getResources().getDrawable(R.drawable.msg_halfcheck_w_6);
+        } else if (check.equals(ImageListActivity.getCheckName(6))) {
+            checkDrawable = context.getResources().getDrawable(R.drawable.msg_check_7);
+            halfCheckDrawable = context.getResources().getDrawable(R.drawable.msg_halfcheck_7);
+            checkMediaDrawable = context.getResources().getDrawable(R.drawable.msg_check_w_7);
+            halfCheckMediaDrawable = context.getResources().getDrawable(R.drawable.msg_halfcheck_w_7);
+        } else if (check.equals(ImageListActivity.getCheckName(7))) {
+            checkDrawable = context.getResources().getDrawable(R.drawable.msg_check_8);
+            halfCheckDrawable = context.getResources().getDrawable(R.drawable.msg_halfcheck_8);
+            checkMediaDrawable = context.getResources().getDrawable(R.drawable.msg_check_w_8);
+            halfCheckMediaDrawable = context.getResources().getDrawable(R.drawable.msg_halfcheck_w_8);
+        } else if (check.equals(ImageListActivity.getCheckName(8))) {
+            checkDrawable = context.getResources().getDrawable(R.drawable.msg_check_9);
+            halfCheckDrawable = context.getResources().getDrawable(R.drawable.msg_halfcheck_9);
+            checkMediaDrawable = context.getResources().getDrawable(R.drawable.msg_check_w_9);
+            halfCheckMediaDrawable = context.getResources().getDrawable(R.drawable.msg_halfcheck_w_9);
+        } else if (check.equals(ImageListActivity.getCheckName(9))) {
+            checkDrawable = context.getResources().getDrawable(R.drawable.msg_check_10);
+            halfCheckDrawable = context.getResources().getDrawable(R.drawable.msg_halfcheck_10);
+            checkMediaDrawable = context.getResources().getDrawable(R.drawable.msg_check_w_10);
+            halfCheckMediaDrawable = context.getResources().getDrawable(R.drawable.msg_halfcheck_w_10);
+        } else if (check.equals(ImageListActivity.getCheckName(10))) {
+            checkDrawable = context.getResources().getDrawable(R.drawable.msg_check_11);
+            halfCheckDrawable = context.getResources().getDrawable(R.drawable.msg_halfcheck_11);
+            checkMediaDrawable = context.getResources().getDrawable(R.drawable.msg_check_w_11);
+            halfCheckMediaDrawable = context.getResources().getDrawable(R.drawable.msg_halfcheck_w_11);
+        } else if (check.equals(ImageListActivity.getCheckName(11))) {
+            checkDrawable = context.getResources().getDrawable(R.drawable.msg_check_12);
+            halfCheckDrawable = context.getResources().getDrawable(R.drawable.msg_halfcheck_12);
+            checkMediaDrawable = context.getResources().getDrawable(R.drawable.msg_check_w_12);
+            halfCheckMediaDrawable = context.getResources().getDrawable(R.drawable.msg_halfcheck_w_12);
+        } else {
+            checkDrawable = context.getResources().getDrawable(R.drawable.msg_check);
+            halfCheckDrawable = context.getResources().getDrawable(R.drawable.msg_halfcheck);
+            checkMediaDrawable = context.getResources().getDrawable(R.drawable.msg_check_w);
+            halfCheckMediaDrawable = context.getResources().getDrawable(R.drawable.msg_halfcheck_w);
         }
     }
 }
