@@ -82,17 +82,16 @@ import java.util.HashMap;
 
 public class ChannelCreateActivity extends BaseFragment implements NotificationCenter.NotificationCenterDelegate, AvatarUpdater.AvatarUpdaterDelegate {
 
+    private final static int done_button = 1;
     private View doneButton;
     private EditText nameTextView;
     private ProgressDialog progressDialog = null;
-
     private BackupImageView avatarImage;
     private AvatarDrawable avatarDrawable;
     private AvatarUpdater avatarUpdater;
     private EditText descriptionTextView;
     private TLRPC.FileLocation avatar;
     private String nameToSet = null;
-
     private LinearLayout linkContainer;
     private LinearLayout publicContainer;
     private TextBlockCell privateContainer;
@@ -108,7 +107,6 @@ public class ChannelCreateActivity extends BaseFragment implements NotificationC
     private boolean isPrivate = false;
     private boolean loadingInvite;
     private TLRPC.ExportedChatInvite invite;
-
     private ContactsAdapter listViewAdapter;
     private TextView emptyTextView;
     private LetterSectionsListView listView;
@@ -120,16 +118,12 @@ public class ChannelCreateActivity extends BaseFragment implements NotificationC
     private int beforeChangeIndex;
     private boolean ignoreChange;
     private CharSequence changeString;
-
     private int currentStep;
     private int chatId;
     private boolean canCreatePublic = true;
     private TLRPC.InputFile uploadedAvatar;
-
     private boolean createAfterUpload;
     private boolean donePressed;
-
-    private final static int done_button = 1;
 
     public ChannelCreateActivity(Bundle args) {
         super(args);
@@ -949,7 +943,7 @@ public class ChannelCreateActivity extends BaseFragment implements NotificationC
     @Override
     public void didReceivedNotification(int id, final Object... args) {
         if (id == NotificationCenter.updateInterfaces) {
-            int mask = (Integer)args[0];
+            int mask = (Integer) args[0];
             if ((mask & MessagesController.UPDATE_MASK_AVATAR) != 0 || (mask & MessagesController.UPDATE_MASK_NAME) != 0 || (mask & MessagesController.UPDATE_MASK_STATUS) != 0) {
                 updateVisibleRows(mask);
             }
@@ -1135,7 +1129,7 @@ public class ChannelCreateActivity extends BaseFragment implements NotificationC
         try {
             LayoutInflater lf = (LayoutInflater) ApplicationLoader.applicationContext.getSystemService(Activity.LAYOUT_INFLATER_SERVICE);
             View textView = lf.inflate(R.layout.group_create_bubble, null);
-            TextView text = (TextView)textView.findViewById(R.id.bubble_text_view);
+            TextView text = (TextView) textView.findViewById(R.id.bubble_text_view);
             String name = UserObject.getUserName(user);
             if (name.length() == 0 && user.phone != null && user.phone.length() != 0) {
                 name = PhoneFormat.getInstance().format("+" + user.phone);

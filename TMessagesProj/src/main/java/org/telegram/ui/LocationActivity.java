@@ -45,7 +45,6 @@ import com.google.android.gms.maps.CameraUpdate;
 import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.MapView;
-
 import com.google.android.gms.maps.MapsInitializer;
 import com.google.android.gms.maps.model.BitmapDescriptorFactory;
 import com.google.android.gms.maps.model.CircleOptions;
@@ -53,24 +52,24 @@ import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.MarkerOptions;
 
 import org.telegram.messenger.AndroidUtilities;
-import org.telegram.messenger.UserObject;
 import org.telegram.messenger.ApplicationLoader;
 import org.telegram.messenger.FileLog;
 import org.telegram.messenger.LocaleController;
-import org.telegram.tgnet.TLRPC;
 import org.telegram.messenger.MessageObject;
 import org.telegram.messenger.MessagesController;
 import org.telegram.messenger.NotificationCenter;
 import org.telegram.messenger.R;
+import org.telegram.messenger.UserObject;
+import org.telegram.tgnet.TLRPC;
 import org.telegram.ui.ActionBar.ActionBar;
 import org.telegram.ui.ActionBar.ActionBarMenu;
 import org.telegram.ui.ActionBar.ActionBarMenuItem;
+import org.telegram.ui.ActionBar.BaseFragment;
 import org.telegram.ui.Adapters.BaseLocationAdapter;
 import org.telegram.ui.Adapters.LocationActivityAdapter;
 import org.telegram.ui.Adapters.LocationActivitySearchAdapter;
 import org.telegram.ui.Components.AvatarDrawable;
 import org.telegram.ui.Components.BackupImageView;
-import org.telegram.ui.ActionBar.BaseFragment;
 import org.telegram.ui.Components.LayoutHelper;
 import org.telegram.ui.Components.MapPlaceholderDrawable;
 
@@ -80,6 +79,10 @@ import java.util.Locale;
 
 public class LocationActivity extends BaseFragment implements NotificationCenter.NotificationCenterDelegate {
 
+    private final static int share = 1;
+    private final static int map_list_menu_map = 2;
+    private final static int map_list_menu_satellite = 3;
+    private final static int map_list_menu_hybrid = 4;
     private GoogleMap googleMap;
     private TextView distanceTextView;
     private BackupImageView avatarImageView;
@@ -94,36 +97,20 @@ public class LocationActivity extends BaseFragment implements NotificationCenter
     private ImageView markerImageView;
     private ImageView markerXImageView;
     private ImageView locationButton;
-
     private AnimatorSet animatorSet;
-
     private boolean checkPermission = true;
-
     private boolean searching;
     private boolean searchWas;
-
     private boolean wasResults;
-
     private Location myLocation;
     private Location userLocation;
     private int markerTop;
-
     private MessageObject messageObject;
     private boolean userLocationMoved = false;
     private boolean firstWas = false;
     private CircleOptions circleOptions;
     private LocationActivityDelegate delegate;
-
     private int overScrollHeight = AndroidUtilities.displaySize.x - ActionBar.getCurrentActionBarHeight() - AndroidUtilities.dp(66);
-
-    private final static int share = 1;
-    private final static int map_list_menu_map = 2;
-    private final static int map_list_menu_satellite = 3;
-    private final static int map_list_menu_hybrid = 4;
-
-    public interface LocationActivityDelegate {
-        void didSelectLocation(TLRPC.MessageMedia location);
-    }
 
     @Override
     public boolean onFragmentCreate() {
@@ -954,5 +941,9 @@ public class LocationActivity extends BaseFragment implements NotificationCenter
         if (adapter != null) {
             adapter.notifyDataSetChanged();
         }
+    }
+
+    public interface LocationActivityDelegate {
+        void didSelectLocation(TLRPC.MessageMedia location);
     }
 }

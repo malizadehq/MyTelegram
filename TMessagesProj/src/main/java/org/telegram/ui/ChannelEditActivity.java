@@ -56,6 +56,7 @@ import java.util.concurrent.Semaphore;
 
 public class ChannelEditActivity extends BaseFragment implements AvatarUpdater.AvatarUpdaterDelegate, NotificationCenter.NotificationCenterDelegate {
 
+    private final static int done_button = 1;
     private View doneButton;
     private EditText nameTextView;
     private EditText descriptionTextView;
@@ -65,18 +66,14 @@ public class ChannelEditActivity extends BaseFragment implements AvatarUpdater.A
     private ProgressDialog progressDialog;
     private TextSettingsCell typeCell;
     private TextSettingsCell adminCell;
-
     private TLRPC.FileLocation avatar;
     private TLRPC.Chat currentChat;
     private TLRPC.ChatFull info;
     private int chatId;
     private TLRPC.InputFile uploadedAvatar;
     private boolean signMessages;
-
     private boolean createAfterUpload;
     private boolean donePressed;
-
-    private final static int done_button = 1;
 
     public ChannelEditActivity(Bundle args) {
         super(args);

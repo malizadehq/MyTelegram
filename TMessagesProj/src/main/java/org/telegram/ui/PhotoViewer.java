@@ -55,43 +55,43 @@ import android.widget.Scroller;
 import android.widget.TextView;
 
 import org.telegram.messenger.AndroidUtilities;
+import org.telegram.messenger.AnimatorListenerAdapterProxy;
+import org.telegram.messenger.ApplicationLoader;
 import org.telegram.messenger.Emoji;
+import org.telegram.messenger.FileLoader;
+import org.telegram.messenger.FileLog;
 import org.telegram.messenger.ImageLoader;
+import org.telegram.messenger.ImageReceiver;
+import org.telegram.messenger.LocaleController;
+import org.telegram.messenger.MediaController;
+import org.telegram.messenger.MessageObject;
+import org.telegram.messenger.MessagesController;
 import org.telegram.messenger.MessagesStorage;
+import org.telegram.messenger.NotificationCenter;
+import org.telegram.messenger.R;
+import org.telegram.messenger.UserConfig;
 import org.telegram.messenger.UserObject;
+import org.telegram.messenger.Utilities;
 import org.telegram.messenger.exoplayer.AspectRatioFrameLayout;
 import org.telegram.messenger.exoplayer.ExoPlayer;
 import org.telegram.messenger.exoplayer.util.PlayerControl;
 import org.telegram.messenger.query.SharedMediaQuery;
-import org.telegram.messenger.ApplicationLoader;
-import org.telegram.messenger.FileLoader;
-import org.telegram.messenger.FileLog;
-import org.telegram.messenger.LocaleController;
-import org.telegram.messenger.MediaController;
-import org.telegram.messenger.MessagesController;
-import org.telegram.messenger.NotificationCenter;
-import org.telegram.messenger.R;
 import org.telegram.messenger.support.widget.LinearLayoutManager;
 import org.telegram.tgnet.ConnectionsManager;
 import org.telegram.tgnet.TLRPC;
-import org.telegram.messenger.UserConfig;
-import org.telegram.messenger.MessageObject;
-import org.telegram.messenger.Utilities;
-import org.telegram.ui.ActionBar.Theme;
-import org.telegram.ui.Adapters.MentionsAdapter;
-import org.telegram.messenger.AnimatorListenerAdapterProxy;
 import org.telegram.ui.ActionBar.ActionBar;
 import org.telegram.ui.ActionBar.ActionBarMenu;
 import org.telegram.ui.ActionBar.ActionBarMenuItem;
+import org.telegram.ui.ActionBar.Theme;
+import org.telegram.ui.Adapters.MentionsAdapter;
 import org.telegram.ui.Components.AnimatedFileDrawable;
 import org.telegram.ui.Components.CheckBox;
 import org.telegram.ui.Components.ClippingImageView;
-import org.telegram.messenger.ImageReceiver;
 import org.telegram.ui.Components.LayoutHelper;
 import org.telegram.ui.Components.PhotoCropView;
 import org.telegram.ui.Components.PhotoFilterView;
-import org.telegram.ui.Components.PickerBottomLayout;
 import org.telegram.ui.Components.PhotoViewerCaptionEnterView;
+import org.telegram.ui.Components.PickerBottomLayout;
 import org.telegram.ui.Components.RecyclerListView;
 import org.telegram.ui.Components.SeekBar;
 import org.telegram.ui.Components.SizeNotifierFrameLayoutPhoto;
@@ -107,18 +107,28 @@ import java.util.Locale;
 @SuppressWarnings("unchecked")
 public class PhotoViewer implements NotificationCenter.NotificationCenterDelegate, GestureDetector.OnGestureListener, GestureDetector.OnDoubleTapListener {
 
+    private final static int gallery_menu_save = 1;
+    private final static int gallery_menu_showall = 2;
+    private final static int gallery_menu_send = 3;
+    private final static int gallery_menu_crop = 4;
+    private final static int gallery_menu_delete = 6;
+    private final static int gallery_menu_tune = 7;
+    private final static int gallery_menu_caption = 8;
+    private final static int gallery_menu_caption_done = 9;
+    private final static int gallery_menu_share = 10;
+    private final static int gallery_menu_openin = 11;
+    private final static int PAGE_SPACING = AndroidUtilities.dp(30);
+    private static Drawable[] progressDrawables;
+    private static DecelerateInterpolator decelerateInterpolator = null;
+    private static Paint progressPaint = null;
+    private static volatile PhotoViewer Instance = null;
     private int classGuid;
     private PhotoViewerProvider placeProvider;
     private boolean isVisible;
-
     private Activity parentActivity;
     private Context actvityContext;
-
     private ActionBar actionBar;
     private boolean isActionBarVisible = true;
-
-    private static Drawable[] progressDrawables;
-
     private WindowManager.LayoutParams windowLayoutParams;
     private FrameLayoutDrawer containerView;
     private FrameLayoutTouchListener windowView;
@@ -149,7 +159,6 @@ public class PhotoViewer implements NotificationCenter.NotificationCenterDelegat
     private int sendPhotoType = 0;
     private boolean needCaptionLayout;
     private AnimatedFileDrawable currentAnimation;
-
     private AspectRatioFrameLayout aspectRatioFrameLayout;
     private TextureView videoTextureView;
     private VideoPlayer videoPlayer;
@@ -180,27 +189,21 @@ public class PhotoViewer implements NotificationCenter.NotificationCenterDelegat
             }
         }
     };
-
     private float animationValues[][] = new float[2][8];
-
     private ChatActivity parentChatActivity;
     private MentionsAdapter mentionsAdapter;
     private RecyclerListView mentionListView;
     private LinearLayoutManager mentionLayoutManager;
     private AnimatorSet mentionListAnimation;
     private boolean allowMentions;
-
     private int animationInProgress = 0;
     private long transitionAnimationStartTime = 0;
     private Runnable animationEndRunnable = null;
     private PlaceProviderObject showAfterAnimation;
     private PlaceProviderObject hideAfterAnimation;
     private boolean disableShowCheck = false;
-
     private String lastTitle;
-
     private int currentEditMode;
-
     private ImageReceiver leftImage = new ImageReceiver();
     private ImageReceiver centerImage = new ImageReceiver();
     private ImageReceiver rightImage = new ImageReceiver();
@@ -211,7 +214,6 @@ public class PhotoViewer implements NotificationCenter.NotificationCenterDelegat
     private PlaceProviderObject currentPlaceObject;
     private String currentPathObject;
     private Bitmap currentThumb = null;
-
     private int avatarsDialogId;
     private long currentDialogId;
     private long mergeDialogId;
@@ -220,9 +222,8 @@ public class PhotoViewer implements NotificationCenter.NotificationCenterDelegat
     private boolean isFirstLoading;
     private boolean needSearchImageInArr;
     private boolean loadingMoreImages;
-    private boolean endReached[] = new boolean[] {false, true};
+    private boolean endReached[] = new boolean[]{false, true};
     private boolean opennedFromMedia;
-
     private boolean draggingDown = false;
     private float dragY;
     private float translationX;
@@ -262,432 +263,15 @@ public class PhotoViewer implements NotificationCenter.NotificationCenterDelegat
     private int switchImageAfterAnimation = 0;
     private VelocityTracker velocityTracker = null;
     private Scroller scroller = null;
-
     private ArrayList<MessageObject> imagesArrTemp = new ArrayList<>();
-    private HashMap<Integer, MessageObject>[] imagesByIdsTemp = new HashMap[] {new HashMap<>(), new HashMap<>()};
+    private HashMap<Integer, MessageObject>[] imagesByIdsTemp = new HashMap[]{new HashMap<>(), new HashMap<>()};
     private ArrayList<MessageObject> imagesArr = new ArrayList<>();
-    private HashMap<Integer, MessageObject>[] imagesByIds = new HashMap[] {new HashMap<>(), new HashMap<>()};
+    private HashMap<Integer, MessageObject>[] imagesByIds = new HashMap[]{new HashMap<>(), new HashMap<>()};
     private ArrayList<TLRPC.FileLocation> imagesArrLocations = new ArrayList<>();
     private ArrayList<TLRPC.Photo> avatarsArr = new ArrayList<>();
     private ArrayList<Integer> imagesArrLocationsSizes = new ArrayList<>();
     private ArrayList<Object> imagesArrLocals = new ArrayList<>();
     private TLRPC.FileLocation currentUserAvatarLocation = null;
-
-    private final static int gallery_menu_save = 1;
-    private final static int gallery_menu_showall = 2;
-    private final static int gallery_menu_send = 3;
-    private final static int gallery_menu_crop = 4;
-    private final static int gallery_menu_delete = 6;
-    private final static int gallery_menu_tune = 7;
-    private final static int gallery_menu_caption = 8;
-    private final static int gallery_menu_caption_done = 9;
-    private final static int gallery_menu_share = 10;
-    private final static int gallery_menu_openin = 11;
-
-    private final static int PAGE_SPACING = AndroidUtilities.dp(30);
-
-    private static DecelerateInterpolator decelerateInterpolator = null;
-    private static Paint progressPaint = null;
-
-    private class BackgroundDrawable extends ColorDrawable {
-
-        private Runnable drawRunnable;
-
-        public BackgroundDrawable(int color) {
-            super(color);
-        }
-
-        @Override
-        public void setAlpha(int alpha) {
-            if (parentActivity instanceof LaunchActivity) {
-                ((LaunchActivity) parentActivity).drawerLayoutContainer.setAllowDrawContent(!isVisible || alpha != 255);
-            }
-            super.setAlpha(alpha);
-        }
-
-        @Override
-        public void draw(Canvas canvas) {
-            super.draw(canvas);
-            if (getAlpha() != 0) {
-                if (drawRunnable != null) {
-                    drawRunnable.run();
-                    drawRunnable = null;
-                }
-            }
-        }
-    }
-
-    private class RadialProgressView {
-
-        private long lastUpdateTime = 0;
-        private float radOffset = 0;
-        private float currentProgress = 0;
-        private float animationProgressStart = 0;
-        private long currentProgressTime = 0;
-        private float animatedProgressValue = 0;
-        private RectF progressRect = new RectF();
-        private int backgroundState = -1;
-        private View parent = null;
-        private int size = AndroidUtilities.dp(64);
-        private int previousBackgroundState = -2;
-        private float animatedAlphaValue = 1.0f;
-        private float alpha = 1.0f;
-        private float scale = 1.0f;
-
-        public RadialProgressView(Context context, View parentView) {
-            if (decelerateInterpolator == null) {
-                decelerateInterpolator = new DecelerateInterpolator(1.5f);
-                progressPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-                progressPaint.setStyle(Paint.Style.STROKE);
-                progressPaint.setStrokeCap(Paint.Cap.ROUND);
-                progressPaint.setStrokeWidth(AndroidUtilities.dp(3));
-                progressPaint.setColor(0xffffffff);
-            }
-            parent = parentView;
-        }
-
-        private void updateAnimation() {
-            long newTime = System.currentTimeMillis();
-            long dt = newTime - lastUpdateTime;
-            lastUpdateTime = newTime;
-
-            if (animatedProgressValue != 1) {
-                radOffset += 360 * dt / 3000.0f;
-                float progressDiff = currentProgress - animationProgressStart;
-                if (progressDiff > 0) {
-                    currentProgressTime += dt;
-                    if (currentProgressTime >= 300) {
-                        animatedProgressValue = currentProgress;
-                        animationProgressStart = currentProgress;
-                        currentProgressTime = 0;
-                    } else {
-                        animatedProgressValue = animationProgressStart + progressDiff * decelerateInterpolator.getInterpolation(currentProgressTime / 300.0f);
-                    }
-                }
-                parent.invalidate();
-            }
-            if (animatedProgressValue >= 1 && previousBackgroundState != -2) {
-                animatedAlphaValue -= dt / 200.0f;
-                if (animatedAlphaValue <= 0) {
-                    animatedAlphaValue = 0.0f;
-                    previousBackgroundState = -2;
-                }
-                parent.invalidate();
-            }
-        }
-
-        public void setProgress(float value, boolean animated) {
-            if (!animated) {
-                animatedProgressValue = value;
-                animationProgressStart = value;
-            } else {
-                animationProgressStart = animatedProgressValue;
-            }
-            currentProgress = value;
-            currentProgressTime = 0;
-        }
-
-        public void setBackgroundState(int state, boolean animated) {
-            lastUpdateTime = System.currentTimeMillis();
-            if (animated && backgroundState != state) {
-                previousBackgroundState = backgroundState;
-                animatedAlphaValue = 1.0f;
-            } else {
-                previousBackgroundState = -2;
-            }
-            backgroundState = state;
-            parent.invalidate();
-        }
-
-        public void setAlpha(float value) {
-            alpha = value;
-        }
-
-        public void setScale(float value) {
-            scale = value;
-        }
-
-        public void onDraw(Canvas canvas) {
-            int sizeScaled = (int) (size * scale);
-            int x = (getContainerViewWidth() - sizeScaled) / 2;
-            int y = (getContainerViewHeight() - sizeScaled) / 2;
-
-            if (previousBackgroundState >= 0 && previousBackgroundState < 4) {
-                Drawable drawable = progressDrawables[previousBackgroundState];
-                if (drawable != null) {
-                    drawable.setAlpha((int) (255 * animatedAlphaValue * alpha));
-                    drawable.setBounds(x, y, x + sizeScaled, y + sizeScaled);
-                    drawable.draw(canvas);
-                }
-            }
-
-            if (backgroundState >= 0 && backgroundState < 4) {
-                Drawable drawable = progressDrawables[backgroundState];
-                if (drawable != null) {
-                    if (previousBackgroundState != -2) {
-                        drawable.setAlpha((int) (255 * (1.0f - animatedAlphaValue) * alpha));
-                    } else {
-                        drawable.setAlpha((int) (255 * alpha));
-                    }
-                    drawable.setBounds(x, y, x + sizeScaled, y + sizeScaled);
-                    drawable.draw(canvas);
-                }
-            }
-
-            if (backgroundState == 0 || backgroundState == 1 || previousBackgroundState == 0 || previousBackgroundState == 1) {
-                int diff = AndroidUtilities.dp(4);
-                if (previousBackgroundState != -2) {
-                    progressPaint.setAlpha((int) (255 * animatedAlphaValue * alpha));
-                } else {
-                    progressPaint.setAlpha((int) (255 * alpha));
-                }
-                progressRect.set(x + diff, y + diff, x + sizeScaled - diff, y + sizeScaled - diff);
-                canvas.drawArc(progressRect, -90 + radOffset, Math.max(4, 360 * animatedProgressValue), false, progressPaint);
-                updateAnimation();
-            }
-        }
-    }
-
-    public static class PlaceProviderObject {
-        public ImageReceiver imageReceiver;
-        public int viewX;
-        public int viewY;
-        public View parentView;
-        public Bitmap thumb;
-        public int dialogId;
-        public int index;
-        public int size;
-        public int radius;
-        public int clipBottomAddition;
-        public int clipTopAddition;
-        public float scale = 1.0f;
-    }
-
-    public static class EmptyPhotoViewerProvider implements PhotoViewerProvider {
-        @Override
-        public PlaceProviderObject getPlaceForPhoto(MessageObject messageObject, TLRPC.FileLocation fileLocation, int index) {
-            return null;
-        }
-
-        @Override
-        public Bitmap getThumbForPhoto(MessageObject messageObject, TLRPC.FileLocation fileLocation, int index) {
-            return null;
-        }
-
-        @Override
-        public void willSwitchFromPhoto(MessageObject messageObject, TLRPC.FileLocation fileLocation, int index) {
-
-        }
-
-        @Override
-        public void willHidePhotoViewer() {
-
-        }
-
-        @Override
-        public boolean isPhotoChecked(int index) {
-            return false;
-        }
-
-        @Override
-        public void setPhotoChecked(int index) {
-
-        }
-
-        @Override
-        public boolean cancelButtonPressed() {
-            return true;
-        }
-
-        @Override
-        public void sendButtonPressed(int index) {
-
-        }
-
-        @Override
-        public int getSelectedCount() {
-            return 0;
-        }
-
-        @Override
-        public void updatePhotoAtIndex(int index) {
-
-        }
-    }
-
-    public interface PhotoViewerProvider {
-        PlaceProviderObject getPlaceForPhoto(MessageObject messageObject, TLRPC.FileLocation fileLocation, int index);
-
-        Bitmap getThumbForPhoto(MessageObject messageObject, TLRPC.FileLocation fileLocation, int index);
-
-        void willSwitchFromPhoto(MessageObject messageObject, TLRPC.FileLocation fileLocation, int index);
-
-        void willHidePhotoViewer();
-
-        boolean isPhotoChecked(int index);
-
-        void setPhotoChecked(int index);
-
-        boolean cancelButtonPressed();
-
-        void sendButtonPressed(int index);
-
-        int getSelectedCount();
-
-        void updatePhotoAtIndex(int index);
-    }
-
-    private class FrameLayoutTouchListener extends FrameLayout {
-
-        private boolean attachedToWindow;
-        private Runnable attachRunnable;
-
-        public FrameLayoutTouchListener(Context context) {
-            super(context);
-        }
-
-        @Override
-        public boolean onTouchEvent(MotionEvent event) {
-            return getInstance().onTouchEvent(event);
-        }
-
-        @Override
-        protected void onLayout(boolean changed, int left, int top, int right, int bottom) {
-            super.onLayout(changed, left, top, right, bottom);
-            getInstance().onLayout(changed, left, top, right, bottom);
-        }
-
-        @Override
-        protected void onAttachedToWindow() {
-            super.onAttachedToWindow();
-            attachedToWindow = true;
-        }
-
-        @Override
-        protected void onDetachedFromWindow() {
-            super.onDetachedFromWindow();
-            attachedToWindow = false;
-        }
-    }
-
-    private class FrameLayoutDrawer extends SizeNotifierFrameLayoutPhoto {
-        public FrameLayoutDrawer(Context context) {
-            super(context);
-            setWillNotDraw(false);
-        }
-
-        @Override
-        protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
-            int widthSize = MeasureSpec.getSize(widthMeasureSpec);
-            int heightSize = MeasureSpec.getSize(heightMeasureSpec);
-            if (heightSize > AndroidUtilities.displaySize.y - AndroidUtilities.statusBarHeight) {
-                heightSize = AndroidUtilities.displaySize.y - AndroidUtilities.statusBarHeight;
-            }
-
-            setMeasuredDimension(widthSize, heightSize);
-
-            int childCount = getChildCount();
-            for (int i = 0; i < childCount; i++) {
-                View child = getChildAt(i);
-                if (child.getVisibility() == GONE) {
-                    continue;
-                }
-                if (captionEditText.isPopupView(child)) {
-                    child.measure(MeasureSpec.makeMeasureSpec(widthSize, MeasureSpec.EXACTLY), MeasureSpec.makeMeasureSpec(child.getLayoutParams().height, MeasureSpec.EXACTLY));
-                } else {
-                    measureChildWithMargins(child, widthMeasureSpec, 0, heightMeasureSpec, 0);
-                }
-            }
-        }
-
-        @Override
-        protected void onLayout(boolean changed, int l, int t, int r, int b) {
-            final int count = getChildCount();
-
-            int paddingBottom = getKeyboardHeight() <= AndroidUtilities.dp(20) ? captionEditText.getEmojiPadding() : 0;
-
-            for (int i = 0; i < count; i++) {
-                final View child = getChildAt(i);
-                if (child.getVisibility() == GONE) {
-                    continue;
-                }
-                final LayoutParams lp = (LayoutParams) child.getLayoutParams();
-
-                final int width = child.getMeasuredWidth();
-                final int height = child.getMeasuredHeight();
-
-                int childLeft;
-                int childTop;
-
-                int gravity = lp.gravity;
-                if (gravity == -1) {
-                    gravity = Gravity.TOP | Gravity.LEFT;
-                }
-
-                final int absoluteGravity = gravity & Gravity.HORIZONTAL_GRAVITY_MASK;
-                final int verticalGravity = gravity & Gravity.VERTICAL_GRAVITY_MASK;
-
-                switch (absoluteGravity & Gravity.HORIZONTAL_GRAVITY_MASK) {
-                    case Gravity.CENTER_HORIZONTAL:
-                        childLeft = (r - l - width) / 2 + lp.leftMargin - lp.rightMargin;
-                        break;
-                    case Gravity.RIGHT:
-                        childLeft = r - width - lp.rightMargin;
-                        break;
-                    case Gravity.LEFT:
-                    default:
-                        childLeft = lp.leftMargin;
-                }
-
-                switch (verticalGravity) {
-                    case Gravity.TOP:
-                        childTop = lp.topMargin;
-                        break;
-                    case Gravity.CENTER_VERTICAL:
-                        childTop = ((b - paddingBottom) - t - height) / 2 + lp.topMargin - lp.bottomMargin;
-                        break;
-                    case Gravity.BOTTOM:
-                        childTop = ((b - paddingBottom) - t) - height - lp.bottomMargin;
-                        break;
-                    default:
-                        childTop = lp.topMargin;
-                }
-
-                if (child == mentionListView) {
-                    if (!captionEditText.isPopupShowing() && !captionEditText.isKeyboardVisible() && captionEditText.getEmojiPadding() == 0) {
-                        childTop += AndroidUtilities.dp(400);
-                    } else {
-                        childTop -= captionEditText.getMeasuredHeight();
-                    }
-                } else if (child == captionEditText) {
-                    if (!captionEditText.isPopupShowing() && !captionEditText.isKeyboardVisible() && captionEditText.getEmojiPadding() == 0) {
-                        childTop += AndroidUtilities.dp(400);
-                    }
-                } else if (child == pickerView || child == captionTextViewNew || child == captionTextViewOld) {
-                    if (captionEditText.isPopupShowing() || captionEditText.isKeyboardVisible()) {
-                        childTop += AndroidUtilities.dp(400);
-                    }
-                } else if (captionEditText.isPopupView(child)) {
-                    childTop = captionEditText.getBottom();
-                }
-                child.layout(childLeft, childTop, childLeft + width, childTop + height);
-            }
-
-            notifyHeightChanged();
-        }
-
-        @Override
-        protected void onDraw(Canvas canvas) {
-            getInstance().onDraw(canvas);
-        }
-
-        @Override
-        protected boolean drawChild(Canvas canvas, View child, long drawingTime) {
-            return child != aspectRatioFrameLayout && super.drawChild(canvas, child, drawingTime);
-        }
-    }
-
-    private static volatile PhotoViewer Instance = null;
 
     public static PhotoViewer getInstance() {
         PhotoViewer localInstance = Instance;
@@ -1273,7 +857,7 @@ public class PhotoViewer implements NotificationCenter.NotificationCenterDelegat
         menuItem = menu.addItem(0, R.drawable.ic_ab_other);
         String str = LocaleController.getString("OpenInBrowser", R.string.OpenInBrowser);
         if (!TextUtils.isEmpty(str)) { //TODO add new string later
-            str = str.substring(0,1).toUpperCase() + str.substring(1).toLowerCase();
+            str = str.substring(0, 1).toUpperCase() + str.substring(1).toLowerCase();
         }
         menuItem.addSubItem(gallery_menu_openin, str, 0);
         menuItem.addSubItem(gallery_menu_showall, LocaleController.getString("ShowAllMedia", R.string.ShowAllMedia), 0);
@@ -4034,13 +3618,13 @@ public class PhotoViewer implements NotificationCenter.NotificationCenterDelegat
         imageMoveAnimation.start();
     }
 
+    public float getAnimationValue() {
+        return animationValue;
+    }
+
     public void setAnimationValue(float value) {
         animationValue = value;
         containerView.invalidate();
-    }
-
-    public float getAnimationValue() {
-        return animationValue;
     }
 
     @SuppressLint("NewApi")
@@ -4427,5 +4011,403 @@ public class PhotoViewer implements NotificationCenter.NotificationCenterDelegat
     @Override
     public boolean onDoubleTapEvent(MotionEvent e) {
         return false;
+    }
+
+    public interface PhotoViewerProvider {
+        PlaceProviderObject getPlaceForPhoto(MessageObject messageObject, TLRPC.FileLocation fileLocation, int index);
+
+        Bitmap getThumbForPhoto(MessageObject messageObject, TLRPC.FileLocation fileLocation, int index);
+
+        void willSwitchFromPhoto(MessageObject messageObject, TLRPC.FileLocation fileLocation, int index);
+
+        void willHidePhotoViewer();
+
+        boolean isPhotoChecked(int index);
+
+        void setPhotoChecked(int index);
+
+        boolean cancelButtonPressed();
+
+        void sendButtonPressed(int index);
+
+        int getSelectedCount();
+
+        void updatePhotoAtIndex(int index);
+    }
+
+    public static class PlaceProviderObject {
+        public ImageReceiver imageReceiver;
+        public int viewX;
+        public int viewY;
+        public View parentView;
+        public Bitmap thumb;
+        public int dialogId;
+        public int index;
+        public int size;
+        public int radius;
+        public int clipBottomAddition;
+        public int clipTopAddition;
+        public float scale = 1.0f;
+    }
+
+    public static class EmptyPhotoViewerProvider implements PhotoViewerProvider {
+        @Override
+        public PlaceProviderObject getPlaceForPhoto(MessageObject messageObject, TLRPC.FileLocation fileLocation, int index) {
+            return null;
+        }
+
+        @Override
+        public Bitmap getThumbForPhoto(MessageObject messageObject, TLRPC.FileLocation fileLocation, int index) {
+            return null;
+        }
+
+        @Override
+        public void willSwitchFromPhoto(MessageObject messageObject, TLRPC.FileLocation fileLocation, int index) {
+
+        }
+
+        @Override
+        public void willHidePhotoViewer() {
+
+        }
+
+        @Override
+        public boolean isPhotoChecked(int index) {
+            return false;
+        }
+
+        @Override
+        public void setPhotoChecked(int index) {
+
+        }
+
+        @Override
+        public boolean cancelButtonPressed() {
+            return true;
+        }
+
+        @Override
+        public void sendButtonPressed(int index) {
+
+        }
+
+        @Override
+        public int getSelectedCount() {
+            return 0;
+        }
+
+        @Override
+        public void updatePhotoAtIndex(int index) {
+
+        }
+    }
+
+    private class BackgroundDrawable extends ColorDrawable {
+
+        private Runnable drawRunnable;
+
+        public BackgroundDrawable(int color) {
+            super(color);
+        }
+
+        @Override
+        public void setAlpha(int alpha) {
+            if (parentActivity instanceof LaunchActivity) {
+                ((LaunchActivity) parentActivity).drawerLayoutContainer.setAllowDrawContent(!isVisible || alpha != 255);
+            }
+            super.setAlpha(alpha);
+        }
+
+        @Override
+        public void draw(Canvas canvas) {
+            super.draw(canvas);
+            if (getAlpha() != 0) {
+                if (drawRunnable != null) {
+                    drawRunnable.run();
+                    drawRunnable = null;
+                }
+            }
+        }
+    }
+
+    private class RadialProgressView {
+
+        private long lastUpdateTime = 0;
+        private float radOffset = 0;
+        private float currentProgress = 0;
+        private float animationProgressStart = 0;
+        private long currentProgressTime = 0;
+        private float animatedProgressValue = 0;
+        private RectF progressRect = new RectF();
+        private int backgroundState = -1;
+        private View parent = null;
+        private int size = AndroidUtilities.dp(64);
+        private int previousBackgroundState = -2;
+        private float animatedAlphaValue = 1.0f;
+        private float alpha = 1.0f;
+        private float scale = 1.0f;
+
+        public RadialProgressView(Context context, View parentView) {
+            if (decelerateInterpolator == null) {
+                decelerateInterpolator = new DecelerateInterpolator(1.5f);
+                progressPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+                progressPaint.setStyle(Paint.Style.STROKE);
+                progressPaint.setStrokeCap(Paint.Cap.ROUND);
+                progressPaint.setStrokeWidth(AndroidUtilities.dp(3));
+                progressPaint.setColor(0xffffffff);
+            }
+            parent = parentView;
+        }
+
+        private void updateAnimation() {
+            long newTime = System.currentTimeMillis();
+            long dt = newTime - lastUpdateTime;
+            lastUpdateTime = newTime;
+
+            if (animatedProgressValue != 1) {
+                radOffset += 360 * dt / 3000.0f;
+                float progressDiff = currentProgress - animationProgressStart;
+                if (progressDiff > 0) {
+                    currentProgressTime += dt;
+                    if (currentProgressTime >= 300) {
+                        animatedProgressValue = currentProgress;
+                        animationProgressStart = currentProgress;
+                        currentProgressTime = 0;
+                    } else {
+                        animatedProgressValue = animationProgressStart + progressDiff * decelerateInterpolator.getInterpolation(currentProgressTime / 300.0f);
+                    }
+                }
+                parent.invalidate();
+            }
+            if (animatedProgressValue >= 1 && previousBackgroundState != -2) {
+                animatedAlphaValue -= dt / 200.0f;
+                if (animatedAlphaValue <= 0) {
+                    animatedAlphaValue = 0.0f;
+                    previousBackgroundState = -2;
+                }
+                parent.invalidate();
+            }
+        }
+
+        public void setProgress(float value, boolean animated) {
+            if (!animated) {
+                animatedProgressValue = value;
+                animationProgressStart = value;
+            } else {
+                animationProgressStart = animatedProgressValue;
+            }
+            currentProgress = value;
+            currentProgressTime = 0;
+        }
+
+        public void setBackgroundState(int state, boolean animated) {
+            lastUpdateTime = System.currentTimeMillis();
+            if (animated && backgroundState != state) {
+                previousBackgroundState = backgroundState;
+                animatedAlphaValue = 1.0f;
+            } else {
+                previousBackgroundState = -2;
+            }
+            backgroundState = state;
+            parent.invalidate();
+        }
+
+        public void setAlpha(float value) {
+            alpha = value;
+        }
+
+        public void setScale(float value) {
+            scale = value;
+        }
+
+        public void onDraw(Canvas canvas) {
+            int sizeScaled = (int) (size * scale);
+            int x = (getContainerViewWidth() - sizeScaled) / 2;
+            int y = (getContainerViewHeight() - sizeScaled) / 2;
+
+            if (previousBackgroundState >= 0 && previousBackgroundState < 4) {
+                Drawable drawable = progressDrawables[previousBackgroundState];
+                if (drawable != null) {
+                    drawable.setAlpha((int) (255 * animatedAlphaValue * alpha));
+                    drawable.setBounds(x, y, x + sizeScaled, y + sizeScaled);
+                    drawable.draw(canvas);
+                }
+            }
+
+            if (backgroundState >= 0 && backgroundState < 4) {
+                Drawable drawable = progressDrawables[backgroundState];
+                if (drawable != null) {
+                    if (previousBackgroundState != -2) {
+                        drawable.setAlpha((int) (255 * (1.0f - animatedAlphaValue) * alpha));
+                    } else {
+                        drawable.setAlpha((int) (255 * alpha));
+                    }
+                    drawable.setBounds(x, y, x + sizeScaled, y + sizeScaled);
+                    drawable.draw(canvas);
+                }
+            }
+
+            if (backgroundState == 0 || backgroundState == 1 || previousBackgroundState == 0 || previousBackgroundState == 1) {
+                int diff = AndroidUtilities.dp(4);
+                if (previousBackgroundState != -2) {
+                    progressPaint.setAlpha((int) (255 * animatedAlphaValue * alpha));
+                } else {
+                    progressPaint.setAlpha((int) (255 * alpha));
+                }
+                progressRect.set(x + diff, y + diff, x + sizeScaled - diff, y + sizeScaled - diff);
+                canvas.drawArc(progressRect, -90 + radOffset, Math.max(4, 360 * animatedProgressValue), false, progressPaint);
+                updateAnimation();
+            }
+        }
+    }
+
+    private class FrameLayoutTouchListener extends FrameLayout {
+
+        private boolean attachedToWindow;
+        private Runnable attachRunnable;
+
+        public FrameLayoutTouchListener(Context context) {
+            super(context);
+        }
+
+        @Override
+        public boolean onTouchEvent(MotionEvent event) {
+            return getInstance().onTouchEvent(event);
+        }
+
+        @Override
+        protected void onLayout(boolean changed, int left, int top, int right, int bottom) {
+            super.onLayout(changed, left, top, right, bottom);
+            getInstance().onLayout(changed, left, top, right, bottom);
+        }
+
+        @Override
+        protected void onAttachedToWindow() {
+            super.onAttachedToWindow();
+            attachedToWindow = true;
+        }
+
+        @Override
+        protected void onDetachedFromWindow() {
+            super.onDetachedFromWindow();
+            attachedToWindow = false;
+        }
+    }
+
+    private class FrameLayoutDrawer extends SizeNotifierFrameLayoutPhoto {
+        public FrameLayoutDrawer(Context context) {
+            super(context);
+            setWillNotDraw(false);
+        }
+
+        @Override
+        protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
+            int widthSize = MeasureSpec.getSize(widthMeasureSpec);
+            int heightSize = MeasureSpec.getSize(heightMeasureSpec);
+            if (heightSize > AndroidUtilities.displaySize.y - AndroidUtilities.statusBarHeight) {
+                heightSize = AndroidUtilities.displaySize.y - AndroidUtilities.statusBarHeight;
+            }
+
+            setMeasuredDimension(widthSize, heightSize);
+
+            int childCount = getChildCount();
+            for (int i = 0; i < childCount; i++) {
+                View child = getChildAt(i);
+                if (child.getVisibility() == GONE) {
+                    continue;
+                }
+                if (captionEditText.isPopupView(child)) {
+                    child.measure(MeasureSpec.makeMeasureSpec(widthSize, MeasureSpec.EXACTLY), MeasureSpec.makeMeasureSpec(child.getLayoutParams().height, MeasureSpec.EXACTLY));
+                } else {
+                    measureChildWithMargins(child, widthMeasureSpec, 0, heightMeasureSpec, 0);
+                }
+            }
+        }
+
+        @Override
+        protected void onLayout(boolean changed, int l, int t, int r, int b) {
+            final int count = getChildCount();
+
+            int paddingBottom = getKeyboardHeight() <= AndroidUtilities.dp(20) ? captionEditText.getEmojiPadding() : 0;
+
+            for (int i = 0; i < count; i++) {
+                final View child = getChildAt(i);
+                if (child.getVisibility() == GONE) {
+                    continue;
+                }
+                final LayoutParams lp = (LayoutParams) child.getLayoutParams();
+
+                final int width = child.getMeasuredWidth();
+                final int height = child.getMeasuredHeight();
+
+                int childLeft;
+                int childTop;
+
+                int gravity = lp.gravity;
+                if (gravity == -1) {
+                    gravity = Gravity.TOP | Gravity.LEFT;
+                }
+
+                final int absoluteGravity = gravity & Gravity.HORIZONTAL_GRAVITY_MASK;
+                final int verticalGravity = gravity & Gravity.VERTICAL_GRAVITY_MASK;
+
+                switch (absoluteGravity & Gravity.HORIZONTAL_GRAVITY_MASK) {
+                    case Gravity.CENTER_HORIZONTAL:
+                        childLeft = (r - l - width) / 2 + lp.leftMargin - lp.rightMargin;
+                        break;
+                    case Gravity.RIGHT:
+                        childLeft = r - width - lp.rightMargin;
+                        break;
+                    case Gravity.LEFT:
+                    default:
+                        childLeft = lp.leftMargin;
+                }
+
+                switch (verticalGravity) {
+                    case Gravity.TOP:
+                        childTop = lp.topMargin;
+                        break;
+                    case Gravity.CENTER_VERTICAL:
+                        childTop = ((b - paddingBottom) - t - height) / 2 + lp.topMargin - lp.bottomMargin;
+                        break;
+                    case Gravity.BOTTOM:
+                        childTop = ((b - paddingBottom) - t) - height - lp.bottomMargin;
+                        break;
+                    default:
+                        childTop = lp.topMargin;
+                }
+
+                if (child == mentionListView) {
+                    if (!captionEditText.isPopupShowing() && !captionEditText.isKeyboardVisible() && captionEditText.getEmojiPadding() == 0) {
+                        childTop += AndroidUtilities.dp(400);
+                    } else {
+                        childTop -= captionEditText.getMeasuredHeight();
+                    }
+                } else if (child == captionEditText) {
+                    if (!captionEditText.isPopupShowing() && !captionEditText.isKeyboardVisible() && captionEditText.getEmojiPadding() == 0) {
+                        childTop += AndroidUtilities.dp(400);
+                    }
+                } else if (child == pickerView || child == captionTextViewNew || child == captionTextViewOld) {
+                    if (captionEditText.isPopupShowing() || captionEditText.isKeyboardVisible()) {
+                        childTop += AndroidUtilities.dp(400);
+                    }
+                } else if (captionEditText.isPopupView(child)) {
+                    childTop = captionEditText.getBottom();
+                }
+                child.layout(childLeft, childTop, childLeft + width, childTop + height);
+            }
+
+            notifyHeightChanged();
+        }
+
+        @Override
+        protected void onDraw(Canvas canvas) {
+            getInstance().onDraw(canvas);
+        }
+
+        @Override
+        protected boolean drawChild(Canvas canvas, View child, long drawingTime) {
+            return child != aspectRatioFrameLayout && super.drawChild(canvas, child, drawingTime);
+        }
     }
 }

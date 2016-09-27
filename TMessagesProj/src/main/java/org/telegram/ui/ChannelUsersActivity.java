@@ -361,7 +361,7 @@ public class ChannelUsersActivity extends BaseFragment implements NotificationCe
             return 0;
         } else if (participant instanceof TLRPC.TL_channelParticipantEditor) {
             return 1;
-        }  else {
+        } else {
             return 2;
         }
     }
@@ -572,7 +572,7 @@ public class ChannelUsersActivity extends BaseFragment implements NotificationCe
                             role = LocaleController.getString("ChannelCreator", R.string.ChannelCreator);
                         } else if (participant instanceof TLRPC.TL_channelParticipantModerator) {
                             role = LocaleController.getString("ChannelModerator", R.string.ChannelModerator);
-                        }  else if (participant instanceof TLRPC.TL_channelParticipantEditor) {
+                        } else if (participant instanceof TLRPC.TL_channelParticipantEditor) {
                             role = LocaleController.getString("ChannelEditor", R.string.ChannelEditor);
                         }
                         userCell.setData(user, null, role, 0);

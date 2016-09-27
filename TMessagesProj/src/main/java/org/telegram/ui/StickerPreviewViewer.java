@@ -24,8 +24,8 @@ import android.widget.AdapterView;
 import android.widget.FrameLayout;
 
 import org.telegram.messenger.AndroidUtilities;
-import org.telegram.messenger.ImageReceiver;
 import org.telegram.messenger.FileLog;
+import org.telegram.messenger.ImageReceiver;
 import org.telegram.tgnet.TLRPC;
 import org.telegram.ui.Cells.ContextLinkCell;
 import org.telegram.ui.Cells.StickerCell;
@@ -35,18 +35,7 @@ import org.telegram.ui.Components.RecyclerListView;
 
 public class StickerPreviewViewer {
 
-    private class FrameLayoutDrawer extends FrameLayout {
-        public FrameLayoutDrawer(Context context) {
-            super(context);
-            setWillNotDraw(false);
-        }
-
-        @Override
-        protected void onDraw(Canvas canvas) {
-            getInstance().onDraw(canvas);
-        }
-    }
-
+    private static volatile StickerPreviewViewer Instance = null;
     private int startX;
     private int startY;
     private View currentStickerPreviewCell;
@@ -65,7 +54,6 @@ public class StickerPreviewViewer {
 
     private TLRPC.Document currentSticker = null;
 
-    private static volatile StickerPreviewViewer Instance = null;
     public static StickerPreviewViewer getInstance() {
         StickerPreviewViewer localInstance = Instance;
         if (localInstance == null) {
@@ -368,7 +356,7 @@ public class StickerPreviewViewer {
         AndroidUtilities.runOnUIThread(new Runnable() {
             @Override
             public void run() {
-                centerImage.setImageBitmap((Bitmap)null);
+                centerImage.setImageBitmap((Bitmap) null);
             }
         });
         try {
@@ -428,6 +416,18 @@ public class StickerPreviewViewer {
             if (showProgress > 1.0f) {
                 showProgress = 1.0f;
             }
+        }
+    }
+
+    private class FrameLayoutDrawer extends FrameLayout {
+        public FrameLayoutDrawer(Context context) {
+            super(context);
+            setWillNotDraw(false);
+        }
+
+        @Override
+        protected void onDraw(Canvas canvas) {
+            getInstance().onDraw(canvas);
         }
     }
 }

@@ -11,6 +11,9 @@ package org.telegram.ui;
 import android.app.AlertDialog;
 import android.content.Context;
 import android.content.DialogInterface;
+import android.content.SharedPreferences;
+import android.graphics.PorterDuff;
+import android.graphics.drawable.Drawable;
 import android.os.Bundle;
 import android.view.Gravity;
 import android.view.MotionEvent;
@@ -22,6 +25,8 @@ import android.widget.ListView;
 import android.widget.TextView;
 
 import org.telegram.PhoneFormat.PhoneFormat;
+import org.telegram.messenger.AndroidUtilities;
+import org.telegram.messenger.ApplicationLoader;
 import org.telegram.messenger.LocaleController;
 import org.telegram.messenger.MessagesController;
 import org.telegram.messenger.NotificationCenter;
@@ -39,10 +44,7 @@ import java.util.ArrayList;
 
 public class PrivacyUsersActivity extends BaseFragment implements NotificationCenter.NotificationCenterDelegate {
 
-    public interface PrivacyActivityDelegate {
-        void didUpdatedUserList(ArrayList<Integer> ids, boolean added);
-    }
-
+    private final static int block_user = 1;
     private ListView listView;
     private ListAdapter listViewAdapter;
     private int selectedUserId;
@@ -53,8 +55,6 @@ public class PrivacyUsersActivity extends BaseFragment implements NotificationCe
     private boolean isAlwaysShare;
 
     private PrivacyActivityDelegate delegate;
-
-    private final static int block_user = 1;
 
     public PrivacyUsersActivity(ArrayList<Integer> users, boolean group, boolean always) {
         super();
@@ -78,7 +78,12 @@ public class PrivacyUsersActivity extends BaseFragment implements NotificationCe
 
     @Override
     public View createView(Context context) {
-        actionBar.setBackButtonImage(R.drawable.ic_ab_back);
+        SharedPreferences themePrefs = ApplicationLoader.applicationContext.getSharedPreferences(AndroidUtilities.THEME_PREFS, AndroidUtilities.THEME_PREFS_MODE);
+        int def = themePrefs.getInt("themeColor", AndroidUtilities.defColor);
+        int iconColor = themePrefs.getInt("chatsHeaderIconsColor", 0xffffffff);
+        Drawable back = getParentActivity().getResources().getDrawable(R.drawable.ic_ab_back);
+        if (back != null) back.setColorFilter(iconColor, PorterDuff.Mode.MULTIPLY);
+        actionBar.setBackButtonDrawable(back);
         actionBar.setAllowOverlayTitle(true);
         if (isGroup) {
             if (isAlwaysShare) {
@@ -205,7 +210,7 @@ public class PrivacyUsersActivity extends BaseFragment implements NotificationCe
     @Override
     public void didReceivedNotification(int id, Object... args) {
         if (id == NotificationCenter.updateInterfaces) {
-            int mask = (Integer)args[0];
+            int mask = (Integer) args[0];
             if ((mask & MessagesController.UPDATE_MASK_AVATAR) != 0 || (mask & MessagesController.UPDATE_MASK_NAME) != 0) {
                 updateVisibleRows(mask);
             }
@@ -235,6 +240,10 @@ public class PrivacyUsersActivity extends BaseFragment implements NotificationCe
         if (listViewAdapter != null) {
             listViewAdapter.notifyDataSetChanged();
         }
+    }
+
+    public interface PrivacyActivityDelegate {
+        void didUpdatedUserList(ArrayList<Integer> ids, boolean added);
     }
 
     private class ListAdapter extends BaseFragmentAdapter {
@@ -285,7 +294,7 @@ public class PrivacyUsersActivity extends BaseFragment implements NotificationCe
                     view = new UserCell(mContext, 1, 0, false);
                 }
                 TLRPC.User user = MessagesController.getInstance().getUser(uidArray.get(i));
-                ((UserCell)view).setData(user, null, user.phone != null && user.phone.length() != 0 ? PhoneFormat.getInstance().format("+" + user.phone) : LocaleController.getString("NumberUnknown", R.string.NumberUnknown), 0);
+                ((UserCell) view).setData(user, null, user.phone != null && user.phone.length() != 0 ? PhoneFormat.getInstance().format("+" + user.phone) : LocaleController.getString("NumberUnknown", R.string.NumberUnknown), 0);
             } else if (type == 1) {
                 if (view == null) {
                     view = new TextInfoCell(mContext);
@@ -297,7 +306,7 @@ public class PrivacyUsersActivity extends BaseFragment implements NotificationCe
 
         @Override
         public int getItemViewType(int i) {
-            if(i == uidArray.size()) {
+            if (i == uidArray.size()) {
                 return 1;
             }
             return 0;

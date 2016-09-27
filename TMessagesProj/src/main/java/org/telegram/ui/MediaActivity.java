@@ -13,6 +13,7 @@ import android.animation.AnimatorSet;
 import android.animation.ObjectAnimator;
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.app.ProgressDialog;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
@@ -22,6 +23,7 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.text.TextUtils;
+import android.util.Log;
 import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.MotionEvent;
@@ -39,30 +41,34 @@ import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.TextView;
+import android.widget.Toast;
 
+import org.telegram.SQLite.SQLDownload;
 import org.telegram.messenger.AndroidUtilities;
-import org.telegram.messenger.ChatObject;
-import org.telegram.messenger.LocaleController;
-import org.telegram.messenger.MediaController;
-import org.telegram.messenger.MessagesController;
-import org.telegram.messenger.browser.Browser;
-import org.telegram.messenger.query.SharedMediaQuery;
 import org.telegram.messenger.ApplicationLoader;
+import org.telegram.messenger.ChatObject;
 import org.telegram.messenger.FileLoader;
 import org.telegram.messenger.FileLog;
+import org.telegram.messenger.LocaleController;
+import org.telegram.messenger.MediaController;
+import org.telegram.messenger.MessageObject;
+import org.telegram.messenger.MessagesController;
+import org.telegram.messenger.MessagesStorage;
+import org.telegram.messenger.NotificationCenter;
+import org.telegram.messenger.R;
+import org.telegram.messenger.Utilities;
+import org.telegram.messenger.browser.Browser;
+import org.telegram.messenger.query.SharedMediaQuery;
 import org.telegram.tgnet.ConnectionsManager;
 import org.telegram.tgnet.RequestDelegate;
 import org.telegram.tgnet.TLObject;
 import org.telegram.tgnet.TLRPC;
-import org.telegram.messenger.MessageObject;
-import org.telegram.messenger.NotificationCenter;
-import org.telegram.messenger.R;
-import org.telegram.messenger.Utilities;
+import org.telegram.ui.ActionBar.ActionBar;
 import org.telegram.ui.ActionBar.ActionBarMenu;
 import org.telegram.ui.ActionBar.ActionBarMenuItem;
 import org.telegram.ui.ActionBar.ActionBarPopupWindow;
-import org.telegram.ui.ActionBar.ActionBar;
 import org.telegram.ui.ActionBar.BackDrawable;
+import org.telegram.ui.ActionBar.BaseFragment;
 import org.telegram.ui.ActionBar.BottomSheet;
 import org.telegram.ui.ActionBar.Theme;
 import org.telegram.ui.Adapters.BaseFragmentAdapter;
@@ -74,7 +80,6 @@ import org.telegram.ui.Cells.SharedLinkCell;
 import org.telegram.ui.Cells.SharedMediaSectionCell;
 import org.telegram.ui.Cells.SharedPhotoVideoCell;
 import org.telegram.ui.Components.BackupImageView;
-import org.telegram.ui.ActionBar.BaseFragment;
 import org.telegram.ui.Components.LayoutHelper;
 import org.telegram.ui.Components.NumberTextView;
 import org.telegram.ui.Components.PlayerView;
@@ -85,12 +90,23 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Timer;
 import java.util.TimerTask;
 
 @SuppressWarnings("unchecked")
 public class MediaActivity extends BaseFragment implements NotificationCenter.NotificationCenterDelegate, PhotoViewer.PhotoViewerProvider {
 
+    private static final int delete = 4;
+    private static final int download = 20;
+    private static final int files_item = 2;
+    private static final int forward = 3;
+    private static final int link_ch = 21;
+    private static final int links_item = 5;
+    private static final int music_item = 6;
+    private static final int photo_item = 7;
+    private static final int shared_media_item = 1;
+    protected TLRPC.ChatFull info = null;
     private SharedPhotoVideoAdapter photoVideoAdapter;
     private SharedLinksAdapter linksAdapter;
     private SharedDocumentsAdapter documentsAdapter;
@@ -109,102 +125,17 @@ public class MediaActivity extends BaseFragment implements NotificationCenter.No
     private NumberTextView selectedMessagesCountTextView;
     private ActionBarPopupWindow.ActionBarPopupWindowLayout popupLayout;
     private ArrayList<SharedPhotoVideoCell> cellCache = new ArrayList<>(6);
-
     private boolean searchWas;
     private boolean searching;
-
-    private HashMap<Integer, MessageObject>[] selectedFiles = new HashMap[] {new HashMap<>(), new HashMap<>()};
+    private HashMap<Integer, MessageObject>[] selectedFiles = new HashMap[]{new HashMap<>(), new HashMap<>()};
     private int cantDeleteMessagesCount;
     private ArrayList<View> actionModeViews = new ArrayList<>();
     private boolean scrolling;
     private long mergeDialogId;
-    protected TLRPC.ChatFull info = null;
-
     private long dialog_id;
     private int selectedMode;
     private int columnsCount = 4;
-
-    private class SharedMediaData {
-        private ArrayList<MessageObject> messages = new ArrayList<>();
-        private HashMap<Integer, MessageObject>[] messagesDict = new HashMap[] {new HashMap<>(), new HashMap<>()};
-        private ArrayList<String> sections = new ArrayList<>();
-        private HashMap<String, ArrayList<MessageObject>> sectionArrays = new HashMap<>();
-        private int totalCount;
-        private boolean loading;
-        private boolean endReached[] = new boolean[] {false, true};
-        private int max_id[] = new int[] {0, 0};
-
-        public boolean addMessage(MessageObject messageObject, boolean isNew, boolean enc) {
-            int loadIndex = messageObject.getDialogId() == dialog_id ? 0 : 1;
-            if (messagesDict[loadIndex].containsKey(messageObject.getId())) {
-                return false;
-            }
-            ArrayList<MessageObject> messageObjects = sectionArrays.get(messageObject.monthKey);
-            if (messageObjects == null) {
-                messageObjects = new ArrayList<>();
-                sectionArrays.put(messageObject.monthKey, messageObjects);
-                if (isNew) {
-                    sections.add(0, messageObject.monthKey);
-                } else {
-                    sections.add(messageObject.monthKey);
-                }
-            }
-            if (isNew) {
-                messageObjects.add(0, messageObject);
-                messages.add(0, messageObject);
-            } else {
-                messageObjects.add(messageObject);
-                messages.add(messageObject);
-            }
-            messagesDict[loadIndex].put(messageObject.getId(), messageObject);
-            if (!enc) {
-                if (messageObject.getId() > 0) {
-                    max_id[loadIndex] = Math.min(messageObject.getId(), max_id[loadIndex]);
-                }
-            } else {
-                max_id[loadIndex] = Math.max(messageObject.getId(), max_id[loadIndex]);
-            }
-            return true;
-        }
-
-        public boolean deleteMessage(int mid, int loadIndex) {
-            MessageObject messageObject = messagesDict[loadIndex].get(mid);
-            if (messageObject == null) {
-                return false;
-            }
-            ArrayList<MessageObject> messageObjects = sectionArrays.get(messageObject.monthKey);
-            if (messageObjects == null) {
-                return false;
-            }
-            messageObjects.remove(messageObject);
-            messages.remove(messageObject);
-            messagesDict[loadIndex].remove(messageObject.getId());
-            if (messageObjects.isEmpty()) {
-                sectionArrays.remove(messageObject.monthKey);
-                sections.remove(messageObject.monthKey);
-            }
-            totalCount--;
-            return true;
-        }
-
-        public void replaceMid(int oldMid, int newMid) {
-            MessageObject obj = messagesDict[0].get(oldMid);
-            if (obj != null) {
-                messagesDict[0].remove(oldMid);
-                messagesDict[0].put(newMid, obj);
-                obj.messageOwner.id = newMid;
-            }
-        }
-    }
-
     private SharedMediaData sharedMediaData[] = new SharedMediaData[5];
-
-    private final static int shared_media_item = 1;
-    private final static int files_item = 2;
-    private final static int links_item = 5;
-    private final static int music_item = 6;
-    private final static int forward = 3;
-    private final static int delete = 4;
 
     public MediaActivity(Bundle args) {
         super(args);
@@ -220,7 +151,7 @@ public class MediaActivity extends BaseFragment implements NotificationCenter.No
         dialog_id = getArguments().getLong("dialog_id", 0);
         for (int a = 0; a < sharedMediaData.length; a++) {
             sharedMediaData[a] = new SharedMediaData();
-            sharedMediaData[a].max_id[0] = ((int)dialog_id) == 0 ? Integer.MIN_VALUE : Integer.MAX_VALUE;
+            sharedMediaData[a].max_id[0] = ((int) dialog_id) == 0 ? Integer.MIN_VALUE : Integer.MAX_VALUE;
             if (mergeDialogId != 0 && info != null) {
                 sharedMediaData[a].max_id[1] = info.migrated_from_max_id;
                 sharedMediaData[a].endReached[1] = false;
@@ -247,7 +178,7 @@ public class MediaActivity extends BaseFragment implements NotificationCenter.No
         actionBar.setAllowOverlayTitle(false);
         actionBar.setActionBarMenuOnItemClick(new ActionBar.ActionBarMenuOnItemClick() {
             @Override
-            public void onItemClick(int id) {
+            public void onItemClick(final int id) {
                 if (id == -1) {
                     if (actionBar.isActionModeShowed()) {
                         for (int a = 1; a >= 0; a--) {
@@ -376,10 +307,99 @@ public class MediaActivity extends BaseFragment implements NotificationCenter.No
                         }
                     });
                     presentFragment(fragment);
+                } else if (id == MediaActivity.download) {
+                    AlertDialog.Builder r0 = new AlertDialog.Builder(MediaActivity.this.getParentActivity());
+                    r0.setMessage(LocaleController.formatString("AreYouSureDeleteVideo", R.string.AreYouSureDeleteVideo, new Object[0]));
+                    r0.setTitle(LocaleController.getString("AppName", R.string.AppName));
+                    r0.setPositiveButton(LocaleController.getString("OK", R.string.OK), new DialogInterface.OnClickListener() {
+                        @Override
+                        public void onClick(DialogInterface dialogInterface, int i) {
+                            for (int i2 = MediaActivity.shared_media_item; i2 >= 0; i2--) {
+                                ArrayList arrayList = new ArrayList(MediaActivity.this.selectedFiles[i2].keySet());
+                                Collections.sort(arrayList);
+                                for (int i3 = 0; i3 < arrayList.size(); i3 += MediaActivity.shared_media_item) {
+                                    MessageObject messageObject = MediaActivity.this.selectedFiles[i2].get(arrayList.get(i3));
+                                    TLRPC.TL_channels_exportMessageLink tL_channels_exportMessageLink = new TLRPC.TL_channels_exportMessageLink();
+                                    tL_channels_exportMessageLink.id = messageObject.getId();
+                                    tL_channels_exportMessageLink.channel = MessagesController.getInputChannel(messageObject.messageOwner.to_id.channel_id);
+                                    ConnectionsManager.getInstance().sendRequest(tL_channels_exportMessageLink, new RequestDelegate() {
+                                        @Override
+                                        public void run(final TLObject tLObject, TLRPC.TL_error tL_error) {
+                                            AndroidUtilities.runOnUIThread(new Runnable() {
+                                                @Override
+                                                public void run() {
+                                                    if (tLObject != null) {
+                                                        runLink(((TLRPC.TL_exportedMessageLink) tLObject).link);
+                                                    }
+                                                }
+                                            });
+                                        }
+                                    });
+                                    if (messageObject != null && id > 0) {
+                                        if (messageObject.type == MediaActivity.forward) {
+                                            SQLDownload sQLDownload = new SQLDownload(MediaActivity.this.getParentActivity());
+                                            if (sQLDownload.findIndex(String.valueOf(messageObject.messageOwner.media.document.id)) == -1) {
+                                                sQLDownload.createDownload(messageObject.messageOwner.media.document, MediaActivity.forward, FileLoader.getAttachFileName(messageObject.messageOwner.media.document));
+                                            }
+                                        } else if (messageObject.type == 9) {
+                                            SQLDownload sQLDownload2 = new SQLDownload(MediaActivity.this.getParentActivity());
+                                            if (sQLDownload2.findIndex(String.valueOf(messageObject.messageOwner.media.document.id)) == -1) {
+                                                sQLDownload2.createDownload(messageObject.messageOwner.media.document, messageObject.type, FileLoader.getAttachFileName(messageObject.messageOwner.media.document));
+                                            }
+                                        }
+                                        Log.v("jjj select", String.valueOf(messageObject.messageOwner.id));
+                                    }
+                                }
+                            }
+                            for (int i4 = MediaActivity.shared_media_item; i4 >= 0; i4--) {
+                                MediaActivity.this.selectedFiles[i4].clear();
+                            }
+                            MediaActivity.this.cantDeleteMessagesCount = 0;
+                            MediaActivity.this.actionBar.hideActionMode();
+                            MediaActivity.this.listView.invalidateViews();
+                        }
+                    });
+                    r0.setNegativeButton(LocaleController.getString("Cancel", R.string.Cancel), null);
+                    r0.show();
+                } else if (id == MediaActivity.link_ch) {
+                    for (int i3 = MediaActivity.shared_media_item; i3 >= 0; i3--) {
+                        ArrayList arrayList = new ArrayList(MediaActivity.this.selectedFiles[i3].keySet());
+                        Collections.sort(arrayList);
+                        if (0 < arrayList.size()) {
+                            MessageObject messageObject = MediaActivity.this.selectedFiles[i3].get(arrayList.get(0));
+                            TLRPC.TL_channels_exportMessageLink tL_channels_exportMessageLink = new TLRPC.TL_channels_exportMessageLink();
+                            tL_channels_exportMessageLink.id = messageObject.getId();
+                            tL_channels_exportMessageLink.channel = MessagesController.getInputChannel(messageObject.messageOwner.to_id.channel_id);
+                            ConnectionsManager.getInstance().sendRequest(tL_channels_exportMessageLink, new RequestDelegate() {
+                                @Override
+                                public void run(final TLObject response, TLRPC.TL_error error) {
+                                    AndroidUtilities.runOnUIThread(new Runnable() {
+                                        @Override
+                                        public void run() {
+                                            if (response != null) {
+                                                runLink(((TLRPC.TL_exportedMessageLink) response).link);
+                                            }
+                                        }
+                                    });
+                                }
+                            });
+                            for (int i4 = MediaActivity.shared_media_item; i4 >= 0; i4--) {
+                                MediaActivity.this.selectedFiles[i4].clear();
+                            }
+                            MediaActivity.this.cantDeleteMessagesCount = 0;
+                            MediaActivity.this.actionBar.hideActionMode();
+                            MediaActivity.this.listView.invalidateViews();
+                        } else if (id == MediaActivity.photo_item) {
+                            if (MediaActivity.this.selectedMode != MediaActivity.photo_item) {
+                                MediaActivity.this.selectedMode = MediaActivity.photo_item;
+                                MediaActivity.this.switchToCurrentSelectedMode();
+                            }
+                        }
+                    }
                 }
+
             }
         });
-
         for (int a = 1; a >= 0; a--) {
             selectedFiles[a].clear();
         }
@@ -847,25 +867,35 @@ public class MediaActivity extends BaseFragment implements NotificationCenter.No
     }
 
     @Override
-    public void willSwitchFromPhoto(MessageObject messageObject, TLRPC.FileLocation fileLocation, int index) { }
+    public void willSwitchFromPhoto(MessageObject messageObject, TLRPC.FileLocation fileLocation, int index) {
+    }
 
     @Override
-    public void willHidePhotoViewer() { }
+    public void willHidePhotoViewer() {
+    }
 
     @Override
-    public boolean isPhotoChecked(int index) { return false; }
+    public boolean isPhotoChecked(int index) {
+        return false;
+    }
 
     @Override
-    public void setPhotoChecked(int index) { }
+    public void setPhotoChecked(int index) {
+    }
 
     @Override
-    public boolean cancelButtonPressed() { return true; }
+    public boolean cancelButtonPressed() {
+        return true;
+    }
 
     @Override
-    public void sendButtonPressed(int index) { }
+    public void sendButtonPressed(int index) {
+    }
 
     @Override
-    public int getSelectedCount() { return 0; }
+    public int getSelectedCount() {
+        return 0;
+    }
 
     public void setChatInfo(TLRPC.ChatFull chatInfo) {
         info = chatInfo;
@@ -1190,6 +1220,205 @@ public class MediaActivity extends BaseFragment implements NotificationCenter.No
         }
     }
 
+    private void runLink(String str) {
+        String str2;
+        String queryParameter;
+        String queryParameter2;
+        Integer num = 0;
+        Uri parse = Uri.parse(str);
+        if (parse != null) {
+            String scheme = parse.getScheme();
+            if (scheme != null && ((scheme.equals("http") || scheme.equals("https")) && parse.getHost().toLowerCase().equals("telegram.me"))) {
+                scheme = parse.getPath();
+                if (scheme != null && scheme.length() > shared_media_item && scheme.substring(shared_media_item).length() >= shared_media_item) {
+                    List pathSegments = parse.getPathSegments();
+                    if (pathSegments.size() > 0) {
+                        scheme = (String) pathSegments.get(0);
+                        if (pathSegments.size() > shared_media_item) {
+                            Integer parseInt = Utilities.parseInt((String) pathSegments.get(shared_media_item));
+                            if (parseInt.intValue() == 0) {
+                                str2 = scheme;
+                                scheme = null;
+                            } else {
+                                Integer num2 = parseInt;
+                                str2 = scheme;
+                                Object obj = num2;
+                            }
+                        } else {
+                            str2 = scheme;
+                            scheme = null;
+                        }
+                    } else {
+                        scheme = null;
+                        str2 = null;
+                    }
+                    queryParameter = parse.getQueryParameter("start");
+                    queryParameter2 = parse.getQueryParameter("startgroup");
+                    // num = scheme;
+                    if (str2 == null || null != null || null != null || null != null) {
+                        runLinkRequest(str2, null, null, queryParameter, queryParameter2, null, false, num, 0);
+                    }
+                    return;
+                }
+            }
+        }
+        num = null;
+        queryParameter2 = null;
+        queryParameter = null;
+        str2 = null;
+        if (str2 == null) {
+        }
+        runLinkRequest(str2, null, null, queryParameter, queryParameter2, null, false, num, 0);
+    }
+
+    private void runLinkRequest(String str, String str2, String str3, final String str4,
+                                String str5, String str6, boolean z, final Integer num, int i) {
+        int i2 = 0;
+        final ProgressDialog progressDialog = new ProgressDialog(getParentActivity());
+        progressDialog.setMessage(LocaleController.getString("Loading", R.string.Loading));
+        progressDialog.setCanceledOnTouchOutside(false);
+        progressDialog.setCancelable(false);
+        if (str != null) {
+            TLRPC.TL_contacts_resolveUsername tL_contacts_resolveUsername = new TLRPC.TL_contacts_resolveUsername();
+            tL_contacts_resolveUsername.username = str;
+            i2 = ConnectionsManager.getInstance().sendRequest(tL_contacts_resolveUsername, new RequestDelegate() {
+                @Override
+                public void run(TLObject response, TLRPC.TL_error error) {
+
+                    if (!MediaActivity.this.getParentActivity().isFinishing()) {
+                        try {
+                            progressDialog.dismiss();
+                        } catch (Throwable e) {
+                            FileLog.e("tmessages", e);
+                        }
+                        if (error != null || MediaActivity.this.getParentActivity() == null) {
+                            try {
+                                Toast.makeText(MediaActivity.this.getParentActivity(), LocaleController.getString("NoUsernameFound", R.string.NoUsernameFound), Toast.LENGTH_LONG).show();
+                                return;
+                            } catch (Throwable e2) {
+                                FileLog.e("tmessages", e2);
+                                return;
+                            }
+                        }
+                        TLRPC.TL_contacts_resolvedPeer tL_contacts_resolvedPeer = (TLRPC.TL_contacts_resolvedPeer) response;
+                        MessagesController.getInstance().putUsers(tL_contacts_resolvedPeer.users, false);
+                        MessagesController.getInstance().putChats(tL_contacts_resolvedPeer.chats, false);
+                        MessagesStorage.getInstance().putUsersAndChats(tL_contacts_resolvedPeer.users, tL_contacts_resolvedPeer.chats, false, true);
+                        Bundle bundle = new Bundle();
+                        if (tL_contacts_resolvedPeer.chats.isEmpty()) {
+                            bundle.putInt("user_id", tL_contacts_resolvedPeer.users.get(0).id);
+                        } else {
+                            bundle.putInt("chat_id", tL_contacts_resolvedPeer.chats.get(0).id);
+                        }
+                        if (str4 != null && tL_contacts_resolvedPeer.users.size() > 0 && tL_contacts_resolvedPeer.users.get(0).bot) {
+                            bundle.putString("botUser", str4);
+                        }
+                        if (num != null) {
+                            bundle.putInt("message_id", num.intValue());
+                        }
+                        BaseFragment chatActivity = new ChatActivity(bundle);
+                        NotificationCenter.getInstance().postNotificationName(NotificationCenter.closeChats);
+                        for (int i = 0; i < MediaActivity.this.parentLayout.fragmentsStack.size(); i += MediaActivity.shared_media_item) {
+                            if (MediaActivity.this.parentLayout.fragmentsStack.get(i) instanceof ProfileActivity) {
+                                MediaActivity.this.parentLayout.removeFragmentFromStack(chatActivity);
+                                break;
+                            }
+                        }
+                        MediaActivity.this.presentFragment(chatActivity, true, false);
+                    }
+                }
+            });
+        }
+        if (i2 != 0) {
+            progressDialog.setButton(-2, LocaleController.getString("Cancel", R.string.Cancel), new DialogInterface.OnClickListener() {
+                @Override
+                public void onClick(DialogInterface dialogInterface, int i) {
+                    ConnectionsManager.getInstance().cancelRequest(i, true);
+                    try {
+                        dialogInterface.dismiss();
+                    } catch (Throwable e) {
+                        FileLog.e("tmessages", e);
+                    }
+                }
+            });
+            progressDialog.show();
+        }
+
+    }
+
+    private class SharedMediaData {
+        private ArrayList<MessageObject> messages = new ArrayList<>();
+        private HashMap<Integer, MessageObject>[] messagesDict = new HashMap[]{new HashMap<>(), new HashMap<>()};
+        private ArrayList<String> sections = new ArrayList<>();
+        private HashMap<String, ArrayList<MessageObject>> sectionArrays = new HashMap<>();
+        private int totalCount;
+        private boolean loading;
+        private boolean endReached[] = new boolean[]{false, true};
+        private int max_id[] = new int[]{0, 0};
+
+        public boolean addMessage(MessageObject messageObject, boolean isNew, boolean enc) {
+            int loadIndex = messageObject.getDialogId() == dialog_id ? 0 : 1;
+            if (messagesDict[loadIndex].containsKey(messageObject.getId())) {
+                return false;
+            }
+            ArrayList<MessageObject> messageObjects = sectionArrays.get(messageObject.monthKey);
+            if (messageObjects == null) {
+                messageObjects = new ArrayList<>();
+                sectionArrays.put(messageObject.monthKey, messageObjects);
+                if (isNew) {
+                    sections.add(0, messageObject.monthKey);
+                } else {
+                    sections.add(messageObject.monthKey);
+                }
+            }
+            if (isNew) {
+                messageObjects.add(0, messageObject);
+                messages.add(0, messageObject);
+            } else {
+                messageObjects.add(messageObject);
+                messages.add(messageObject);
+            }
+            messagesDict[loadIndex].put(messageObject.getId(), messageObject);
+            if (!enc) {
+                if (messageObject.getId() > 0) {
+                    max_id[loadIndex] = Math.min(messageObject.getId(), max_id[loadIndex]);
+                }
+            } else {
+                max_id[loadIndex] = Math.max(messageObject.getId(), max_id[loadIndex]);
+            }
+            return true;
+        }
+
+        public boolean deleteMessage(int mid, int loadIndex) {
+            MessageObject messageObject = messagesDict[loadIndex].get(mid);
+            if (messageObject == null) {
+                return false;
+            }
+            ArrayList<MessageObject> messageObjects = sectionArrays.get(messageObject.monthKey);
+            if (messageObjects == null) {
+                return false;
+            }
+            messageObjects.remove(messageObject);
+            messages.remove(messageObject);
+            messagesDict[loadIndex].remove(messageObject.getId());
+            if (messageObjects.isEmpty()) {
+                sectionArrays.remove(messageObject.monthKey);
+                sections.remove(messageObject.monthKey);
+            }
+            totalCount--;
+            return true;
+        }
+
+        public void replaceMid(int oldMid, int newMid) {
+            MessageObject obj = messagesDict[0].get(oldMid);
+            if (obj != null) {
+                messagesDict[0].remove(oldMid);
+                messagesDict[0].put(newMid, obj);
+                obj.messageOwner.id = newMid;
+            }
+        }
+    }
+
     private class SharedLinksAdapter extends BaseSectionsAdapter {
         private Context mContext;
 
@@ -1417,7 +1646,7 @@ public class MediaActivity extends BaseFragment implements NotificationCenter.No
         @Override
         public int getCountForSection(int section) {
             if (section < sharedMediaData[0].sections.size()) {
-                return (int) Math.ceil(sharedMediaData[0].sectionArrays.get(sharedMediaData[0].sections.get(section)).size() / (float)columnsCount) + 1;
+                return (int) Math.ceil(sharedMediaData[0].sectionArrays.get(sharedMediaData[0].sections.get(section)).size() / (float) columnsCount) + 1;
             }
             return 1;
         }
@@ -1518,10 +1747,10 @@ public class MediaActivity extends BaseFragment implements NotificationCenter.No
     }
 
     public class MediaSearchAdapter extends BaseFragmentAdapter {
+        protected ArrayList<MessageObject> globalSearch = new ArrayList<>();
         private Context mContext;
         private ArrayList<MessageObject> searchResult = new ArrayList<>();
         private Timer searchTimer;
-        protected ArrayList<MessageObject> globalSearch = new ArrayList<>();
         private int reqId = 0;
         private int lastReqId;
         private int currentType;

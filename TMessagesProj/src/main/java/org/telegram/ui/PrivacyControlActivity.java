@@ -14,6 +14,8 @@ import android.app.ProgressDialog;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.SharedPreferences;
+import android.graphics.PorterDuff;
+import android.graphics.drawable.Drawable;
 import android.os.Bundle;
 import android.text.Spannable;
 import android.text.method.LinkMovementMethod;
@@ -27,12 +29,12 @@ import android.widget.ListView;
 import android.widget.TextView;
 
 import org.telegram.messenger.AndroidUtilities;
+import org.telegram.messenger.ApplicationLoader;
 import org.telegram.messenger.ContactsController;
+import org.telegram.messenger.FileLog;
 import org.telegram.messenger.LocaleController;
 import org.telegram.messenger.MessagesController;
 import org.telegram.messenger.NotificationCenter;
-import org.telegram.messenger.ApplicationLoader;
-import org.telegram.messenger.FileLog;
 import org.telegram.messenger.R;
 import org.telegram.tgnet.ConnectionsManager;
 import org.telegram.tgnet.RequestDelegate;
@@ -52,18 +54,15 @@ import java.util.ArrayList;
 
 public class PrivacyControlActivity extends BaseFragment implements NotificationCenter.NotificationCenterDelegate {
 
+    private final static int done_button = 1;
     private ListAdapter listAdapter;
     private View doneButton;
-
     private int currentType = 0;
     private ArrayList<Integer> currentPlus;
     private ArrayList<Integer> currentMinus;
     private int lastCheckedType = -1;
-
     private boolean isGroup;
-
     private boolean enableAnimation;
-
     private int sectionRow;
     private int everybodyRow;
     private int myContactsRow;
@@ -74,20 +73,6 @@ public class PrivacyControlActivity extends BaseFragment implements Notification
     private int neverShareRow;
     private int shareDetailRow;
     private int rowCount;
-
-    private final static int done_button = 1;
-
-    private static class LinkMovementMethodMy extends LinkMovementMethod {
-        @Override
-        public boolean onTouchEvent(TextView widget, Spannable buffer, MotionEvent event) {
-            try {
-                return super.onTouchEvent(widget, buffer, event);
-            } catch (Exception e) {
-                FileLog.e("tmessages", e);
-            }
-            return false;
-        }
-    }
 
     public PrivacyControlActivity(boolean group) {
         super();
@@ -111,7 +96,13 @@ public class PrivacyControlActivity extends BaseFragment implements Notification
 
     @Override
     public View createView(Context context) {
-        actionBar.setBackButtonImage(R.drawable.ic_ab_back);
+        SharedPreferences themePrefs = ApplicationLoader.applicationContext.getSharedPreferences(AndroidUtilities.THEME_PREFS, AndroidUtilities.THEME_PREFS_MODE);
+        int def = themePrefs.getInt("themeColor", AndroidUtilities.defColor);
+        int iconColor = themePrefs.getInt("chatsHeaderIconsColor", 0xffffffff);
+        Drawable back = getParentActivity().getResources().getDrawable(R.drawable.ic_ab_back);
+        if (back != null) back.setColorFilter(iconColor, PorterDuff.Mode.MULTIPLY);
+        actionBar.setBackButtonDrawable(back);
+        actionBar.setTitleColor(themePrefs.getInt("chatsHeaderTitleColor", 0xffffffff));
         actionBar.setAllowOverlayTitle(true);
         if (isGroup) {
             actionBar.setTitle(LocaleController.getString("GroupsAndChannels", R.string.GroupsAndChannels));
@@ -157,7 +148,11 @@ public class PrivacyControlActivity extends BaseFragment implements Notification
         });
 
         ActionBarMenu menu = actionBar.createMenu();
-        doneButton = menu.addItemWithWidth(done_button, R.drawable.ic_done, AndroidUtilities.dp(56));
+        Drawable ic_done = getParentActivity().getResources().getDrawable(R.drawable.ic_done);
+        if (ic_done != null) ic_done.setColorFilter(iconColor, PorterDuff.Mode.MULTIPLY);
+        doneButton = menu.addItem(done_button, ic_done);
+
+        // doneButton = menu.addItemWithWidth(done_button, R.drawable.ic_done, AndroidUtilities.dp(56));
         doneButton.setVisibility(View.GONE);
 
         listAdapter = new ListAdapter(context);
@@ -426,6 +421,18 @@ public class PrivacyControlActivity extends BaseFragment implements Notification
         super.onResume();
         lastCheckedType = -1;
         enableAnimation = false;
+    }
+
+    private static class LinkMovementMethodMy extends LinkMovementMethod {
+        @Override
+        public boolean onTouchEvent(TextView widget, Spannable buffer, MotionEvent event) {
+            try {
+                return super.onTouchEvent(widget, buffer, event);
+            } catch (Exception e) {
+                FileLog.e("tmessages", e);
+            }
+            return false;
+        }
     }
 
     private class ListAdapter extends BaseFragmentAdapter {

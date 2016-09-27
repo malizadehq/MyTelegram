@@ -11,7 +11,6 @@ package org.telegram.ui;
 import android.app.AlertDialog;
 import android.content.Context;
 import android.content.DialogInterface;
-import android.os.Build;
 import android.os.Bundle;
 import android.view.Gravity;
 import android.view.MotionEvent;
@@ -25,28 +24,26 @@ import android.widget.TextView;
 
 import org.telegram.PhoneFormat.PhoneFormat;
 import org.telegram.messenger.LocaleController;
-import org.telegram.tgnet.TLRPC;
 import org.telegram.messenger.MessagesController;
 import org.telegram.messenger.NotificationCenter;
 import org.telegram.messenger.R;
-import org.telegram.ui.Adapters.BaseFragmentAdapter;
-import org.telegram.ui.Cells.TextInfoCell;
-import org.telegram.ui.Cells.UserCell;
+import org.telegram.tgnet.TLRPC;
 import org.telegram.ui.ActionBar.ActionBar;
 import org.telegram.ui.ActionBar.ActionBarMenu;
 import org.telegram.ui.ActionBar.BaseFragment;
+import org.telegram.ui.Adapters.BaseFragmentAdapter;
+import org.telegram.ui.Cells.TextInfoCell;
+import org.telegram.ui.Cells.UserCell;
 import org.telegram.ui.Components.LayoutHelper;
 
 public class BlockedUsersActivity extends BaseFragment implements NotificationCenter.NotificationCenterDelegate, ContactsActivity.ContactsActivityDelegate {
 
+    private final static int block_user = 1;
     private ListView listView;
     private ListAdapter listViewAdapter;
     private FrameLayout progressView;
     private TextView emptyTextView;
     private int selectedUserId;
-
-
-    private final static int block_user = 1;
 
     @Override
     public boolean onFragmentCreate() {
@@ -170,7 +167,7 @@ public class BlockedUsersActivity extends BaseFragment implements NotificationCe
     @Override
     public void didReceivedNotification(int id, Object... args) {
         if (id == NotificationCenter.updateInterfaces) {
-            int mask = (Integer)args[0];
+            int mask = (Integer) args[0];
             if ((mask & MessagesController.UPDATE_MASK_AVATAR) != 0 || (mask & MessagesController.UPDATE_MASK_NAME) != 0) {
                 updateVisibleRows(mask);
             }
@@ -286,7 +283,7 @@ public class BlockedUsersActivity extends BaseFragment implements NotificationCe
 
         @Override
         public int getItemViewType(int i) {
-            if(i == MessagesController.getInstance().blockedUsers.size()) {
+            if (i == MessagesController.getInstance().blockedUsers.size()) {
                 return 1;
             }
             return 0;

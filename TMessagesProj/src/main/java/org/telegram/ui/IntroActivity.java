@@ -120,6 +120,7 @@ public class IntroActivity extends Activity {
         }
         viewPager = (ViewPager) findViewById(R.id.intro_view_pager);
         TextView startMessagingButton = (TextView) findViewById(R.id.start_messaging_button);
+        startMessagingButton.setTypeface(AndroidUtilities.getTypeface("fonts/rmedium.ttf"));
         startMessagingButton.setText(LocaleController.getString("StartMessaging", R.string.StartMessaging).toUpperCase());
         if (Build.VERSION.SDK_INT >= 21) {
             StateListAnimator animator = new StateListAnimator();
@@ -273,6 +274,8 @@ public class IntroActivity extends Activity {
 
             headerTextView.setText(getString(titles[position]));
             messageTextView.setText(AndroidUtilities.replaceTags(getString(messages[position])));
+            headerTextView.setTypeface(AndroidUtilities.getTypeface("fonts/rmedium.ttf"));
+            messageTextView.setTypeface(AndroidUtilities.getTypeface("fonts/rmedium.ttf"));
 
             return view;
         }

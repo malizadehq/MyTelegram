@@ -9,6 +9,9 @@
 package org.telegram.ui;
 
 import android.content.Context;
+import android.content.SharedPreferences;
+import android.graphics.PorterDuff;
+import android.graphics.drawable.Drawable;
 import android.os.Bundle;
 import android.view.View;
 import android.view.ViewGroup;
@@ -18,6 +21,7 @@ import android.widget.FrameLayout;
 import android.widget.ListView;
 
 import org.telegram.messenger.AndroidUtilities;
+import org.telegram.messenger.ApplicationLoader;
 import org.telegram.messenger.ContactsController;
 import org.telegram.messenger.FileLog;
 import org.telegram.messenger.LocaleController;
@@ -88,8 +92,13 @@ public class SetAdminsActivity extends BaseFragment implements NotificationCente
     public View createView(Context context) {
         searching = false;
         searchWas = false;
-
-        actionBar.setBackButtonImage(R.drawable.ic_ab_back);
+        SharedPreferences themePrefs = ApplicationLoader.applicationContext.getSharedPreferences(AndroidUtilities.THEME_PREFS, AndroidUtilities.THEME_PREFS_MODE);
+        int def = themePrefs.getInt("themeColor", AndroidUtilities.defColor);
+        int iconColor = themePrefs.getInt("chatsHeaderIconsColor", 0xffffffff);
+        Drawable back = getParentActivity().getResources().getDrawable(R.drawable.ic_ab_back);
+        if (back != null) back.setColorFilter(iconColor, PorterDuff.Mode.MULTIPLY);
+        actionBar.setBackButtonDrawable(back);
+        actionBar.setTitleColor(themePrefs.getInt("chatsHeaderTitleColor", 0xffffffff));
         actionBar.setAllowOverlayTitle(true);
         actionBar.setTitle(LocaleController.getString("SetAdminsTitle", R.string.SetAdminsTitle));
         actionBar.setActionBarMenuOnItemClick(new ActionBar.ActionBarMenuOnItemClick() {
@@ -102,7 +111,9 @@ public class SetAdminsActivity extends BaseFragment implements NotificationCente
         });
 
         ActionBarMenu menu = actionBar.createMenu();
-        searchItem = menu.addItem(0, R.drawable.ic_ab_search).setIsSearchField(true).setActionBarMenuItemSearchListener(new ActionBarMenuItem.ActionBarMenuItemSearchListener() {
+        Drawable ic_ab_search = getParentActivity().getResources().getDrawable(R.drawable.ic_ab_search);
+        if (ic_ab_search != null) ic_ab_search.setColorFilter(iconColor, PorterDuff.Mode.MULTIPLY);
+        searchItem = menu.addItem(0, ic_ab_search).setIsSearchField(true).setActionBarMenuItemSearchListener(new ActionBarMenuItem.ActionBarMenuItemSearchListener() {
             @Override
             public void onSearchExpand() {
                 searching = true;
@@ -242,7 +253,8 @@ public class SetAdminsActivity extends BaseFragment implements NotificationCente
                 updateChatParticipants();
                 updateRowsIds();
             }
-        } if (id == NotificationCenter.updateInterfaces) {
+        }
+        if (id == NotificationCenter.updateInterfaces) {
             int mask = (Integer) args[0];
             if ((mask & MessagesController.UPDATE_MASK_AVATAR) != 0 || (mask & MessagesController.UPDATE_MASK_NAME) != 0 || (mask & MessagesController.UPDATE_MASK_STATUS) != 0) {
                 if (listView != null) {
@@ -276,7 +288,7 @@ public class SetAdminsActivity extends BaseFragment implements NotificationCente
             return 0;
         } else if (participant instanceof TLRPC.TL_chatParticipantAdmin) {
             return 1;
-        }  else {
+        } else {
             return 2;
         }
     }

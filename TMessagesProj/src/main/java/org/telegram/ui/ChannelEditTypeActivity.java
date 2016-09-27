@@ -52,6 +52,7 @@ import java.util.concurrent.Semaphore;
 
 public class ChannelEditTypeActivity extends BaseFragment implements NotificationCenter.NotificationCenterDelegate {
 
+    private final static int done_button = 1;
     private LinearLayout linkContainer;
     private LinearLayout publicContainer;
     private TextBlockCell privateContainer;
@@ -64,17 +65,13 @@ public class ChannelEditTypeActivity extends BaseFragment implements Notificatio
     private boolean isPrivate = false;
     private boolean loadingInvite;
     private TLRPC.ExportedChatInvite invite;
-
     private int checkReqId = 0;
     private String lastCheckName = null;
     private Runnable checkRunnable = null;
     private boolean lastNameAvailable = false;
     private TLRPC.Chat currentChat;
     private int chatId;
-
     private boolean donePressed;
-
-    private final static int done_button = 1;
 
     public ChannelEditTypeActivity(Bundle args) {
         super(args);

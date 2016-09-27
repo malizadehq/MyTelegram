@@ -18,6 +18,7 @@ import android.media.MediaCodecInfo;
 import android.media.MediaPlayer;
 import android.os.Build;
 import android.os.Bundle;
+import android.text.InputFilter;
 import android.view.Gravity;
 import android.view.Surface;
 import android.view.TextureView;
@@ -25,8 +26,10 @@ import android.view.View;
 import android.view.ViewTreeObserver;
 import android.widget.CheckBox;
 import android.widget.CompoundButton;
+import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import com.coremedia.iso.IsoFile;
@@ -40,11 +43,11 @@ import com.googlecode.mp4parser.util.Matrix;
 import com.googlecode.mp4parser.util.Path;
 
 import org.telegram.messenger.AndroidUtilities;
+import org.telegram.messenger.ApplicationLoader;
+import org.telegram.messenger.FileLog;
 import org.telegram.messenger.LocaleController;
 import org.telegram.messenger.MediaController;
 import org.telegram.messenger.NotificationCenter;
-import org.telegram.messenger.ApplicationLoader;
-import org.telegram.messenger.FileLog;
 import org.telegram.messenger.R;
 import org.telegram.ui.ActionBar.ActionBar;
 import org.telegram.ui.ActionBar.ActionBarMenu;
@@ -60,6 +63,8 @@ import java.util.List;
 @TargetApi(16)
 public class VideoEditorActivity extends BaseFragment implements TextureView.SurfaceTextureListener, NotificationCenter.NotificationCenterDelegate {
 
+
+    private final Object sync = new Object();
     private boolean created = false;
     private MediaPlayer videoPlayer = null;
     private VideoTimelineView videoTimelineView = null;
@@ -73,13 +78,12 @@ public class VideoEditorActivity extends BaseFragment implements TextureView.Sur
     private View controlView = null;
     private CheckBox compressVideo = null;
     private boolean playerPrepared = false;
-
+    private EditText messageEditText;
+    private ImageView emojiButton;
     private String videoPath = null;
     private float lastProgress = 0;
     private boolean needSeek = false;
     private VideoEditorActivityDelegate delegate;
-
-    private final Object sync = new Object();
     private Thread thread = null;
 
     private int rotationValue = 0;
@@ -97,11 +101,7 @@ public class VideoEditorActivity extends BaseFragment implements TextureView.Sur
     private int estimatedSize = 0;
     private long esimatedDuration = 0;
     private long originalSize = 0;
-
-    public interface VideoEditorActivityDelegate {
-        void didFinishEditVideo(String videoPath, long startTime, long endTime, int resultWidth, int resultHeight, int rotationValue, int originalWidth, int originalHeight, int bitrate, long estimatedSize, long estimatedDuration);
-    }
-
+    private LinearLayout textFieldContainer;
     private Runnable progressRunnable = new Runnable() {
         @Override
         public void run() {
@@ -249,18 +249,23 @@ public class VideoEditorActivity extends BaseFragment implements TextureView.Sur
                     }
                     if (delegate != null) {
                         if (compressVideo.getVisibility() == View.GONE || compressVideo.getVisibility() == View.VISIBLE && !compressVideo.isChecked()) {
-                            delegate.didFinishEditVideo(videoPath, startTime, endTime, originalWidth, originalHeight, rotationValue, originalWidth, originalHeight, originalBitrate, estimatedSize, esimatedDuration);
+                            delegate.didFinishEditVideo(videoPath, startTime, endTime, originalWidth, originalHeight, rotationValue, originalWidth, originalHeight, originalBitrate, estimatedSize, esimatedDuration, messageEditText.getText().toString());
                         } else {
-                            delegate.didFinishEditVideo(videoPath, startTime, endTime, resultWidth, resultHeight, rotationValue, originalWidth, originalHeight, bitrate, estimatedSize, esimatedDuration);
+                            delegate.didFinishEditVideo(videoPath, startTime, endTime, resultWidth, resultHeight, rotationValue, originalWidth, originalHeight, bitrate, estimatedSize, esimatedDuration, messageEditText.getText().toString());
                         }
                     }
                     finishFragment();
+                } else if (id == 2) {
+                    textFieldContainer.setVisibility(View.VISIBLE);
+                    VideoEditorActivity.this.messageEditText.requestFocus();
+                    AndroidUtilities.showKeyboard(VideoEditorActivity.this.messageEditText);
                 }
             }
         });
 
         ActionBarMenu menu = actionBar.createMenu();
         menu.addItemWithWidth(1, R.drawable.ic_done, AndroidUtilities.dp(56));
+        menu.addItemWithWidth(2, R.drawable.photo_text, AndroidUtilities.dp(56.0f));
 
         fragmentView = getParentActivity().getLayoutInflater().inflate(R.layout.video_editor_layout, null, false);
         originalSizeTextView = (TextView) fragmentView.findViewById(R.id.original_size);
@@ -401,8 +406,29 @@ public class VideoEditorActivity extends BaseFragment implements TextureView.Sur
 
         updateVideoOriginalInfo();
         updateVideoEditedInfo();
-
-        return fragmentView;
+        this.textFieldContainer = (LinearLayout) fragmentView.findViewById(R.id.editText_container);
+        this.textFieldContainer.setVisibility(View.GONE);
+        FrameLayout frameLayout = new FrameLayout(context);
+        this.textFieldContainer.addView(frameLayout, LayoutHelper.createLinear(0, -2, 1.0f));
+        emojiButton = new ImageView(context);
+        emojiButton.setImageResource(R.drawable.ic_smile_w);
+        emojiButton.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+        emojiButton.setPadding(AndroidUtilities.dp(4.0f), AndroidUtilities.dp(1.0f), 0, 0);
+        frameLayout.addView(emojiButton, LayoutHelper.createFrame(48, 48, 83));
+        this.messageEditText = new EditText(context);
+        this.messageEditText.setHint(LocaleController.getString("AddCaption", R.string.AddCaption));
+        this.messageEditText.setMaxLines(4);
+        this.messageEditText.setHorizontallyScrolling(false);
+        this.messageEditText.setTextSize(1, 18.0f);
+        this.messageEditText.setGravity(80);
+        this.messageEditText.setPadding(0, AndroidUtilities.dp(11.0f), 0, AndroidUtilities.dp(12.0f));
+        this.messageEditText.setBackgroundDrawable(null);
+        AndroidUtilities.clearCursorDrawable(this.messageEditText);
+        this.messageEditText.setTextColor(-1);
+        this.messageEditText.setHintTextColor(0xff979797);
+        this.messageEditText.setFilters(new InputFilter[]{new InputFilter.LengthFilter(140)});
+        frameLayout.addView(this.messageEditText, LayoutHelper.createFrame(-1, -2.0f, 83, 52.0f, 0.0f, 6.0f, 0.0f));
+        return this.fragmentView;
     }
 
     @Override
@@ -798,5 +824,9 @@ public class VideoEditorActivity extends BaseFragment implements TextureView.Sur
         int size = (int) ((audioFramesSize + videoFramesSize) * timeDelta);
         size += size / (32 * 1024) * 16;
         return size;
+    }
+
+    public interface VideoEditorActivityDelegate {
+        void didFinishEditVideo(String videoPath, long startTime, long endTime, int resultWidth, int resultHeight, int rotationValue, int originalWidth, int originalHeight, int bitrate, long estimatedSize, long estimatedDuration, String str2);
     }
 }

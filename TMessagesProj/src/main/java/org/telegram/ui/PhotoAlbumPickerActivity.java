@@ -27,11 +27,11 @@ import android.widget.ProgressBar;
 import android.widget.TextView;
 
 import org.telegram.messenger.AndroidUtilities;
+import org.telegram.messenger.ApplicationLoader;
 import org.telegram.messenger.LocaleController;
 import org.telegram.messenger.MediaController;
 import org.telegram.messenger.MessagesStorage;
 import org.telegram.messenger.NotificationCenter;
-import org.telegram.messenger.ApplicationLoader;
 import org.telegram.messenger.R;
 import org.telegram.ui.ActionBar.ActionBar;
 import org.telegram.ui.ActionBar.ActionBarMenu;
@@ -49,12 +49,8 @@ import java.util.HashMap;
 
 public class PhotoAlbumPickerActivity extends BaseFragment implements NotificationCenter.NotificationCenterDelegate {
 
-    public interface PhotoAlbumPickerActivityDelegate {
-        void didSelectPhotos(ArrayList<String> photos, ArrayList<String> captions, ArrayList<MediaController.SearchImage> webPhotos);
-        boolean didSelectVideo(String path);
-        void startPhotoSelectActivity();
-    }
-
+    private final static int item_photos = 2;
+    private final static int item_video = 3;
     private ArrayList<MediaController.AlbumEntry> albumsSorted = null;
     private ArrayList<MediaController.AlbumEntry> videoAlbumsSorted = null;
     private HashMap<Integer, MediaController.PhotoEntry> selectedPhotos = new HashMap<>();
@@ -64,7 +60,6 @@ public class PhotoAlbumPickerActivity extends BaseFragment implements Notificati
     private ArrayList<MediaController.SearchImage> recentWebImages = new ArrayList<>();
     private ArrayList<MediaController.SearchImage> recentGifImages = new ArrayList<>();
     private boolean loading = false;
-
     private int columnsCount = 2;
     private ListView listView;
     private ListAdapter listAdapter;
@@ -78,11 +73,7 @@ public class PhotoAlbumPickerActivity extends BaseFragment implements Notificati
     private boolean allowGifs;
     private int selectedMode;
     private ChatActivity chatActivity;
-
     private PhotoAlbumPickerActivityDelegate delegate;
-
-    private final static int item_photos = 2;
-    private final static int item_video = 3;
 
     public PhotoAlbumPickerActivity(boolean singlePhoto, boolean allowGifs, ChatActivity chatActivity) {
         super();
@@ -489,6 +480,14 @@ public class PhotoAlbumPickerActivity extends BaseFragment implements Notificati
             }
         });
         presentFragment(fragment);
+    }
+
+    public interface PhotoAlbumPickerActivityDelegate {
+        void didSelectPhotos(ArrayList<String> photos, ArrayList<String> captions, ArrayList<MediaController.SearchImage> webPhotos);
+
+        boolean didSelectVideo(String path);
+
+        void startPhotoSelectActivity();
     }
 
     private class ListAdapter extends BaseFragmentAdapter {

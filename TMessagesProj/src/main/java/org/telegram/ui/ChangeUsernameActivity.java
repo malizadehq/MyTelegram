@@ -28,18 +28,18 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import org.telegram.messenger.AndroidUtilities;
+import org.telegram.messenger.ApplicationLoader;
+import org.telegram.messenger.FileLog;
 import org.telegram.messenger.LocaleController;
 import org.telegram.messenger.MessagesController;
 import org.telegram.messenger.MessagesStorage;
 import org.telegram.messenger.NotificationCenter;
-import org.telegram.messenger.ApplicationLoader;
-import org.telegram.messenger.FileLog;
 import org.telegram.messenger.R;
+import org.telegram.messenger.UserConfig;
 import org.telegram.tgnet.ConnectionsManager;
 import org.telegram.tgnet.RequestDelegate;
 import org.telegram.tgnet.TLObject;
 import org.telegram.tgnet.TLRPC;
-import org.telegram.messenger.UserConfig;
 import org.telegram.ui.ActionBar.ActionBar;
 import org.telegram.ui.ActionBar.ActionBarMenu;
 import org.telegram.ui.ActionBar.BaseFragment;
@@ -49,6 +49,7 @@ import java.util.ArrayList;
 
 public class ChangeUsernameActivity extends BaseFragment {
 
+    private final static int done_button = 1;
     private EditText firstNameField;
     private View doneButton;
     private TextView checkTextView;
@@ -56,8 +57,6 @@ public class ChangeUsernameActivity extends BaseFragment {
     private String lastCheckName = null;
     private Runnable checkRunnable = null;
     private boolean lastNameAvailable = false;
-
-    private final static int done_button = 1;
 
     @Override
     public View createView(Context context) {
@@ -336,7 +335,7 @@ public class ChangeUsernameActivity extends BaseFragment {
             @Override
             public void run(TLObject response, final TLRPC.TL_error error) {
                 if (error == null) {
-                    final TLRPC.User user = (TLRPC.User)response;
+                    final TLRPC.User user = (TLRPC.User) response;
                     AndroidUtilities.runOnUIThread(new Runnable() {
                         @Override
                         public void run() {

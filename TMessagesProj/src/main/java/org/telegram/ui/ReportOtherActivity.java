@@ -11,6 +11,8 @@ package org.telegram.ui;
 import android.app.Activity;
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.graphics.PorterDuff;
+import android.graphics.drawable.Drawable;
 import android.os.Bundle;
 import android.text.InputType;
 import android.util.TypedValue;
@@ -40,12 +42,11 @@ import org.telegram.ui.Components.LayoutHelper;
 
 public class ReportOtherActivity extends BaseFragment {
 
+    private final static int done_button = 1;
     private EditText firstNameField;
     private View headerLabelView;
     private long dialog_id;
     private View doneButton;
-
-    private final static int done_button = 1;
 
     public ReportOtherActivity(Bundle args) {
         super(args);
@@ -54,7 +55,12 @@ public class ReportOtherActivity extends BaseFragment {
 
     @Override
     public View createView(Context context) {
-        actionBar.setBackButtonImage(R.drawable.ic_ab_back);
+        SharedPreferences themePrefs = ApplicationLoader.applicationContext.getSharedPreferences(AndroidUtilities.THEME_PREFS, AndroidUtilities.THEME_PREFS_MODE);
+        int def = themePrefs.getInt("themeColor", AndroidUtilities.defColor);
+        int iconColor = themePrefs.getInt("chatsHeaderIconsColor", 0xffffffff);
+        Drawable back = getParentActivity().getResources().getDrawable(R.drawable.ic_ab_back);
+        if (back != null) back.setColorFilter(iconColor, PorterDuff.Mode.MULTIPLY);
+        actionBar.setBackButtonDrawable(back);
         actionBar.setAllowOverlayTitle(true);
         actionBar.setTitle(LocaleController.getString("ReportChat", R.string.ReportChat));
         actionBar.setActionBarMenuOnItemClick(new ActionBar.ActionBarMenuOnItemClick() {
@@ -81,7 +87,10 @@ public class ReportOtherActivity extends BaseFragment {
         });
 
         ActionBarMenu menu = actionBar.createMenu();
-        doneButton = menu.addItemWithWidth(done_button, R.drawable.ic_done, AndroidUtilities.dp(56));
+        Drawable ic_done = getParentActivity().getResources().getDrawable(R.drawable.ic_done);
+        if (ic_done != null) ic_done.setColorFilter(iconColor, PorterDuff.Mode.MULTIPLY);
+        doneButton = menu.addItem(done_button, ic_done);
+        //    doneButton = menu.addItemWithWidth(done_button, R.drawable.ic_done, AndroidUtilities.dp(56));
 
         LinearLayout linearLayout = new LinearLayout(context);
         fragmentView = linearLayout;

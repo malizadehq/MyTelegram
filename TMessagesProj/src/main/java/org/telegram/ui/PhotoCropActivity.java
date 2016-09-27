@@ -21,8 +21,8 @@ import android.widget.FrameLayout;
 
 import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.Bitmaps;
-import org.telegram.messenger.ImageLoader;
 import org.telegram.messenger.FileLog;
+import org.telegram.messenger.ImageLoader;
 import org.telegram.messenger.LocaleController;
 import org.telegram.messenger.R;
 import org.telegram.ui.ActionBar.ActionBar;
@@ -34,6 +34,105 @@ import org.telegram.ui.Components.LayoutHelper;
 import java.io.File;
 
 public class PhotoCropActivity extends BaseFragment {
+
+    private final static int done_button = 1;
+    private Bitmap imageToCrop;
+    private BitmapDrawable drawable;
+    private PhotoEditActivityDelegate delegate = null;
+    private PhotoCropView view;
+    private boolean sameBitmap = false;
+    private boolean doneButtonPressed = false;
+    private String bitmapKey;
+
+    public PhotoCropActivity(Bundle args) {
+        super(args);
+    }
+
+    @Override
+    public boolean onFragmentCreate() {
+        swipeBackEnabled = false;
+        if (imageToCrop == null) {
+            String photoPath = getArguments().getString("photoPath");
+            Uri photoUri = getArguments().getParcelable("photoUri");
+            if (photoPath == null && photoUri == null) {
+                return false;
+            }
+            if (photoPath != null) {
+                File f = new File(photoPath);
+                if (!f.exists()) {
+                    return false;
+                }
+            }
+            int size;
+            if (AndroidUtilities.isTablet()) {
+                size = AndroidUtilities.dp(520);
+            } else {
+                size = Math.max(AndroidUtilities.displaySize.x, AndroidUtilities.displaySize.y);
+            }
+            imageToCrop = ImageLoader.loadBitmap(photoPath, photoUri, size, size, true);
+            if (imageToCrop == null) {
+                return false;
+            }
+        }
+        drawable = new BitmapDrawable(imageToCrop);
+        super.onFragmentCreate();
+        return true;
+    }
+
+    @Override
+    public void onFragmentDestroy() {
+        super.onFragmentDestroy();
+        if (bitmapKey != null) {
+            if (ImageLoader.getInstance().decrementUseCount(bitmapKey) && !ImageLoader.getInstance().isInCache(bitmapKey)) {
+                bitmapKey = null;
+            }
+        }
+        if (bitmapKey == null && imageToCrop != null && !sameBitmap) {
+            imageToCrop.recycle();
+            imageToCrop = null;
+        }
+        drawable = null;
+    }
+
+    @Override
+    public View createView(Context context) {
+        actionBar.setBackgroundColor(Theme.ACTION_BAR_MEDIA_PICKER_COLOR);
+        actionBar.setItemsBackgroundColor(Theme.ACTION_BAR_PICKER_SELECTOR_COLOR);
+        actionBar.setBackButtonImage(R.drawable.ic_ab_back);
+        actionBar.setAllowOverlayTitle(true);
+        actionBar.setTitle(LocaleController.getString("CropImage", R.string.CropImage));
+        actionBar.setActionBarMenuOnItemClick(new ActionBar.ActionBarMenuOnItemClick() {
+            @Override
+            public void onItemClick(int id) {
+                if (id == -1) {
+                    finishFragment();
+                } else if (id == done_button) {
+                    if (delegate != null && !doneButtonPressed) {
+                        Bitmap bitmap = view.getBitmap();
+                        if (bitmap == imageToCrop) {
+                            sameBitmap = true;
+                        }
+                        delegate.didFinishEdit(bitmap);
+                        doneButtonPressed = true;
+                    }
+                    finishFragment();
+                }
+            }
+        });
+
+        ActionBarMenu menu = actionBar.createMenu();
+        menu.addItemWithWidth(done_button, R.drawable.ic_done, AndroidUtilities.dp(56));
+
+        fragmentView = view = new PhotoCropView(context);
+        ((PhotoCropView) fragmentView).freeform = getArguments().getBoolean("freeform", false);
+        fragmentView.setLayoutParams(new FrameLayout.LayoutParams(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT));
+
+        return fragmentView;
+    }
+
+    public void setDelegate(PhotoEditActivityDelegate delegate) {
+        this.delegate = delegate;
+    }
 
     public interface PhotoEditActivityDelegate {
         void didFinishEdit(Bitmap bitmap);
@@ -240,10 +339,10 @@ public class PhotoCropActivity extends BaseFragment {
             float scaleY = viewHeight / h;
             if (scaleX > scaleY) {
                 bitmapHeight = viewHeight;
-                bitmapWidth = (int)Math.ceil(w * scaleY);
+                bitmapWidth = (int) Math.ceil(w * scaleY);
             } else {
                 bitmapWidth = viewWidth;
-                bitmapHeight = (int)Math.ceil(h * scaleX);
+                bitmapHeight = (int) Math.ceil(h * scaleX);
             }
             bitmapX = (viewWidth - bitmapWidth) / 2 + AndroidUtilities.dp(14);
             bitmapY = (viewHeight - bitmapHeight) / 2 + AndroidUtilities.dp(14);
@@ -289,10 +388,10 @@ public class PhotoCropActivity extends BaseFragment {
             float percY = (rectY - bitmapY) / bitmapHeight;
             float percSizeX = rectSizeX / bitmapWidth;
             float percSizeY = rectSizeY / bitmapWidth;
-            int x = (int)(percX * imageToCrop.getWidth());
-            int y = (int)(percY * imageToCrop.getHeight());
-            int sizeX = (int)(percSizeX * imageToCrop.getWidth());
-            int sizeY = (int)(percSizeY * imageToCrop.getWidth());
+            int x = (int) (percX * imageToCrop.getWidth());
+            int y = (int) (percY * imageToCrop.getHeight());
+            int sizeX = (int) (percSizeX * imageToCrop.getWidth());
+            int sizeY = (int) (percSizeY * imageToCrop.getWidth());
             if (x < 0) {
                 x = 0;
             }
@@ -354,105 +453,5 @@ public class PhotoCropActivity extends BaseFragment {
                 canvas.drawRect(rectX + side, rectY + rectSizeY / 3 * a, rectX - side + rectSizeX, rectY + rectSizeY / 3 * a + side, circlePaint);
             }
         }
-    }
-
-    private Bitmap imageToCrop;
-    private BitmapDrawable drawable;
-    private PhotoEditActivityDelegate delegate = null;
-    private PhotoCropView view;
-    private boolean sameBitmap = false;
-    private boolean doneButtonPressed = false;
-    private String bitmapKey;
-
-    private final static int done_button = 1;
-
-    public PhotoCropActivity(Bundle args) {
-        super(args);
-    }
-
-    @Override
-    public boolean onFragmentCreate() {
-        swipeBackEnabled = false;
-        if (imageToCrop == null) {
-            String photoPath = getArguments().getString("photoPath");
-            Uri photoUri = getArguments().getParcelable("photoUri");
-            if (photoPath == null && photoUri == null) {
-                return false;
-            }
-            if (photoPath != null) {
-                File f = new File(photoPath);
-                if (!f.exists()) {
-                    return false;
-                }
-            }
-            int size;
-            if (AndroidUtilities.isTablet()) {
-                size = AndroidUtilities.dp(520);
-            } else {
-                size = Math.max(AndroidUtilities.displaySize.x, AndroidUtilities.displaySize.y);
-            }
-            imageToCrop = ImageLoader.loadBitmap(photoPath, photoUri, size, size, true);
-            if (imageToCrop == null) {
-                return false;
-            }
-        }
-        drawable = new BitmapDrawable(imageToCrop);
-        super.onFragmentCreate();
-        return true;
-    }
-
-    @Override
-    public void onFragmentDestroy() {
-        super.onFragmentDestroy();
-        if (bitmapKey != null) {
-            if (ImageLoader.getInstance().decrementUseCount(bitmapKey) && !ImageLoader.getInstance().isInCache(bitmapKey)) {
-                bitmapKey = null;
-            }
-        }
-        if (bitmapKey == null && imageToCrop != null && !sameBitmap) {
-            imageToCrop.recycle();
-            imageToCrop = null;
-        }
-        drawable = null;
-    }
-
-    @Override
-    public View createView(Context context) {
-        actionBar.setBackgroundColor(Theme.ACTION_BAR_MEDIA_PICKER_COLOR);
-        actionBar.setItemsBackgroundColor(Theme.ACTION_BAR_PICKER_SELECTOR_COLOR);
-        actionBar.setBackButtonImage(R.drawable.ic_ab_back);
-        actionBar.setAllowOverlayTitle(true);
-        actionBar.setTitle(LocaleController.getString("CropImage", R.string.CropImage));
-        actionBar.setActionBarMenuOnItemClick(new ActionBar.ActionBarMenuOnItemClick() {
-            @Override
-            public void onItemClick(int id) {
-                if (id == -1) {
-                    finishFragment();
-                } else if (id == done_button) {
-                    if (delegate != null && !doneButtonPressed) {
-                        Bitmap bitmap = view.getBitmap();
-                        if (bitmap == imageToCrop) {
-                            sameBitmap = true;
-                        }
-                        delegate.didFinishEdit(bitmap);
-                        doneButtonPressed = true;
-                    }
-                    finishFragment();
-                }
-            }
-        });
-
-        ActionBarMenu menu = actionBar.createMenu();
-        menu.addItemWithWidth(done_button, R.drawable.ic_done, AndroidUtilities.dp(56));
-
-        fragmentView = view = new PhotoCropView(context);
-        ((PhotoCropView) fragmentView).freeform = getArguments().getBoolean("freeform", false);
-        fragmentView.setLayoutParams(new FrameLayout.LayoutParams(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT));
-
-        return fragmentView;
-    }
-
-    public void setDelegate(PhotoEditActivityDelegate delegate) {
-        this.delegate = delegate;
     }
 }

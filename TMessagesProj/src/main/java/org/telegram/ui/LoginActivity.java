@@ -50,21 +50,21 @@ import android.widget.TextView;
 
 import org.telegram.PhoneFormat.PhoneFormat;
 import org.telegram.messenger.AndroidUtilities;
+import org.telegram.messenger.ApplicationLoader;
+import org.telegram.messenger.BuildVars;
 import org.telegram.messenger.ContactsController;
+import org.telegram.messenger.FileLog;
+import org.telegram.messenger.LocaleController;
 import org.telegram.messenger.MessagesController;
 import org.telegram.messenger.MessagesStorage;
 import org.telegram.messenger.NotificationCenter;
-import org.telegram.messenger.ApplicationLoader;
-import org.telegram.messenger.BuildVars;
-import org.telegram.messenger.FileLog;
-import org.telegram.messenger.LocaleController;
 import org.telegram.messenger.R;
+import org.telegram.messenger.UserConfig;
+import org.telegram.messenger.Utilities;
 import org.telegram.tgnet.ConnectionsManager;
 import org.telegram.tgnet.RequestDelegate;
 import org.telegram.tgnet.TLObject;
 import org.telegram.tgnet.TLRPC;
-import org.telegram.messenger.UserConfig;
-import org.telegram.messenger.Utilities;
 import org.telegram.ui.ActionBar.ActionBar;
 import org.telegram.ui.ActionBar.ActionBarMenu;
 import org.telegram.ui.ActionBar.BaseFragment;
@@ -86,6 +86,7 @@ import java.util.TimerTask;
 
 public class LoginActivity extends BaseFragment {
 
+    private final static int done_button = 1;
     private int currentViewNum = 0;
     private SlideView[] views = new SlideView[8];
     private ProgressDialog progressDialog;
@@ -93,8 +94,6 @@ public class LoginActivity extends BaseFragment {
     private ArrayList<String> permissionsItems = new ArrayList<>();
     private boolean checkPermissions = true;
     private View doneButton;
-
-    private final static int done_button = 1;
 
     @Override
     public void onFragmentDestroy() {
@@ -1030,31 +1029,7 @@ public class LoginActivity extends BaseFragment {
 
     public class LoginActivitySmsView extends SlideView implements NotificationCenter.NotificationCenterDelegate {
 
-        private class ProgressView extends View {
-
-            private Paint paint = new Paint();
-            private Paint paint2 = new Paint();
-            private float progress;
-
-            public ProgressView(Context context) {
-                super(context);
-                paint.setColor(0xffe1eaf2);
-                paint2.setColor(0xff62a0d0);
-            }
-
-            public void setProgress(float value) {
-                progress = value;
-                invalidate();
-            }
-
-            @Override
-            protected void onDraw(Canvas canvas) {
-                int start = (int) (getMeasuredWidth() * progress);
-                canvas.drawRect(0, 0, start, getMeasuredHeight(), paint2);
-                canvas.drawRect(start, 0, getMeasuredWidth(), getMeasuredHeight(), paint);
-            }
-        }
-
+        private final Object timerSync = new Object();
         private String phone;
         private String phoneHash;
         private String requestPhone;
@@ -1069,7 +1044,6 @@ public class LoginActivity extends BaseFragment {
         private Timer timeTimer;
         private Timer codeTimer;
         private int openTime;
-        private final Object timerSync = new Object();
         private volatile int time = 60000;
         private volatile int codeTime = 15000;
         private double lastCurrentTime;
@@ -1540,6 +1514,7 @@ public class LoginActivity extends BaseFragment {
                                 UserConfig.clearConfig();
                                 MessagesController.getInstance().cleanup();
                                 UserConfig.setCurrentUser(res.user);
+                                UserConfig.setClientUserIdInPref(res.user.id);
                                 UserConfig.saveConfig(true);
                                 MessagesStorage.getInstance().cleanup(true);
                                 ArrayList<TLRPC.User> users = new ArrayList<>();
@@ -1724,6 +1699,31 @@ public class LoginActivity extends BaseFragment {
             int t2 = bundle.getInt("open");
             if (t2 != 0) {
                 openTime = t2;
+            }
+        }
+
+        private class ProgressView extends View {
+
+            private Paint paint = new Paint();
+            private Paint paint2 = new Paint();
+            private float progress;
+
+            public ProgressView(Context context) {
+                super(context);
+                paint.setColor(0xffe1eaf2);
+                paint2.setColor(0xff62a0d0);
+            }
+
+            public void setProgress(float value) {
+                progress = value;
+                invalidate();
+            }
+
+            @Override
+            protected void onDraw(Canvas canvas) {
+                int start = (int) (getMeasuredWidth() * progress);
+                canvas.drawRect(0, 0, start, getMeasuredHeight(), paint2);
+                canvas.drawRect(start, 0, getMeasuredWidth(), getMeasuredHeight(), paint);
             }
         }
     }
@@ -2002,6 +2002,7 @@ public class LoginActivity extends BaseFragment {
                                 UserConfig.clearConfig();
                                 MessagesController.getInstance().cleanup();
                                 UserConfig.setCurrentUser(res.user);
+                                UserConfig.setClientUserIdInPref(res.user.id);
                                 UserConfig.saveConfig(true);
                                 MessagesStorage.getInstance().cleanup(true);
                                 ArrayList<TLRPC.User> users = new ArrayList<>();
@@ -2225,6 +2226,7 @@ public class LoginActivity extends BaseFragment {
                                 UserConfig.clearConfig();
                                 MessagesController.getInstance().cleanup();
                                 UserConfig.setCurrentUser(res.user);
+                                UserConfig.setClientUserIdInPref(res.user.id);
                                 UserConfig.saveConfig(true);
                                 MessagesStorage.getInstance().cleanup(true);
                                 ArrayList<TLRPC.User> users = new ArrayList<>();
@@ -2438,6 +2440,7 @@ public class LoginActivity extends BaseFragment {
                                 UserConfig.clearConfig();
                                 MessagesController.getInstance().cleanup();
                                 UserConfig.setCurrentUser(res.user);
+                                UserConfig.setClientUserIdInPref(res.user.id);
                                 UserConfig.saveConfig(true);
                                 MessagesStorage.getInstance().cleanup(true);
                                 ArrayList<TLRPC.User> users = new ArrayList<>();

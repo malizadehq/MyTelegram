@@ -47,23 +47,23 @@ import android.widget.TextView;
 
 import org.telegram.PhoneFormat.PhoneFormat;
 import org.telegram.messenger.AndroidUtilities;
+import org.telegram.messenger.AnimatorListenerAdapterProxy;
+import org.telegram.messenger.ApplicationLoader;
+import org.telegram.messenger.BuildVars;
+import org.telegram.messenger.FileLog;
 import org.telegram.messenger.LocaleController;
 import org.telegram.messenger.MessagesController;
 import org.telegram.messenger.MessagesStorage;
 import org.telegram.messenger.NotificationCenter;
-import org.telegram.messenger.ApplicationLoader;
-import org.telegram.messenger.BuildVars;
-import org.telegram.messenger.FileLog;
 import org.telegram.messenger.R;
+import org.telegram.messenger.UserConfig;
 import org.telegram.tgnet.ConnectionsManager;
 import org.telegram.tgnet.RequestDelegate;
 import org.telegram.tgnet.TLObject;
 import org.telegram.tgnet.TLRPC;
-import org.telegram.messenger.UserConfig;
 import org.telegram.ui.ActionBar.ActionBar;
 import org.telegram.ui.ActionBar.ActionBarMenu;
 import org.telegram.ui.ActionBar.BaseFragment;
-import org.telegram.messenger.AnimatorListenerAdapterProxy;
 import org.telegram.ui.Components.HintEditText;
 import org.telegram.ui.Components.LayoutHelper;
 import org.telegram.ui.Components.SlideView;
@@ -80,6 +80,7 @@ import java.util.TimerTask;
 
 public class ChangePhoneActivity extends BaseFragment {
 
+    private final static int done_button = 1;
     private int currentViewNum = 0;
     private SlideView[] views = new SlideView[5];
     private ProgressDialog progressDialog;
@@ -87,8 +88,6 @@ public class ChangePhoneActivity extends BaseFragment {
     private ArrayList<String> permissionsItems = new ArrayList<>();
     private boolean checkPermissions = true;
     private View doneButton;
-
-    private final static int done_button = 1;
 
     @Override
     public void onFragmentDestroy() {
@@ -802,31 +801,7 @@ public class ChangePhoneActivity extends BaseFragment {
 
     public class LoginActivitySmsView extends SlideView implements NotificationCenter.NotificationCenterDelegate {
 
-        private class ProgressView extends View {
-
-            private Paint paint = new Paint();
-            private Paint paint2 = new Paint();
-            private float progress;
-
-            public ProgressView(Context context) {
-                super(context);
-                paint.setColor(0xffe1eaf2);
-                paint2.setColor(0xff62a0d0);
-            }
-
-            public void setProgress(float value) {
-                progress = value;
-                invalidate();
-            }
-
-            @Override
-            protected void onDraw(Canvas canvas) {
-                int start = (int) (getMeasuredWidth() * progress);
-                canvas.drawRect(0, 0, start, getMeasuredHeight(), paint2);
-                canvas.drawRect(start, 0, getMeasuredWidth(), getMeasuredHeight(), paint);
-            }
-        }
-
+        private final Object timerSync = new Object();
         private String phone;
         private String phoneHash;
         private String requestPhone;
@@ -841,7 +816,6 @@ public class ChangePhoneActivity extends BaseFragment {
         private Timer timeTimer;
         private Timer codeTimer;
         private int openTime;
-        private final Object timerSync = new Object();
         private volatile int time = 60000;
         private volatile int codeTime = 15000;
         private double lastCurrentTime;
@@ -1409,6 +1383,31 @@ public class ChangePhoneActivity extends BaseFragment {
                 codeField.setText(num);
                 ignoreOnTextChange = false;
                 onNextPressed();
+            }
+        }
+
+        private class ProgressView extends View {
+
+            private Paint paint = new Paint();
+            private Paint paint2 = new Paint();
+            private float progress;
+
+            public ProgressView(Context context) {
+                super(context);
+                paint.setColor(0xffe1eaf2);
+                paint2.setColor(0xff62a0d0);
+            }
+
+            public void setProgress(float value) {
+                progress = value;
+                invalidate();
+            }
+
+            @Override
+            protected void onDraw(Canvas canvas) {
+                int start = (int) (getMeasuredWidth() * progress);
+                canvas.drawRect(0, 0, start, getMeasuredHeight(), paint2);
+                canvas.drawRect(start, 0, getMeasuredWidth(), getMeasuredHeight(), paint);
             }
         }
     }

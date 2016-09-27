@@ -11,8 +11,11 @@ package org.telegram.ui;
 import android.app.AlertDialog;
 import android.content.Context;
 import android.content.DialogInterface;
+import android.content.SharedPreferences;
 import android.content.res.Configuration;
+import android.graphics.PorterDuff;
 import android.graphics.Typeface;
+import android.graphics.drawable.Drawable;
 import android.os.Build;
 import android.os.Vibrator;
 import android.support.v4.hardware.fingerprint.FingerprintManagerCompat;
@@ -41,10 +44,10 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import org.telegram.messenger.AndroidUtilities;
-import org.telegram.messenger.LocaleController;
-import org.telegram.messenger.NotificationCenter;
 import org.telegram.messenger.ApplicationLoader;
 import org.telegram.messenger.FileLog;
+import org.telegram.messenger.LocaleController;
+import org.telegram.messenger.NotificationCenter;
 import org.telegram.messenger.R;
 import org.telegram.messenger.UserConfig;
 import org.telegram.messenger.Utilities;
@@ -61,18 +64,19 @@ import org.telegram.ui.Components.NumberPicker;
 
 public class PasscodeActivity extends BaseFragment implements NotificationCenter.NotificationCenterDelegate {
 
+    private final static int done_button = 1;
+    private final static int pin_item = 2;
+    private final static int password_item = 3;
     private ListAdapter listAdapter;
     private ListView listView;
     private TextView titleTextView;
     private EditText passwordEditText;
     private TextView dropDown;
     private ActionBarMenuItem dropDownContainer;
-
     private int type;
     private int currentPasswordType = 0;
     private int passcodeSetStep = 0;
     private String firstPassword;
-
     private int passcodeRow;
     private int changePasscodeRow;
     private int passcodeDetailRow;
@@ -80,10 +84,6 @@ public class PasscodeActivity extends BaseFragment implements NotificationCenter
     private int autoLockRow;
     private int autoLockDetailRow;
     private int rowCount;
-
-    private final static int done_button = 1;
-    private final static int pin_item = 2;
-    private final static int password_item = 3;
 
     public PasscodeActivity(int type) {
         super();
@@ -110,8 +110,14 @@ public class PasscodeActivity extends BaseFragment implements NotificationCenter
 
     @Override
     public View createView(Context context) {
+        SharedPreferences themePrefs = ApplicationLoader.applicationContext.getSharedPreferences(AndroidUtilities.THEME_PREFS, AndroidUtilities.THEME_PREFS_MODE);
+        int def = themePrefs.getInt("themeColor", AndroidUtilities.defColor);
+        int iconColor = themePrefs.getInt("chatsHeaderIconsColor", 0xffffffff);
         if (type != 3) {
-            actionBar.setBackButtonImage(R.drawable.ic_ab_back);
+            Drawable back = getParentActivity().getResources().getDrawable(R.drawable.ic_ab_back);
+            if (back != null) back.setColorFilter(iconColor, PorterDuff.Mode.MULTIPLY);
+            actionBar.setBackButtonDrawable(back);
+            actionBar.setTitleColor(themePrefs.getInt("chatsHeaderTitleColor", 0xffffffff));
         }
         actionBar.setAllowOverlayTitle(false);
         actionBar.setActionBarMenuOnItemClick(new ActionBar.ActionBarMenuOnItemClick() {
@@ -140,7 +146,9 @@ public class PasscodeActivity extends BaseFragment implements NotificationCenter
 
         if (type != 0) {
             ActionBarMenu menu = actionBar.createMenu();
-            menu.addItemWithWidth(done_button, R.drawable.ic_done, AndroidUtilities.dp(56));
+            Drawable ic_done = getParentActivity().getResources().getDrawable(R.drawable.ic_done);
+            if (ic_done != null) ic_done.setColorFilter(iconColor, PorterDuff.Mode.MULTIPLY);
+            menu.addItem(done_button, ic_done);
 
             titleTextView = new TextView(context);
             titleTextView.setTextColor(0xff757575);

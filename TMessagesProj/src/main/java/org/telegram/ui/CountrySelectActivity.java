@@ -9,6 +9,9 @@
 package org.telegram.ui;
 
 import android.content.Context;
+import android.content.SharedPreferences;
+import android.graphics.PorterDuff;
+import android.graphics.drawable.Drawable;
 import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.View;
@@ -21,32 +24,27 @@ import android.widget.ListView;
 import android.widget.TextView;
 
 import org.telegram.messenger.AndroidUtilities;
+import org.telegram.messenger.ApplicationLoader;
 import org.telegram.messenger.LocaleController;
 import org.telegram.messenger.R;
-import org.telegram.ui.Adapters.CountryAdapter;
-import org.telegram.ui.Adapters.CountryAdapter.Country;
-import org.telegram.ui.Adapters.CountrySearchAdapter;
 import org.telegram.ui.ActionBar.ActionBar;
 import org.telegram.ui.ActionBar.ActionBarMenu;
 import org.telegram.ui.ActionBar.ActionBarMenuItem;
 import org.telegram.ui.ActionBar.BaseFragment;
+import org.telegram.ui.Adapters.CountryAdapter;
+import org.telegram.ui.Adapters.CountryAdapter.Country;
+import org.telegram.ui.Adapters.CountrySearchAdapter;
 import org.telegram.ui.Components.LayoutHelper;
 import org.telegram.ui.Components.LetterSectionsListView;
 
 public class CountrySelectActivity extends BaseFragment {
 
-    public interface CountrySelectActivityDelegate {
-        void didSelectCountry(String name);
-    }
-
     private LetterSectionsListView listView;
     private TextView emptyTextView;
     private CountryAdapter listViewAdapter;
     private CountrySearchAdapter searchListViewAdapter;
-
     private boolean searchWas;
     private boolean searching;
-
     private CountrySelectActivityDelegate delegate;
 
     @Override
@@ -61,7 +59,12 @@ public class CountrySelectActivity extends BaseFragment {
 
     @Override
     public View createView(Context context) {
-        actionBar.setBackButtonImage(R.drawable.ic_ab_back);
+        SharedPreferences themePrefs = ApplicationLoader.applicationContext.getSharedPreferences(AndroidUtilities.THEME_PREFS, AndroidUtilities.THEME_PREFS_MODE);
+        int def = themePrefs.getInt("themeColor", AndroidUtilities.defColor);
+        int iconColor = themePrefs.getInt("chatsHeaderIconsColor", 0xffffffff);
+        Drawable back = getParentActivity().getResources().getDrawable(R.drawable.ic_ab_back);
+        if (back != null) back.setColorFilter(iconColor, PorterDuff.Mode.MULTIPLY);
+        actionBar.setBackButtonDrawable(back);
         actionBar.setAllowOverlayTitle(true);
         actionBar.setTitle(LocaleController.getString("ChooseCountry", R.string.ChooseCountry));
 
@@ -227,5 +230,9 @@ public class CountrySelectActivity extends BaseFragment {
 
     public void setCountrySelectActivityDelegate(CountrySelectActivityDelegate delegate) {
         this.delegate = delegate;
+    }
+
+    public interface CountrySelectActivityDelegate {
+        void didSelectCountry(String name);
     }
 }

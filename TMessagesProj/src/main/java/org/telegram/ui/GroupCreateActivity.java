@@ -11,9 +11,12 @@ package org.telegram.ui;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
+import android.graphics.PorterDuff;
 import android.graphics.drawable.BitmapDrawable;
+import android.graphics.drawable.Drawable;
 import android.os.Bundle;
 import android.text.Editable;
 import android.text.InputType;
@@ -36,22 +39,22 @@ import android.widget.LinearLayout;
 import android.widget.ListView;
 import android.widget.TextView;
 
-import org.telegram.messenger.AndroidUtilities;
 import org.telegram.PhoneFormat.PhoneFormat;
-import org.telegram.messenger.ChatObject;
-import org.telegram.messenger.LocaleController;
-import org.telegram.messenger.UserObject;
+import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.ApplicationLoader;
-import org.telegram.tgnet.TLRPC;
+import org.telegram.messenger.ChatObject;
 import org.telegram.messenger.FileLog;
+import org.telegram.messenger.LocaleController;
 import org.telegram.messenger.MessagesController;
 import org.telegram.messenger.NotificationCenter;
 import org.telegram.messenger.R;
-import org.telegram.ui.Adapters.ContactsAdapter;
-import org.telegram.ui.Adapters.SearchAdapter;
+import org.telegram.messenger.UserObject;
+import org.telegram.tgnet.TLRPC;
 import org.telegram.ui.ActionBar.ActionBar;
 import org.telegram.ui.ActionBar.ActionBarMenu;
 import org.telegram.ui.ActionBar.BaseFragment;
+import org.telegram.ui.Adapters.ContactsAdapter;
+import org.telegram.ui.Adapters.SearchAdapter;
 import org.telegram.ui.Cells.UserCell;
 import org.telegram.ui.Components.ChipSpan;
 import org.telegram.ui.Components.LayoutHelper;
@@ -62,10 +65,7 @@ import java.util.HashMap;
 
 public class GroupCreateActivity extends BaseFragment implements NotificationCenter.NotificationCenterDelegate {
 
-    public interface GroupCreateActivityDelegate {
-        void didSelectUsers(ArrayList<Integer> ids);
-    }
-
+    private final static int done_button = 1;
     private ContactsAdapter listViewAdapter;
     private TextView emptyTextView;
     private EditText userSelectEditText;
@@ -86,8 +86,6 @@ public class GroupCreateActivity extends BaseFragment implements NotificationCen
     private boolean isGroup;
     private HashMap<Integer, ChipSpan> selectedContacts = new HashMap<>();
     private ArrayList<ChipSpan> allSpans = new ArrayList<>();
-
-    private final static int done_button = 1;
 
     public GroupCreateActivity() {
         super();
@@ -122,9 +120,15 @@ public class GroupCreateActivity extends BaseFragment implements NotificationCen
     public View createView(Context context) {
         searching = false;
         searchWas = false;
-
-        actionBar.setBackButtonImage(R.drawable.ic_ab_back);
+        SharedPreferences themePrefs = ApplicationLoader.applicationContext.getSharedPreferences(AndroidUtilities.THEME_PREFS, AndroidUtilities.THEME_PREFS_MODE);
+        int def = themePrefs.getInt("themeColor", AndroidUtilities.defColor);
+        int iconColor = themePrefs.getInt("chatsHeaderIconsColor", 0xffffffff);
+        Drawable back = getParentActivity().getResources().getDrawable(R.drawable.ic_ab_back);
+        if (back != null) back.setColorFilter(iconColor, PorterDuff.Mode.MULTIPLY);
+        actionBar.setBackButtonDrawable(back);
         actionBar.setAllowOverlayTitle(true);
+        actionBar.setTitleColor(themePrefs.getInt("chatsHeaderTitleColor", 0xffffffff));
+
         if (isAlwaysShare) {
             if (isGroup) {
                 actionBar.setTitle(LocaleController.getString("AlwaysAllow", R.string.AlwaysAllow));
@@ -168,7 +172,9 @@ public class GroupCreateActivity extends BaseFragment implements NotificationCen
             }
         });
         ActionBarMenu menu = actionBar.createMenu();
-        menu.addItemWithWidth(done_button, R.drawable.ic_done, AndroidUtilities.dp(56));
+        Drawable ic_done = getParentActivity().getResources().getDrawable(R.drawable.ic_done);
+        if (ic_done != null) ic_done.setColorFilter(iconColor, PorterDuff.Mode.MULTIPLY);
+        menu.addItem(done_button, ic_done);
 
         searchListViewAdapter = new SearchAdapter(context, null, false, false, false, false);
         searchListViewAdapter.setCheckedMap(selectedContacts);
@@ -431,6 +437,10 @@ public class GroupCreateActivity extends BaseFragment implements NotificationCen
         return fragmentView;
     }
 
+    public void onResume() {
+        super.onResume();
+    }
+
     @Override
     public void didReceivedNotification(int id, Object... args) {
         if (id == NotificationCenter.contactsDidLoaded) {
@@ -438,7 +448,7 @@ public class GroupCreateActivity extends BaseFragment implements NotificationCen
                 listViewAdapter.notifyDataSetChanged();
             }
         } else if (id == NotificationCenter.updateInterfaces) {
-            int mask = (Integer)args[0];
+            int mask = (Integer) args[0];
             if ((mask & MessagesController.UPDATE_MASK_AVATAR) != 0 || (mask & MessagesController.UPDATE_MASK_NAME) != 0 || (mask & MessagesController.UPDATE_MASK_STATUS) != 0) {
                 updateVisibleRows(mask);
             }
@@ -466,7 +476,7 @@ public class GroupCreateActivity extends BaseFragment implements NotificationCen
     private ChipSpan createAndPutChipForUser(TLRPC.User user) {
         LayoutInflater lf = (LayoutInflater) ApplicationLoader.applicationContext.getSystemService(Activity.LAYOUT_INFLATER_SERVICE);
         View textView = lf.inflate(R.layout.group_create_bubble, null);
-        TextView text = (TextView)textView.findViewById(R.id.bubble_text_view);
+        TextView text = (TextView) textView.findViewById(R.id.bubble_text_view);
         String name = UserObject.getUserName(user);
         if (name.length() == 0 && user.phone != null && user.phone.length() != 0) {
             name = PhoneFormat.getInstance().format("+" + user.phone);
@@ -499,5 +509,9 @@ public class GroupCreateActivity extends BaseFragment implements NotificationCen
         userSelectEditText.setText(ssb);
         userSelectEditText.setSelection(ssb.length());
         return span;
+    }
+
+    public interface GroupCreateActivityDelegate {
+        void didSelectUsers(ArrayList<Integer> ids);
     }
 }

@@ -34,12 +34,12 @@ import org.telegram.messenger.ApplicationLoader;
 import org.telegram.messenger.FileLog;
 import org.telegram.messenger.LocaleController;
 import org.telegram.messenger.R;
-import org.telegram.ui.ActionBar.BackDrawable;
-import org.telegram.ui.ActionBar.Theme;
-import org.telegram.ui.Adapters.BaseFragmentAdapter;
 import org.telegram.ui.ActionBar.ActionBar;
 import org.telegram.ui.ActionBar.ActionBarMenu;
+import org.telegram.ui.ActionBar.BackDrawable;
 import org.telegram.ui.ActionBar.BaseFragment;
+import org.telegram.ui.ActionBar.Theme;
+import org.telegram.ui.Adapters.BaseFragmentAdapter;
 import org.telegram.ui.Cells.SharedDocumentCell;
 import org.telegram.ui.Components.LayoutHelper;
 import org.telegram.ui.Components.NumberTextView;
@@ -56,16 +56,13 @@ import java.util.StringTokenizer;
 
 public class DocumentSelectActivity extends BaseFragment {
 
-    public interface DocumentSelectActivityDelegate {
-        void didSelectFiles(DocumentSelectActivity activity, ArrayList<String> files);
-        void startDocumentSelectActivity();
-    }
-
+    private final static int done = 3;
+    //Teleh
+    public String fileFilter = "*";
     private ListView listView;
     private ListAdapter listAdapter;
     private NumberTextView selectedMessagesCountTextView;
     private TextView emptyView;
-
     private File currentDir;
     private ArrayList<ListItem> items = new ArrayList<>();
     private boolean receiverRegistered = false;
@@ -75,24 +72,6 @@ public class DocumentSelectActivity extends BaseFragment {
     private HashMap<String, ListItem> selectedFiles = new HashMap<>();
     private ArrayList<View> actionModeViews = new ArrayList<>();
     private boolean scrolling;
-
-    private final static int done = 3;
-
-    private class ListItem {
-        int icon;
-        String title;
-        String subtitle = "";
-        String ext = "";
-        String thumb;
-        File file;
-    }
-
-    private class HistoryEntry {
-        int scrollItem, scrollOffset;
-        File dir;
-        String title;
-    }
-
     private BroadcastReceiver receiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context arg0, Intent intent) {
@@ -126,6 +105,7 @@ public class DocumentSelectActivity extends BaseFragment {
         } catch (Exception e) {
             FileLog.e("tmessages", e);
         }
+        fileFilter = "*";
         super.onFragmentDestroy();
     }
 
@@ -424,7 +404,7 @@ public class DocumentSelectActivity extends BaseFragment {
         File[] files;
         try {
             files = dir.listFiles();
-        } catch(Exception e) {
+        } catch (Exception e) {
             showErrorBox(e.getLocalizedMessage());
             return false;
         }
@@ -465,6 +445,11 @@ public class DocumentSelectActivity extends BaseFragment {
                 item.subtitle = LocaleController.getString("Folder", R.string.Folder);
             } else {
                 String fname = file.getName();
+        /*Teleh*/
+                if (!fileFilter.equals("*") && !fname.toLowerCase().endsWith(fileFilter)) {
+                    continue;
+                }
+                 /*End Teleh*/
                 String[] sp = fname.split("\\.");
                 item.ext = sp.length > 1 ? sp[sp.length - 1] : "?";
                 item.subtitle = AndroidUtilities.formatFileSize(file.length());
@@ -607,8 +592,9 @@ public class DocumentSelectActivity extends BaseFragment {
         fs.subtitle = LocaleController.getString("GalleryInfo", R.string.GalleryInfo);
         fs.icon = R.drawable.ic_storage_gallery;
         fs.file = null;
-        items.add(fs);
-
+        //Teleh
+        if (fileFilter.equals("*")) items.add(fs);
+        //End Teleh
         AndroidUtilities.clearDrawableAnimation(listView);
         scrolling = true;
         listAdapter.notifyDataSetChanged();
@@ -617,8 +603,8 @@ public class DocumentSelectActivity extends BaseFragment {
     private String getRootSubtitle(String path) {
         try {
             StatFs stat = new StatFs(path);
-            long total = (long)stat.getBlockCount() * (long)stat.getBlockSize();
-            long free = (long)stat.getAvailableBlocks() * (long)stat.getBlockSize();
+            long total = (long) stat.getBlockCount() * (long) stat.getBlockSize();
+            long free = (long) stat.getAvailableBlocks() * (long) stat.getBlockSize();
             if (total == 0) {
                 return "";
             }
@@ -627,6 +613,28 @@ public class DocumentSelectActivity extends BaseFragment {
             FileLog.e("tmessages", e);
         }
         return path;
+    }
+
+    public interface DocumentSelectActivityDelegate {
+        void didSelectFiles(DocumentSelectActivity activity, ArrayList<String> files);
+
+        void startDocumentSelectActivity();
+    }
+
+    // End Teleh
+    private class ListItem {
+        int icon;
+        String title;
+        String subtitle = "";
+        String ext = "";
+        String thumb;
+        File file;
+    }
+
+    private class HistoryEntry {
+        int scrollItem, scrollOffset;
+        File dir;
+        String title;
     }
 
     private class ListAdapter extends BaseFragmentAdapter {

@@ -20,13 +20,13 @@ import android.widget.ImageView;
 import android.widget.TextView;
 
 import org.telegram.messenger.AndroidUtilities;
+import org.telegram.messenger.FileLoader;
 import org.telegram.messenger.ImageLoader;
 import org.telegram.messenger.MediaController;
 import org.telegram.messenger.MessageObject;
 import org.telegram.messenger.NotificationCenter;
-import org.telegram.messenger.audioinfo.AudioInfo;
-import org.telegram.messenger.FileLoader;
 import org.telegram.messenger.R;
+import org.telegram.messenger.audioinfo.AudioInfo;
 import org.telegram.tgnet.TLRPC;
 import org.telegram.ui.ActionBar.ActionBar;
 import org.telegram.ui.ActionBar.BaseFragment;
@@ -54,99 +54,6 @@ public class AudioPlayerActivity extends BaseFragment implements NotificationCen
     private int TAG;
 
     private String lastTimeString;
-
-    private class SeekBarView extends FrameLayout {
-
-        private Paint innerPaint1;
-        private Paint outerPaint1;
-        private int thumbWidth;
-        private int thumbHeight;
-        public int thumbX = 0;
-        public int thumbDX = 0;
-        private boolean pressed = false;
-
-        public SeekBarView(Context context) {
-            super(context);
-            setWillNotDraw(false);
-            innerPaint1 = new Paint(Paint.ANTI_ALIAS_FLAG);
-            innerPaint1.setColor(0x19000000);
-
-            outerPaint1 = new Paint(Paint.ANTI_ALIAS_FLAG);
-            outerPaint1.setColor(0xff23afef);
-
-            thumbWidth = AndroidUtilities.dp(24);
-            thumbHeight = AndroidUtilities.dp(24);
-        }
-
-        @Override
-        public boolean onInterceptTouchEvent(MotionEvent ev) {
-            return onTouch(ev);
-        }
-
-        @Override
-        public boolean onTouchEvent(MotionEvent event) {
-            return onTouch(event);
-        }
-
-        boolean onTouch(MotionEvent ev) {
-            if (ev.getAction() == MotionEvent.ACTION_DOWN) {
-                getParent().requestDisallowInterceptTouchEvent(true);
-                int additionWidth = (getMeasuredHeight() - thumbWidth) / 2;
-                if (thumbX - additionWidth <= ev.getX() && ev.getX() <= thumbX + thumbWidth + additionWidth && ev.getY() >= 0 && ev.getY() <= getMeasuredHeight()) {
-                    pressed = true;
-                    thumbDX = (int)(ev.getX() - thumbX);
-                    invalidate();
-                    return true;
-                }
-            } else if (ev.getAction() == MotionEvent.ACTION_UP || ev.getAction() == MotionEvent.ACTION_CANCEL) {
-                if (pressed) {
-                    if (ev.getAction() == MotionEvent.ACTION_UP) {
-                        onSeekBarDrag((float) thumbX / (float) (getMeasuredWidth() - thumbWidth));
-                    }
-                    pressed = false;
-                    invalidate();
-                    return true;
-                }
-            } else if (ev.getAction() == MotionEvent.ACTION_MOVE) {
-                if (pressed) {
-                    thumbX = (int)(ev.getX() - thumbDX);
-                    if (thumbX < 0) {
-                        thumbX = 0;
-                    } else if (thumbX > getMeasuredWidth() - thumbWidth) {
-                        thumbX = getMeasuredWidth() - thumbWidth;
-                    }
-                    invalidate();
-                    return true;
-                }
-            }
-            return false;
-        }
-
-        public void setProgress(float progress) {
-            int newThumbX = (int)Math.ceil((getMeasuredWidth() - thumbWidth) * progress);
-            if (thumbX != newThumbX) {
-                thumbX = newThumbX;
-                if (thumbX < 0) {
-                    thumbX = 0;
-                } else if (thumbX > getMeasuredWidth() - thumbWidth) {
-                    thumbX = getMeasuredWidth() - thumbWidth;
-                }
-                invalidate();
-            }
-        }
-
-        public boolean isDragging() {
-            return pressed;
-        }
-
-        @Override
-        protected void onDraw(Canvas canvas) {
-            int y = (getMeasuredHeight() - thumbHeight) / 2;
-            canvas.drawRect(thumbWidth / 2, getMeasuredHeight() / 2 - AndroidUtilities.dp(1), getMeasuredWidth() - thumbWidth / 2, getMeasuredHeight() / 2 + AndroidUtilities.dp(1), innerPaint1);
-            canvas.drawRect(thumbWidth / 2, getMeasuredHeight() / 2 - AndroidUtilities.dp(1), thumbWidth / 2 + thumbX, getMeasuredHeight() / 2 + AndroidUtilities.dp(1), outerPaint1);
-            canvas.drawCircle(thumbX + thumbWidth / 2, y + thumbHeight / 2, AndroidUtilities.dp(pressed ? 8 : 6), outerPaint1);
-        }
-    }
 
     @Override
     public boolean onFragmentCreate() {
@@ -389,7 +296,7 @@ public class AudioPlayerActivity extends BaseFragment implements NotificationCen
         File cacheFile = null;
         if (messageObject.messageOwner.attachPath != null && messageObject.messageOwner.attachPath.length() > 0) {
             cacheFile = new File(messageObject.messageOwner.attachPath);
-            if(!cacheFile.exists()) {
+            if (!cacheFile.exists()) {
                 cacheFile = null;
             }
         }
@@ -463,6 +370,99 @@ public class AudioPlayerActivity extends BaseFragment implements NotificationCen
                 }
                 durationTextView.setText(duration != 0 ? String.format("%d:%02d", duration / 60, duration % 60) : "-:--");
             }
+        }
+    }
+
+    private class SeekBarView extends FrameLayout {
+
+        public int thumbX = 0;
+        public int thumbDX = 0;
+        private Paint innerPaint1;
+        private Paint outerPaint1;
+        private int thumbWidth;
+        private int thumbHeight;
+        private boolean pressed = false;
+
+        public SeekBarView(Context context) {
+            super(context);
+            setWillNotDraw(false);
+            innerPaint1 = new Paint(Paint.ANTI_ALIAS_FLAG);
+            innerPaint1.setColor(0x19000000);
+
+            outerPaint1 = new Paint(Paint.ANTI_ALIAS_FLAG);
+            outerPaint1.setColor(0xff23afef);
+
+            thumbWidth = AndroidUtilities.dp(24);
+            thumbHeight = AndroidUtilities.dp(24);
+        }
+
+        @Override
+        public boolean onInterceptTouchEvent(MotionEvent ev) {
+            return onTouch(ev);
+        }
+
+        @Override
+        public boolean onTouchEvent(MotionEvent event) {
+            return onTouch(event);
+        }
+
+        boolean onTouch(MotionEvent ev) {
+            if (ev.getAction() == MotionEvent.ACTION_DOWN) {
+                getParent().requestDisallowInterceptTouchEvent(true);
+                int additionWidth = (getMeasuredHeight() - thumbWidth) / 2;
+                if (thumbX - additionWidth <= ev.getX() && ev.getX() <= thumbX + thumbWidth + additionWidth && ev.getY() >= 0 && ev.getY() <= getMeasuredHeight()) {
+                    pressed = true;
+                    thumbDX = (int) (ev.getX() - thumbX);
+                    invalidate();
+                    return true;
+                }
+            } else if (ev.getAction() == MotionEvent.ACTION_UP || ev.getAction() == MotionEvent.ACTION_CANCEL) {
+                if (pressed) {
+                    if (ev.getAction() == MotionEvent.ACTION_UP) {
+                        onSeekBarDrag((float) thumbX / (float) (getMeasuredWidth() - thumbWidth));
+                    }
+                    pressed = false;
+                    invalidate();
+                    return true;
+                }
+            } else if (ev.getAction() == MotionEvent.ACTION_MOVE) {
+                if (pressed) {
+                    thumbX = (int) (ev.getX() - thumbDX);
+                    if (thumbX < 0) {
+                        thumbX = 0;
+                    } else if (thumbX > getMeasuredWidth() - thumbWidth) {
+                        thumbX = getMeasuredWidth() - thumbWidth;
+                    }
+                    invalidate();
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        public void setProgress(float progress) {
+            int newThumbX = (int) Math.ceil((getMeasuredWidth() - thumbWidth) * progress);
+            if (thumbX != newThumbX) {
+                thumbX = newThumbX;
+                if (thumbX < 0) {
+                    thumbX = 0;
+                } else if (thumbX > getMeasuredWidth() - thumbWidth) {
+                    thumbX = getMeasuredWidth() - thumbWidth;
+                }
+                invalidate();
+            }
+        }
+
+        public boolean isDragging() {
+            return pressed;
+        }
+
+        @Override
+        protected void onDraw(Canvas canvas) {
+            int y = (getMeasuredHeight() - thumbHeight) / 2;
+            canvas.drawRect(thumbWidth / 2, getMeasuredHeight() / 2 - AndroidUtilities.dp(1), getMeasuredWidth() - thumbWidth / 2, getMeasuredHeight() / 2 + AndroidUtilities.dp(1), innerPaint1);
+            canvas.drawRect(thumbWidth / 2, getMeasuredHeight() / 2 - AndroidUtilities.dp(1), thumbWidth / 2 + thumbX, getMeasuredHeight() / 2 + AndroidUtilities.dp(1), outerPaint1);
+            canvas.drawCircle(thumbX + thumbWidth / 2, y + thumbHeight / 2, AndroidUtilities.dp(pressed ? 8 : 6), outerPaint1);
         }
     }
 }

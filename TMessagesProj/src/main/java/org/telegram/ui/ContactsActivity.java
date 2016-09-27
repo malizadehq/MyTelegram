@@ -14,7 +14,11 @@ import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.graphics.PorterDuff;
+import android.graphics.drawable.Drawable;
+import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 import android.text.Editable;
 import android.text.InputType;
@@ -36,28 +40,29 @@ import android.widget.Toast;
 
 import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.ApplicationLoader;
+import org.telegram.messenger.ContactsController;
+import org.telegram.messenger.FileLog;
 import org.telegram.messenger.LocaleController;
+import org.telegram.messenger.MessagesController;
 import org.telegram.messenger.MessagesStorage;
+import org.telegram.messenger.NotificationCenter;
+import org.telegram.messenger.R;
 import org.telegram.messenger.SecretChatHelper;
 import org.telegram.messenger.UserConfig;
 import org.telegram.messenger.UserObject;
-import org.telegram.tgnet.TLRPC;
-import org.telegram.messenger.ContactsController;
-import org.telegram.messenger.FileLog;
-import org.telegram.messenger.MessagesController;
-import org.telegram.messenger.NotificationCenter;
-import org.telegram.messenger.R;
 import org.telegram.messenger.Utilities;
-import org.telegram.ui.Adapters.BaseSectionsAdapter;
-import org.telegram.ui.Adapters.ContactsAdapter;
-import org.telegram.ui.Adapters.SearchAdapter;
-import org.telegram.ui.Cells.UserCell;
+import org.telegram.tgnet.TLRPC;
 import org.telegram.ui.ActionBar.ActionBar;
 import org.telegram.ui.ActionBar.ActionBarMenu;
 import org.telegram.ui.ActionBar.ActionBarMenuItem;
 import org.telegram.ui.ActionBar.BaseFragment;
+import org.telegram.ui.Adapters.BaseSectionsAdapter;
+import org.telegram.ui.Adapters.ContactsAdapter;
+import org.telegram.ui.Adapters.SearchAdapter;
+import org.telegram.ui.Cells.UserCell;
 import org.telegram.ui.Components.LayoutHelper;
 import org.telegram.ui.Components.LetterSectionsListView;
+import org.telegram.ui.Telehgram.DeleteContactActivity;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -68,7 +73,6 @@ public class ContactsActivity extends BaseFragment implements NotificationCenter
     private TextView emptyTextView;
     private LetterSectionsListView listView;
     private SearchAdapter searchListViewAdapter;
-
     private boolean searchWas;
     private boolean searching;
     private boolean onlyUsers;
@@ -84,10 +88,6 @@ public class ContactsActivity extends BaseFragment implements NotificationCenter
     private HashMap<Integer, TLRPC.User> ignoreUsers;
     private boolean allowUsernameSearch = true;
     private ContactsActivityDelegate delegate;
-
-    public interface ContactsActivityDelegate {
-        void didSelectContact(TLRPC.User user, String param);
-    }
 
     public ContactsActivity(Bundle args) {
         super(args);
@@ -130,13 +130,59 @@ public class ContactsActivity extends BaseFragment implements NotificationCenter
         delegate = null;
     }
 
+    private void updateTheme() {
+        SharedPreferences themePrefs = ApplicationLoader.applicationContext.getSharedPreferences(AndroidUtilities.THEME_PREFS, AndroidUtilities.THEME_PREFS_MODE);
+        int def = themePrefs.getInt("themeColor", AndroidUtilities.defColor);
+
+        int hColor = themePrefs.getInt("contactsHeaderColor", def);
+        actionBar.setBackgroundColor(hColor);
+        int val = themePrefs.getInt("contactsHeaderGradient", 0);
+        if (val > 0) {
+            GradientDrawable.Orientation go;
+            switch (val) {
+                case 2:
+                    go = GradientDrawable.Orientation.LEFT_RIGHT;
+                    break;
+                case 3:
+                    go = GradientDrawable.Orientation.TL_BR;
+                    break;
+                case 4:
+                    go = GradientDrawable.Orientation.BL_TR;
+                    break;
+                default:
+                    go = GradientDrawable.Orientation.TOP_BOTTOM;
+            }
+            int gradColor = themePrefs.getInt("contactsHeaderGradientColor", def);
+            int[] colors = new int[]{hColor, gradColor};
+            GradientDrawable gd = new GradientDrawable(go, colors);
+            actionBar.setBackgroundDrawable(gd);
+        }
+
+        actionBar.setTitleColor(themePrefs.getInt("contactsHeaderTitleColor", 0xffffffff));
+
+        Drawable search = getParentActivity().getResources().getDrawable(R.drawable.ic_ab_search);
+        search.setColorFilter(themePrefs.getInt("contactsHeaderIconsColor", 0xffffffff), PorterDuff.Mode.MULTIPLY);
+
+        //Drawable clear = getParentActivity().getResources().getDrawable(R.drawable.ic_close_white);
+        //clear.setColorFilter(AndroidUtilities.getIntDef("contactsHeaderIconsColor", 0xffffffff), PorterDuff.Mode.MULTIPLY);
+        //Drawable lock = getParentActivity().getResources().getDrawable(R.drawable.lock_close);
+        //lock.setColorFilter(themePrefs.getInt("contactsHeaderIconsColor", 0xffffffff), PorterDuff.Mode.MULTIPLY);
+        //lock = getParentActivity().getResources().getDrawable(R.drawable.lock_open);
+        //lock.setColorFilter(themePrefs.getInt("contactsHeaderIconsColor", 0xffffffff), PorterDuff.Mode.MULTIPLY);
+    }
+
     @Override
     public View createView(Context context) {
 
         searching = false;
         searchWas = false;
 
-        actionBar.setBackButtonImage(R.drawable.ic_ab_back);
+        SharedPreferences themePrefs = ApplicationLoader.applicationContext.getSharedPreferences(AndroidUtilities.THEME_PREFS, AndroidUtilities.THEME_PREFS_MODE);
+        int def = themePrefs.getInt("themeColor", AndroidUtilities.defColor);
+        int iconColor = themePrefs.getInt("chatsHeaderIconsColor", 0xffffffff);
+        Drawable back = getParentActivity().getResources().getDrawable(R.drawable.ic_ab_back);
+        if (back != null) back.setColorFilter(iconColor, PorterDuff.Mode.MULTIPLY);
+        actionBar.setBackButtonDrawable(back);
         actionBar.setAllowOverlayTitle(true);
         if (destroyAfterSelect) {
             if (returnAsResult) {
@@ -151,18 +197,28 @@ public class ContactsActivity extends BaseFragment implements NotificationCenter
         } else {
             actionBar.setTitle(LocaleController.getString("Contacts", R.string.Contacts));
         }
+        ActionBarMenu var5 = this.actionBar.createMenu();
+        if (!this.destroyAfterSelect) {
 
+            Drawable ic_delete = getParentActivity().getResources().getDrawable(R.drawable.ic_delete);
+            if (ic_delete != null) ic_delete.setColorFilter(iconColor, PorterDuff.Mode.MULTIPLY);
+            actionBar.setBackButtonDrawable(back);
+            var5.addItem(1, ic_delete);
+        }
         actionBar.setActionBarMenuOnItemClick(new ActionBar.ActionBarMenuOnItemClick() {
             @Override
             public void onItemClick(int id) {
                 if (id == -1) {
                     finishFragment();
+                } else if (id == 1) {
+                    ContactsActivity.this.presentFragment(new DeleteContactActivity());
                 }
             }
         });
-
+        Drawable ic_ab_search = getParentActivity().getResources().getDrawable(R.drawable.ic_ab_search);
+        if (ic_ab_search != ic_ab_search) back.setColorFilter(iconColor, PorterDuff.Mode.MULTIPLY);
         ActionBarMenu menu = actionBar.createMenu();
-        ActionBarMenuItem item = menu.addItem(0, R.drawable.ic_ab_search).setIsSearchField(true).setActionBarMenuItemSearchListener(new ActionBarMenuItem.ActionBarMenuItemSearchListener() {
+        ActionBarMenuItem item = menu.addItem(0, ic_ab_search).setIsSearchField(true).setActionBarMenuItemSearchListener(new ActionBarMenuItem.ActionBarMenuItemSearchListener() {
             @Override
             public void onSearchExpand() {
                 searching = true;
@@ -175,7 +231,9 @@ public class ContactsActivity extends BaseFragment implements NotificationCenter
                 searchWas = false;
                 listView.setAdapter(listViewAdapter);
                 listViewAdapter.notifyDataSetChanged();
-                listView.setFastScrollAlwaysVisible(true);
+                if (Build.VERSION.SDK_INT >= 11) {
+                    listView.setFastScrollAlwaysVisible(true);
+                }
                 listView.setFastScrollEnabled(true);
                 listView.setVerticalScrollBarEnabled(false);
                 emptyTextView.setText(LocaleController.getString("NoContacts", R.string.NoContacts));
@@ -192,7 +250,9 @@ public class ContactsActivity extends BaseFragment implements NotificationCenter
                     if (listView != null) {
                         listView.setAdapter(searchListViewAdapter);
                         searchListViewAdapter.notifyDataSetChanged();
-                        listView.setFastScrollAlwaysVisible(false);
+                        if (Build.VERSION.SDK_INT >= 11) {
+                            listView.setFastScrollAlwaysVisible(false);
+                        }
                         listView.setFastScrollEnabled(false);
                         listView.setVerticalScrollBarEnabled(true);
                     }
@@ -254,8 +314,10 @@ public class ContactsActivity extends BaseFragment implements NotificationCenter
         listView.setFastScrollEnabled(true);
         listView.setScrollBarStyle(View.SCROLLBARS_OUTSIDE_OVERLAY);
         listView.setAdapter(listViewAdapter);
-        listView.setFastScrollAlwaysVisible(true);
-        listView.setVerticalScrollbarPosition(LocaleController.isRTL ? ListView.SCROLLBAR_POSITION_LEFT : ListView.SCROLLBAR_POSITION_RIGHT);
+        if (Build.VERSION.SDK_INT >= 11) {
+            listView.setFastScrollAlwaysVisible(true);
+            listView.setVerticalScrollbarPosition(LocaleController.isRTL ? ListView.SCROLLBAR_POSITION_LEFT : ListView.SCROLLBAR_POSITION_RIGHT);
+        }
         ((FrameLayout) fragmentView).addView(listView);
         layoutParams = (FrameLayout.LayoutParams) listView.getLayoutParams();
         layoutParams.width = LayoutHelper.MATCH_PARENT;
@@ -440,6 +502,9 @@ public class ContactsActivity extends BaseFragment implements NotificationCenter
             if (!user.bot && needForwardCount) {
                 message = String.format("%s\n\n%s", message, LocaleController.getString("AddToTheGroupForwardCount", R.string.AddToTheGroupForwardCount));
                 editText = new EditText(getParentActivity());
+                if (Build.VERSION.SDK_INT < 11) {
+                    editText.setBackgroundResource(android.R.drawable.editbox_background_normal);
+                }
                 editText.setTextSize(18);
                 editText.setText("50");
                 editText.setGravity(Gravity.CENTER);
@@ -518,6 +583,8 @@ public class ContactsActivity extends BaseFragment implements NotificationCenter
         if (listViewAdapter != null) {
             listViewAdapter.notifyDataSetChanged();
         }
+        updateTheme();
+
     }
 
     @Override
@@ -535,13 +602,13 @@ public class ContactsActivity extends BaseFragment implements NotificationCenter
                 listViewAdapter.notifyDataSetChanged();
             }
         } else if (id == NotificationCenter.updateInterfaces) {
-            int mask = (Integer)args[0];
+            int mask = (Integer) args[0];
             if ((mask & MessagesController.UPDATE_MASK_AVATAR) != 0 || (mask & MessagesController.UPDATE_MASK_NAME) != 0 || (mask & MessagesController.UPDATE_MASK_STATUS) != 0) {
                 updateVisibleRows(mask);
             }
         } else if (id == NotificationCenter.encryptedChatCreated) {
             if (createSecretChat && creatingChat) {
-                TLRPC.EncryptedChat encryptedChat = (TLRPC.EncryptedChat)args[0];
+                TLRPC.EncryptedChat encryptedChat = (TLRPC.EncryptedChat) args[0];
                 Bundle args2 = new Bundle();
                 args2.putInt("enc_id", encryptedChat.id);
                 NotificationCenter.getInstance().postNotificationName(NotificationCenter.closeChats);
@@ -572,5 +639,9 @@ public class ContactsActivity extends BaseFragment implements NotificationCenter
 
     public void setIgnoreUsers(HashMap<Integer, TLRPC.User> users) {
         ignoreUsers = users;
+    }
+
+    public interface ContactsActivityDelegate {
+        void didSelectContact(TLRPC.User user, String param);
     }
 }

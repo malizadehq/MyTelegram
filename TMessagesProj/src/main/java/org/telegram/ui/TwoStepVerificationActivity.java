@@ -38,15 +38,15 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import org.telegram.messenger.AndroidUtilities;
+import org.telegram.messenger.FileLog;
 import org.telegram.messenger.LocaleController;
 import org.telegram.messenger.NotificationCenter;
-import org.telegram.messenger.FileLog;
 import org.telegram.messenger.R;
+import org.telegram.messenger.Utilities;
 import org.telegram.tgnet.ConnectionsManager;
 import org.telegram.tgnet.RequestDelegate;
 import org.telegram.tgnet.TLObject;
 import org.telegram.tgnet.TLRPC;
-import org.telegram.messenger.Utilities;
 import org.telegram.ui.ActionBar.ActionBar;
 import org.telegram.ui.ActionBar.ActionBarMenu;
 import org.telegram.ui.ActionBar.ActionBarMenuItem;
@@ -58,6 +58,7 @@ import org.telegram.ui.Components.LayoutHelper;
 
 public class TwoStepVerificationActivity extends BaseFragment implements NotificationCenter.NotificationCenterDelegate {
 
+    private final static int done_button = 1;
     private ListAdapter listAdapter;
     private ListView listView;
     private TextView titleTextView;
@@ -68,7 +69,6 @@ public class TwoStepVerificationActivity extends BaseFragment implements Notific
     private FrameLayout progressView;
     private ActionBarMenuItem doneItem;
     private ScrollView scrollView;
-
     private int type;
     private int passwordSetState;
     private String firstPassword;
@@ -82,7 +82,6 @@ public class TwoStepVerificationActivity extends BaseFragment implements Notific
     private boolean passwordEntered = true;
     private byte[] currentPasswordHash = new byte[0];
     private Runnable shortPollRunnable;
-
     private int setPasswordRow;
     private int setPasswordDetailRow;
     private int changePasswordRow;
@@ -95,8 +94,6 @@ public class TwoStepVerificationActivity extends BaseFragment implements Notific
     private int passwordEnabledDetailRow;
     private int passwordEmailVerifyDetailRow;
     private int rowCount;
-
-    private final static int done_button = 1;
 
     public TwoStepVerificationActivity(int type) {
         super();
