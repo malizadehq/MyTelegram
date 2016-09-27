@@ -11,9 +11,9 @@ import android.os.Build;
 import android.os.PowerManager;
 
 import org.telegram.messenger.AndroidUtilities;
+import org.telegram.messenger.ApplicationLoader;
 import org.telegram.messenger.BuildVars;
 import org.telegram.messenger.ContactsController;
-import org.telegram.messenger.ApplicationLoader;
 import org.telegram.messenger.FileLog;
 import org.telegram.messenger.MessagesController;
 import org.telegram.messenger.NotificationCenter;
@@ -52,7 +52,7 @@ public class ConnectionsManager {
     public final static int ConnectionStateUpdating = 4;
 
     public final static int DEFAULT_DATACENTER_ID = Integer.MAX_VALUE;
-
+    private static volatile ConnectionsManager Instance = null;
     private long lastPauseTime = System.currentTimeMillis();
     private boolean appPaused = true;
     private int lastClassGuid = 1;
@@ -61,7 +61,15 @@ public class ConnectionsManager {
     private AtomicInteger lastRequestToken = new AtomicInteger(1);
     private PowerManager.WakeLock wakeLock = null;
 
-    private static volatile ConnectionsManager Instance = null;
+    public ConnectionsManager() {
+        try {
+            PowerManager pm = (PowerManager) ApplicationLoader.applicationContext.getSystemService(Context.POWER_SERVICE);
+            wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "lock");
+            wakeLock.setReferenceCounted(false);
+        } catch (Exception e) {
+            FileLog.e("tmessages", e);
+        }
+    }
 
     public static ConnectionsManager getInstance() {
         ConnectionsManager localInstance = Instance;
@@ -76,14 +84,268 @@ public class ConnectionsManager {
         return localInstance;
     }
 
-    public ConnectionsManager() {
+    public static void onUnparsedMessageReceived(int address) {
         try {
-            PowerManager pm = (PowerManager) ApplicationLoader.applicationContext.getSystemService(Context.POWER_SERVICE);
-            wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "lock");
-            wakeLock.setReferenceCounted(false);
+            NativeByteBuffer buff = NativeByteBuffer.wrap(address);
+            buff.reused = true;
+            final TLObject message = TLClassStore.Instance().TLdeserialize(buff, buff.readInt32(true), true);
+            if (message instanceof TLRPC.Updates) {
+                FileLog.d("tmessages", "java received " + message);
+                AndroidUtilities.runOnUIThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        if (getInstance().wakeLock.isHeld()) {
+                            FileLog.d("tmessages", "release wakelock");
+                            getInstance().wakeLock.release();
+                        }
+                    }
+                });
+                Utilities.stageQueue.postRunnable(new Runnable() {
+                    @Override
+                    public void run() {
+                        MessagesController.getInstance().processUpdates((TLRPC.Updates) message, false);
+                    }
+                });
+            }
         } catch (Exception e) {
             FileLog.e("tmessages", e);
         }
+    }
+
+    public static void onUpdate() {
+        Utilities.stageQueue.postRunnable(new Runnable() {
+            @Override
+            public void run() {
+                MessagesController.getInstance().updateTimerProc();
+            }
+        });
+    }
+
+    public static void onSessionCreated() {
+        Utilities.stageQueue.postRunnable(new Runnable() {
+            @Override
+            public void run() {
+                MessagesController.getInstance().getDifference();
+            }
+        });
+    }
+
+    public static void onConnectionStateChanged(final int state) {
+        AndroidUtilities.runOnUIThread(new Runnable() {
+            @Override
+            public void run() {
+                getInstance().connectionState = state;
+                NotificationCenter.getInstance().postNotificationName(NotificationCenter.didUpdatedConnectionState);
+            }
+        });
+    }
+
+    public static void onLogout() {
+        AndroidUtilities.runOnUIThread(new Runnable() {
+            @Override
+            public void run() {
+                if (UserConfig.getClientUserId() != 0) {
+                    UserConfig.clearConfig();
+                    MessagesController.getInstance().performLogout(false);
+                }
+            }
+        });
+    }
+
+    public static void onUpdateConfig(int address) {
+        try {
+            NativeByteBuffer buff = NativeByteBuffer.wrap(address);
+            buff.reused = true;
+            final TLRPC.TL_config message = TLRPC.TL_config.TLdeserialize(buff, buff.readInt32(true), true);
+            if (message != null) {
+                Utilities.stageQueue.postRunnable(new Runnable() {
+                    @Override
+                    public void run() {
+                        MessagesController.getInstance().updateConfig(message);
+                    }
+                });
+            }
+        } catch (Exception e) {
+            FileLog.e("tmessages", e);
+        }
+    }
+
+    public static void onInternalPushReceived() {
+        AndroidUtilities.runOnUIThread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    if (!getInstance().wakeLock.isHeld()) {
+                        getInstance().wakeLock.acquire(10000);
+                        FileLog.d("tmessages", "acquire wakelock");
+                    }
+                } catch (Exception e) {
+                    FileLog.e("tmessages", e);
+                }
+            }
+        });
+    }
+
+    public static native void native_switchBackend();
+
+    public static native void native_pauseNetwork();
+
+    public static native void native_setUseIpv6(boolean value);
+
+    public static native void native_updateDcSettings();
+
+    public static native void native_setNetworkAvailable(boolean value);
+
+    public static native void native_resumeNetwork(boolean partial);
+
+    public static native long native_getCurrentTimeMillis();
+
+    public static native int native_getCurrentTime();
+
+    public static native int native_getTimeDifference();
+
+    public static native void native_sendRequest(int object, RequestDelegateInternal onComplete, QuickAckDelegate onQuickAck, int flags, int datacenterId, int connetionType, boolean immediate, int requestToken);
+
+    public static native void native_cancelRequest(int token, boolean notifyServer);
+
+    public static native void native_cleanUp();
+
+    public static native void native_cancelRequestsForGuid(int guid);
+
+    public static native void native_bindRequestToGuid(int requestToken, int guid);
+
+    public static native void native_applyDatacenterAddress(int datacenterId, String ipAddress, int port);
+
+    public static native int native_getConnectionState();
+
+    public static native void native_setUserId(int id);
+
+    public static native void native_init(int version, int layer, int apiId, String deviceModel, String systemVersion, String appVersion, String langCode, String configPath, String logPath, int userId, boolean enablePushConnection);
+
+    public static native void native_setJava(boolean useJavaByteBuffers);
+
+    public static native void native_setPushConnectionEnabled(boolean value);
+
+    public static boolean isRoaming() {
+        try {
+            ConnectivityManager cm = (ConnectivityManager) ApplicationLoader.applicationContext.getSystemService(Context.CONNECTIVITY_SERVICE);
+            NetworkInfo netInfo = cm.getActiveNetworkInfo();
+            if (netInfo != null) {
+                return netInfo.isRoaming();
+            }
+        } catch (Exception e) {
+            FileLog.e("tmessages", e);
+        }
+        return false;
+    }
+
+    public static boolean isConnectedToWiFi() {
+        try {
+            ConnectivityManager cm = (ConnectivityManager) ApplicationLoader.applicationContext.getSystemService(Context.CONNECTIVITY_SERVICE);
+            NetworkInfo netInfo = cm.getNetworkInfo(ConnectivityManager.TYPE_WIFI);
+            if (netInfo != null && netInfo.getState() == NetworkInfo.State.CONNECTED) {
+                return true;
+            }
+        } catch (Exception e) {
+            FileLog.e("tmessages", e);
+        }
+        return false;
+    }
+
+    @SuppressLint("NewApi")
+    protected static boolean useIpv6Address() {
+        if (Build.VERSION.SDK_INT < 19) {
+            return false;
+        }
+        if (BuildVars.DEBUG_VERSION) {
+            try {
+                NetworkInterface networkInterface;
+                Enumeration<NetworkInterface> networkInterfaces = NetworkInterface.getNetworkInterfaces();
+                while (networkInterfaces.hasMoreElements()) {
+                    networkInterface = networkInterfaces.nextElement();
+                    if (!networkInterface.isUp() || networkInterface.isLoopback() || networkInterface.getInterfaceAddresses().isEmpty()) {
+                        continue;
+                    }
+                    FileLog.e("tmessages", "valid interface: " + networkInterface);
+                    List<InterfaceAddress> interfaceAddresses = networkInterface.getInterfaceAddresses();
+                    for (int a = 0; a < interfaceAddresses.size(); a++) {
+                        InterfaceAddress address = interfaceAddresses.get(a);
+                        InetAddress inetAddress = address.getAddress();
+                        if (BuildVars.DEBUG_VERSION) {
+                            FileLog.e("tmessages", "address: " + inetAddress.getHostAddress());
+                        }
+                        if (inetAddress.isLinkLocalAddress() || inetAddress.isLoopbackAddress() || inetAddress.isMulticastAddress()) {
+                            continue;
+                        }
+                        if (BuildVars.DEBUG_VERSION) {
+                            FileLog.e("tmessages", "address is good");
+                        }
+                    }
+                }
+            } catch (Throwable e) {
+                FileLog.e("tmessages", e);
+            }
+        }
+        try {
+            NetworkInterface networkInterface;
+            Enumeration<NetworkInterface> networkInterfaces = NetworkInterface.getNetworkInterfaces();
+            boolean hasIpv4 = false;
+            boolean hasIpv6 = false;
+            while (networkInterfaces.hasMoreElements()) {
+                networkInterface = networkInterfaces.nextElement();
+                if (!networkInterface.isUp() || networkInterface.isLoopback()) {
+                    continue;
+                }
+                List<InterfaceAddress> interfaceAddresses = networkInterface.getInterfaceAddresses();
+                for (int a = 0; a < interfaceAddresses.size(); a++) {
+                    InterfaceAddress address = interfaceAddresses.get(a);
+                    InetAddress inetAddress = address.getAddress();
+                    if (inetAddress.isLinkLocalAddress() || inetAddress.isLoopbackAddress() || inetAddress.isMulticastAddress()) {
+                        continue;
+                    }
+                    if (inetAddress instanceof Inet6Address) {
+                        hasIpv6 = true;
+                    } else if (inetAddress instanceof Inet4Address) {
+                        String addrr = inetAddress.getHostAddress();
+                        if (!addrr.startsWith("192.0.0.")) {
+                            hasIpv4 = true;
+                        }
+                    }
+                }
+            }
+            if (!hasIpv4 && hasIpv6) {
+                return true;
+            }
+        } catch (Throwable e) {
+            FileLog.e("tmessages", e);
+        }
+
+        return false;
+    }
+
+    public static boolean isNetworkOnline() {
+        try {
+            ConnectivityManager cm = (ConnectivityManager) ApplicationLoader.applicationContext.getSystemService(Context.CONNECTIVITY_SERVICE);
+            NetworkInfo netInfo = cm.getActiveNetworkInfo();
+            if (netInfo != null && (netInfo.isConnectedOrConnecting() || netInfo.isAvailable())) {
+                return true;
+            }
+
+            netInfo = cm.getNetworkInfo(ConnectivityManager.TYPE_MOBILE);
+
+            if (netInfo != null && netInfo.isConnectedOrConnecting()) {
+                return true;
+            } else {
+                netInfo = cm.getNetworkInfo(ConnectivityManager.TYPE_WIFI);
+                if (netInfo != null && netInfo.isConnectedOrConnecting()) {
+                    return true;
+                }
+            }
+        } catch (Exception e) {
+            FileLog.e("tmessages", e);
+            return true;
+        }
+        return false;
     }
 
     public long getCurrentTimeMillis() {
@@ -258,157 +520,8 @@ public class ConnectionsManager {
         }
     }
 
-    public static void onUnparsedMessageReceived(int address) {
-        try {
-            NativeByteBuffer buff = NativeByteBuffer.wrap(address);
-            buff.reused = true;
-            final TLObject message = TLClassStore.Instance().TLdeserialize(buff, buff.readInt32(true), true);
-            if (message instanceof TLRPC.Updates) {
-                FileLog.d("tmessages", "java received " + message);
-                AndroidUtilities.runOnUIThread(new Runnable() {
-                    @Override
-                    public void run() {
-                        if (getInstance().wakeLock.isHeld()) {
-                            FileLog.d("tmessages", "release wakelock");
-                            getInstance().wakeLock.release();
-                        }
-                    }
-                });
-                Utilities.stageQueue.postRunnable(new Runnable() {
-                    @Override
-                    public void run() {
-                        MessagesController.getInstance().processUpdates((TLRPC.Updates) message, false);
-                    }
-                });
-            }
-        } catch (Exception e) {
-            FileLog.e("tmessages", e);
-        }
-    }
-
-    public static void onUpdate() {
-        Utilities.stageQueue.postRunnable(new Runnable() {
-            @Override
-            public void run() {
-                MessagesController.getInstance().updateTimerProc();
-            }
-        });
-    }
-
-    public static void onSessionCreated() {
-        Utilities.stageQueue.postRunnable(new Runnable() {
-            @Override
-            public void run() {
-                MessagesController.getInstance().getDifference();
-            }
-        });
-    }
-
-    public static void onConnectionStateChanged(final int state) {
-        AndroidUtilities.runOnUIThread(new Runnable() {
-            @Override
-            public void run() {
-                getInstance().connectionState = state;
-                NotificationCenter.getInstance().postNotificationName(NotificationCenter.didUpdatedConnectionState);
-            }
-        });
-    }
-
-    public static void onLogout() {
-        AndroidUtilities.runOnUIThread(new Runnable() {
-            @Override
-            public void run() {
-                if (UserConfig.getClientUserId() != 0) {
-                    UserConfig.clearConfig();
-                    MessagesController.getInstance().performLogout(false);
-                }
-            }
-        });
-    }
-
-    public static void onUpdateConfig(int address) {
-        try {
-            NativeByteBuffer buff = NativeByteBuffer.wrap(address);
-            buff.reused = true;
-            final TLRPC.TL_config message = TLRPC.TL_config.TLdeserialize(buff, buff.readInt32(true), true);
-            if (message != null) {
-                Utilities.stageQueue.postRunnable(new Runnable() {
-                    @Override
-                    public void run() {
-                        MessagesController.getInstance().updateConfig(message);
-                    }
-                });
-            }
-        } catch (Exception e) {
-            FileLog.e("tmessages", e);
-        }
-    }
-
-    public static void onInternalPushReceived() {
-        AndroidUtilities.runOnUIThread(new Runnable() {
-            @Override
-            public void run() {
-                try {
-                    if (!getInstance().wakeLock.isHeld()) {
-                        getInstance().wakeLock.acquire(10000);
-                        FileLog.d("tmessages", "acquire wakelock");
-                    }
-                } catch (Exception e) {
-                    FileLog.e("tmessages", e);
-                }
-            }
-        });
-    }
-
-    public static native void native_switchBackend();
-    public static native void native_pauseNetwork();
-    public static native void native_setUseIpv6(boolean value);
-    public static native void native_updateDcSettings();
-    public static native void native_setNetworkAvailable(boolean value);
-    public static native void native_resumeNetwork(boolean partial);
-    public static native long native_getCurrentTimeMillis();
-    public static native int native_getCurrentTime();
-    public static native int native_getTimeDifference();
-    public static native void native_sendRequest(int object, RequestDelegateInternal onComplete, QuickAckDelegate onQuickAck, int flags, int datacenterId, int connetionType, boolean immediate, int requestToken);
-    public static native void native_cancelRequest(int token, boolean notifyServer);
-    public static native void native_cleanUp();
-    public static native void native_cancelRequestsForGuid(int guid);
-    public static native void native_bindRequestToGuid(int requestToken, int guid);
-    public static native void native_applyDatacenterAddress(int datacenterId, String ipAddress, int port);
-    public static native int native_getConnectionState();
-    public static native void native_setUserId(int id);
-    public static native void native_init(int version, int layer, int apiId, String deviceModel, String systemVersion, String appVersion, String langCode, String configPath, String logPath, int userId, boolean enablePushConnection);
-    public static native void native_setJava(boolean useJavaByteBuffers);
-    public static native void native_setPushConnectionEnabled(boolean value);
-
     public int generateClassGuid() {
         return lastClassGuid++;
-    }
-
-    public static boolean isRoaming() {
-        try {
-            ConnectivityManager cm = (ConnectivityManager) ApplicationLoader.applicationContext.getSystemService(Context.CONNECTIVITY_SERVICE);
-            NetworkInfo netInfo = cm.getActiveNetworkInfo();
-            if (netInfo != null) {
-                return netInfo.isRoaming();
-            }
-        } catch (Exception e) {
-            FileLog.e("tmessages", e);
-        }
-        return false;
-    }
-
-    public static boolean isConnectedToWiFi() {
-        try {
-            ConnectivityManager cm = (ConnectivityManager) ApplicationLoader.applicationContext.getSystemService(Context.CONNECTIVITY_SERVICE);
-            NetworkInfo netInfo = cm.getNetworkInfo(ConnectivityManager.TYPE_WIFI);
-            if (netInfo != null && netInfo.getState() == NetworkInfo.State.CONNECTED) {
-                return true;
-            }
-        } catch (Exception e) {
-            FileLog.e("tmessages", e);
-        }
-        return false;
     }
 
     public void applyCountryPortNumber(String number) {
@@ -428,101 +541,5 @@ public class ConnectionsManager {
                 }
             }
         });
-    }
-
-    @SuppressLint("NewApi")
-    protected static boolean useIpv6Address() {
-        if (Build.VERSION.SDK_INT < 19) {
-            return false;
-        }
-        if (BuildVars.DEBUG_VERSION) {
-            try {
-                NetworkInterface networkInterface;
-                Enumeration<NetworkInterface> networkInterfaces = NetworkInterface.getNetworkInterfaces();
-                while (networkInterfaces.hasMoreElements()) {
-                    networkInterface = networkInterfaces.nextElement();
-                    if (!networkInterface.isUp() || networkInterface.isLoopback() || networkInterface.getInterfaceAddresses().isEmpty()) {
-                        continue;
-                    }
-                    FileLog.e("tmessages", "valid interface: " + networkInterface);
-                    List<InterfaceAddress> interfaceAddresses = networkInterface.getInterfaceAddresses();
-                    for (int a = 0; a < interfaceAddresses.size(); a++) {
-                        InterfaceAddress address = interfaceAddresses.get(a);
-                        InetAddress inetAddress = address.getAddress();
-                        if (BuildVars.DEBUG_VERSION) {
-                            FileLog.e("tmessages", "address: " + inetAddress.getHostAddress());
-                        }
-                        if (inetAddress.isLinkLocalAddress() || inetAddress.isLoopbackAddress() || inetAddress.isMulticastAddress()) {
-                            continue;
-                        }
-                        if (BuildVars.DEBUG_VERSION) {
-                            FileLog.e("tmessages", "address is good");
-                        }
-                    }
-                }
-            } catch (Throwable e) {
-                FileLog.e("tmessages", e);
-            }
-        }
-        try {
-            NetworkInterface networkInterface;
-            Enumeration<NetworkInterface> networkInterfaces = NetworkInterface.getNetworkInterfaces();
-            boolean hasIpv4 = false;
-            boolean hasIpv6 = false;
-            while (networkInterfaces.hasMoreElements()) {
-                networkInterface = networkInterfaces.nextElement();
-                if (!networkInterface.isUp() || networkInterface.isLoopback()) {
-                    continue;
-                }
-                List<InterfaceAddress> interfaceAddresses = networkInterface.getInterfaceAddresses();
-                for (int a = 0; a < interfaceAddresses.size(); a++) {
-                    InterfaceAddress address = interfaceAddresses.get(a);
-                    InetAddress inetAddress = address.getAddress();
-                    if (inetAddress.isLinkLocalAddress() || inetAddress.isLoopbackAddress() || inetAddress.isMulticastAddress()) {
-                        continue;
-                    }
-                    if (inetAddress instanceof Inet6Address) {
-                        hasIpv6 = true;
-                    } else if (inetAddress instanceof Inet4Address) {
-                        String addrr = inetAddress.getHostAddress();
-                        if (!addrr.startsWith("192.0.0.")) {
-                            hasIpv4 = true;
-                        }
-                    }
-                }
-            }
-            if (!hasIpv4 && hasIpv6) {
-                return true;
-            }
-        } catch (Throwable e) {
-            FileLog.e("tmessages", e);
-        }
-
-        return false;
-    }
-
-    public static boolean isNetworkOnline() {
-        try {
-            ConnectivityManager cm = (ConnectivityManager) ApplicationLoader.applicationContext.getSystemService(Context.CONNECTIVITY_SERVICE);
-            NetworkInfo netInfo = cm.getActiveNetworkInfo();
-            if (netInfo != null && (netInfo.isConnectedOrConnecting() || netInfo.isAvailable())) {
-                return true;
-            }
-
-            netInfo = cm.getNetworkInfo(ConnectivityManager.TYPE_MOBILE);
-
-            if (netInfo != null && netInfo.isConnectedOrConnecting()) {
-                return true;
-            } else {
-                netInfo = cm.getNetworkInfo(ConnectivityManager.TYPE_WIFI);
-                if (netInfo != null && netInfo.isConnectedOrConnecting()) {
-                    return true;
-                }
-            }
-        } catch (Exception e) {
-            FileLog.e("tmessages", e);
-            return true;
-        }
-        return false;
     }
 }

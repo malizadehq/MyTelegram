@@ -13,6 +13,7 @@ import org.telegram.messenger.FileLog;
 import java.util.HashMap;
 
 public class TLClassStore {
+    static TLClassStore store = null;
     private HashMap<Integer, Class> classStore;
 
     public TLClassStore() {
@@ -39,8 +40,6 @@ public class TLClassStore {
         classStore.put(TLRPC.TL_updateShortSentMessage.constructor, TLRPC.TL_updateShortSentMessage.class);
         classStore.put(TLRPC.TL_updatesTooLong.constructor, TLRPC.TL_updatesTooLong.class);
     }
-
-    static TLClassStore store = null;
 
     public static TLClassStore Instance() {
         if (store == null) {

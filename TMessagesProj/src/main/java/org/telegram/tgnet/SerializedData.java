@@ -52,6 +52,17 @@ public class SerializedData extends AbstractSerializedData {
         len = 0;
     }
 
+    public SerializedData(File file) throws Exception {
+        FileInputStream is = new FileInputStream(file);
+        byte[] data = new byte[(int) file.length()];
+        new DataInputStream(is).readFully(data);
+        is.close();
+
+        isOut = false;
+        inbuf = new ByteArrayInputStream(data);
+        in = new DataInputStream(inbuf);
+    }
+
     public void cleanup() {
         try {
             if (inbuf != null) {
@@ -87,17 +98,6 @@ public class SerializedData extends AbstractSerializedData {
         }
     }
 
-    public SerializedData(File file) throws Exception {
-        FileInputStream is = new FileInputStream(file);
-        byte[] data = new byte[(int)file.length()];
-        new DataInputStream(is).readFully(data);
-        is.close();
-
-        isOut = false;
-        inbuf = new ByteArrayInputStream(data);
-        in = new DataInputStream(inbuf);
-    }
-
     public void writeInt32(int x) {
         if (!justCalc) {
             writeInt32(x, out);
@@ -108,10 +108,10 @@ public class SerializedData extends AbstractSerializedData {
 
     private void writeInt32(int x, DataOutputStream out) {
         try {
-            for(int i = 0; i < 4; i++) {
+            for (int i = 0; i < 4; i++) {
                 out.write(x >> (i * 8));
             }
-        } catch(Exception e) {
+        } catch (Exception e) {
             FileLog.e("tmessages", "write int32 error");
         }
     }
@@ -126,10 +126,10 @@ public class SerializedData extends AbstractSerializedData {
 
     private void writeInt64(long x, DataOutputStream out) {
         try {
-            for(int i = 0; i < 8; i++) {
-                out.write((int)(x >> (i * 8)));
+            for (int i = 0; i < 8; i++) {
+                out.write((int) (x >> (i * 8)));
             }
-        } catch(Exception e) {
+        } catch (Exception e) {
             FileLog.e("tmessages", "write int64 error");
         }
     }
@@ -218,7 +218,7 @@ public class SerializedData extends AbstractSerializedData {
                 len += b.length;
             }
             int i = b.length <= 253 ? 1 : 4;
-            while((b.length + i) % 4 != 0) {
+            while ((b.length + i) % 4 != 0) {
                 if (!justCalc) {
                     out.write(0);
                 } else {
@@ -234,14 +234,14 @@ public class SerializedData extends AbstractSerializedData {
     public void writeString(String s) {
         try {
             writeByteArray(s.getBytes("UTF-8"));
-        } catch(Exception e) {
+        } catch (Exception e) {
             FileLog.e("tmessages", "write string error");
         }
     }
 
     public void writeByteArray(byte[] b, int offset, int count) {
         try {
-            if(count <= 253) {
+            if (count <= 253) {
                 if (!justCalc) {
                     out.write(count);
                 } else {
@@ -279,7 +279,7 @@ public class SerializedData extends AbstractSerializedData {
     public void writeDouble(double d) {
         try {
             writeInt64(Double.doubleToRawLongBits(d));
-        } catch(Exception e) {
+        } catch (Exception e) {
             FileLog.e("tmessages", "write double error");
         }
     }
@@ -361,7 +361,7 @@ public class SerializedData extends AbstractSerializedData {
             int sl = 1;
             int l = in.read();
             len++;
-            if(l >= 254) {
+            if (l >= 254) {
                 l = in.read() | (in.read() << 8) | (in.read() << 16);
                 len += 3;
                 sl = 4;
@@ -369,8 +369,8 @@ public class SerializedData extends AbstractSerializedData {
             byte[] b = new byte[l];
             in.read(b);
             len++;
-            int i=sl;
-            while((l + i) % 4 != 0) {
+            int i = sl;
+            while ((l + i) % 4 != 0) {
                 in.read();
                 len++;
                 i++;
@@ -400,7 +400,7 @@ public class SerializedData extends AbstractSerializedData {
             in.read(b);
             len++;
             int i = sl;
-            while((l + i) % 4 != 0) {
+            while ((l + i) % 4 != 0) {
                 in.read();
                 len++;
                 i++;
@@ -419,7 +419,7 @@ public class SerializedData extends AbstractSerializedData {
     public double readDouble(boolean exception) {
         try {
             return Double.longBitsToDouble(readInt64(exception));
-        } catch(Exception e) {
+        } catch (Exception e) {
             if (exception) {
                 throw new RuntimeException("read double error", e);
             } else {
@@ -432,12 +432,12 @@ public class SerializedData extends AbstractSerializedData {
     public int readInt32(boolean exception) {
         try {
             int i = 0;
-            for(int j = 0; j < 4; j++) {
+            for (int j = 0; j < 4; j++) {
                 i |= (in.read() << (j * 8));
                 len++;
             }
             return i;
-        } catch(Exception e) {
+        } catch (Exception e) {
             if (exception) {
                 throw new RuntimeException("read int32 error", e);
             } else {
@@ -450,8 +450,8 @@ public class SerializedData extends AbstractSerializedData {
     public long readInt64(boolean exception) {
         try {
             long i = 0;
-            for(int j = 0; j < 8; j++) {
-                i |= ((long)in.read() << (j * 8));
+            for (int j = 0; j < 8; j++) {
+                i |= ((long) in.read() << (j * 8));
                 len++;
             }
             return i;
