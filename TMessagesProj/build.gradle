@@ -5,53 +5,69 @@ repositories {
 }
 
 dependencies {
-    compile 'com.android.support:support-v4:23.4.0'
+    compile files('libs/eventbus-2.0.1.jar')
+    compile files('libs/android-async.jar')
+    compile files('libs/adad-client-3.1.jar')
+    compile 'com.onesignal:OneSignal:3.+@aar'
+    compile 'com.koushikdutta.ion:ion:2.1.8'
+    compile 'net.hockeyapp.android:HockeySDK:4.0.+'
+    compile 'com.googlecode.mp4parser:isoparser:1.0.+'
+    compile 'com.github.rey5137:material:1.2.2'
+    compile 'com.wdullaer:materialdatetimepicker:2.3.0'
+    compile 'com.android.support:multidex:1.0.1'
     compile "com.google.android.gms:play-services-gcm:8.4.0"
-    compile "com.google.android.gms:play-services-maps:8.4.0"
-    compile 'net.hockeyapp.android:HockeySDK:4.0.1'
-    compile 'com.googlecode.mp4parser:isoparser:1.0.6'
+    compile 'com.google.android.gms:play-services-location:8.4.0'
+    compile 'com.google.android.gms:play-services-maps:8.4.0'
+    compile 'com.google.android.gms:play-services-analytics:8.4.0'
+    compile 'com.squareup.retrofit2:retrofit:2.1.0'
+    compile 'com.squareup.retrofit2:converter-gson:2.1.0'
+    compile 'com.github.bumptech.glide:glide:3.7.0'
+    compile 'com.android.support:appcompat-v7:23.2.0'
+    compile 'com.android.support:cardview-v7:23.2.0'
+    compile 'com.android.support:recyclerview-v7:23.2.0'
+    compile 'com.android.support:design:23.2.0'
+    compile files('libs/android-query.0.26.8.jar')
+    compile files('libs/nineoldandroids-2.4.0.jar')
+    compile files('libs/universal-image-loader-1.9.3-with-sources.jar')
+    compile 'com.google.code.gson:gson:2.2.4'
 }
+
+def base64EncodedPublicKey
+def marketApplicationId
+def marketApplicationIdBilling
+def setmarketApplicationId
+def marketName
+def server
+def market
+def payload
+def helpUrl
 
 android {
     compileSdkVersion 23
-    buildToolsVersion '23.0.3'
+    buildToolsVersion '23.0.2'
 
     useLibrary 'org.apache.http.legacy'
-    defaultConfig.applicationId = "org.telegram.messenger"
-
+    defaultConfig.applicationId = "com.shaltouk.mytelegram"
+    lintOptions {
+        checkReleaseBuilds false
+        abortOnError false
+    }
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_1_7
         targetCompatibility JavaVersion.VERSION_1_7
-    }
-
-    signingConfigs {
-        debug {
-            storeFile file("config/release.keystore")
-            storePassword RELEASE_STORE_PASSWORD
-            keyAlias RELEASE_KEY_ALIAS
-            keyPassword RELEASE_KEY_PASSWORD
-        }
-
-        release {
-            storeFile file("config/release.keystore")
-            storePassword RELEASE_STORE_PASSWORD
-            keyAlias RELEASE_KEY_ALIAS
-            keyPassword RELEASE_KEY_PASSWORD
-        }
     }
 
     buildTypes {
         debug {
             debuggable true
             jniDebuggable true
-            signingConfig signingConfigs.debug
-            applicationIdSuffix ".beta"
+            applicationIdSuffix ""
         }
 
         release {
             debuggable false
             jniDebuggable false
-            signingConfig signingConfigs.release
+            shrinkResources true
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
@@ -59,15 +75,14 @@ android {
         foss {
             debuggable false
             jniDebuggable false
-            signingConfig signingConfigs.release
         }
     }
 
-    defaultConfig.versionCode = 821
+    defaultConfig.versionCode = 803
 
     sourceSets.main {
         jniLibs.srcDir 'libs'
-        jni.srcDirs = [] //disable automatic ndk-build call
+        jni.srcDirs = []
     }
 
     sourceSets.debug {
@@ -83,26 +98,65 @@ android {
     }
 
     productFlavors {
+
         x86 {
             ndk {
                 abiFilter "x86"
             }
+    
             versionCode = 2
         }
         arm {
             ndk {
                 abiFilter "armeabi"
             }
+            
             versionCode = 0
         }
-        armv7 {
+        armv7_bazaar {
             ndk {
                 abiFilter "armeabi-v7a"
             }
-            versionCode = 1
+
+          
+
+
+            versionCode = 17
+        }
+        armv7_myket {
+            ndk {
+                abiFilter "armeabi-v7a"
+            }
+          
+
+            versionCode = 17
+        }
+        armv7_iranapps {
+            ndk {
+                abiFilter "armeabi-v7a"
+            }
+           
+            versionCode = 8
+        }
+        armv7_avvalmarket {
+            ndk {
+                abiFilter "armeabi-v7a"
+            }
+            
+            versionCode = 14
+        }
+        armv7_GooglePlay {
+            ndk {
+                abiFilter "armeabi-v7a"
+            }
+           
+            versionCode = 8
         }
         fat {
-            versionCode = 3
+            versionCode = 11
+            base64EncodedPublicKey = ""
+ 
+
         }
     }
 
@@ -114,7 +168,12 @@ android {
     defaultConfig {
         minSdkVersion 14
         targetSdkVersion 23
-        versionName "3.10.1"
+        versionName "3.10.1.0"
+        multiDexEnabled = true
+
+    }
+    dexOptions {
+        javaMaxHeapSize "1g"
     }
 }
 
